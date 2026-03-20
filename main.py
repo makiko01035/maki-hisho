@@ -24,15 +24,14 @@ def get_calendar_service():
     from google.auth.transport.requests import Request
     creds_info = json.loads(os.environ['GOOGLE_CREDENTIALS'])
     creds = Credentials(
-        token=creds_info.get('token'),
+        token=None,
         refresh_token=creds_info.get('refresh_token'),
         token_uri='https://oauth2.googleapis.com/token',
         client_id=creds_info.get('client_id'),
         client_secret=creds_info.get('client_secret'),
         scopes=creds_info.get('scopes'),
     )
-    if not creds.valid:
-        creds.refresh(Request())
+    creds.refresh(Request())
     return build('calendar', 'v3', credentials=creds)
 
 
