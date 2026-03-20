@@ -38,6 +38,7 @@ def get_calendar_service():
 def get_upcoming_events(days=7):
     service = get_calendar_service()
     now = datetime.datetime.now(JST)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end = now + datetime.timedelta(days=days)
 
     calendars = service.calendarList().list().execute().get('items', [])
@@ -46,7 +47,7 @@ def get_upcoming_events(days=7):
         try:
             result = service.events().list(
                 calendarId=cal['id'],
-                timeMin=now.isoformat(),
+                timeMin=start.isoformat(),
                 timeMax=end.isoformat(),
                 maxResults=20,
                 singleEvents=True,
