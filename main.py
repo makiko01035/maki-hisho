@@ -103,6 +103,20 @@ def handle_message(event):
         )
         return
 
+    # カレンダー一覧を確認するコマンド
+    if user_message == 'カレンダー一覧':
+        try:
+            service = get_calendar_service()
+            calendars = service.calendarList().list().execute().get('items', [])
+            cal_list = '\n'.join([f"・{c.get('summary', '')} ({c.get('accessRole', '')})" for c in calendars])
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f'取得できているカレンダー:\n{cal_list}')
+            )
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f'エラー: {e}'))
+        return
+
     try:
         events = get_upcoming_events(days=14)
         events_text = format_events(events)
