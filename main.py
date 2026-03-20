@@ -92,8 +92,11 @@ def handle_message(event):
     try:
         events = get_upcoming_events(days=14)
         events_text = format_events(events)
-    except Exception:
-        events_text = "（カレンダー取得エラー）"
+    except Exception as e:
+        print(f"Calendar error: {e}")
+        import traceback
+        traceback.print_exc()
+        events_text = f"（カレンダー取得エラー: {str(e)[:100]}）"
 
     now_str = datetime.datetime.now(JST).strftime('%Y年%m月%d日 %H:%M')
 
