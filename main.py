@@ -21,6 +21,7 @@ JST = pytz.timezone('Asia/Tokyo')
 
 
 def get_calendar_service():
+    from google.auth.transport.requests import Request
     creds_info = json.loads(os.environ['GOOGLE_CREDENTIALS'])
     creds = Credentials(
         token=creds_info.get('token'),
@@ -30,6 +31,8 @@ def get_calendar_service():
         client_secret=creds_info.get('client_secret'),
         scopes=creds_info.get('scopes'),
     )
+    if not creds.valid:
+        creds.refresh(Request())
     return build('calendar', 'v3', credentials=creds)
 
 
@@ -77,6 +80,15 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
+    user_id = event.source.user_id
+
+    # ユーザーIDを確認するコマンド
+    if user_message == 'myid':
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=f'あなたのユーザーID:\n{user_id}')
+        )
+        return
 
     try:
         events = get_upcoming_events(days=14)
