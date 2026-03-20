@@ -97,6 +97,51 @@ def format_events(events):
     return '\n'.join(lines)
 
 
+def check_deadline_reminders():
+    """申込期限の前日・当日にLINE通知を送る"""
+    try:
+        service = get_calendar_service()
+        cal_id = get_or_create_maybe_calendar(service)
+        now = datetime.datetime.now(JST)
+        today = now.date()
+        tomorrow = today + datetime.timedelta(days=1)
+
+        # 今日〜明日の「気になるイベント」カレンダーを取得
+        start = datetime.datetime.combine(today, datetime.time.min).astimezone(JST)
+        end = datetime.datetime.combine(tomorrow, datetime.time.max).astimezone(JST)
+
+        result = service.events().list(
+            calendarId=cal_id,
+            timeMin=start.isoformat(),
+            timeMax=end.isoformat(),
+            maxResults=20,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+
+        deadline_events = [
+            e for e in result.get('items', [])
+            if '【申込期限】' in e.get('summary', '')
+        ]
+
+        if not deadline_events:
+            return
+
+        user_id = os.environ['LINE_USER_ID']
+        for e in deadline_events:
+            title = e['summary'].replace('【申込期限】', '').strip()
+            date_str = e['start'].get('date', '')
+            if date_str:
+                event_date = datetime.date.fromisoformat(date_str)
+                if event_date == today:
+                    msg = f"⚠️ 【申込期限 今日！】\n「{title}」の申し込み期限は今日です！\nまだ申し込んでいなければ急いでください！"
+                else:
+                    msg = f"📢 【申込期限 明日！】\n「{title}」の申し込み期限は明日です！\n忘れずに申し込んでください！"
+                line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"Deadline reminder error: {e}")
+
+
 @app.route('/callback', methods=['POST'])
 def callback():
     signature = request.headers['X-Line-Signature']
@@ -144,8 +189,10 @@ def handle_image(event):
   "start_time": "HH:MM",
   "end_time": "HH:MM",
   "location": "場所",
-  "description": "その他メモ"
-}"""
+  "description": "その他メモ",
+  "application_deadline": "YYYY-MM-DD"
+}
+application_deadlineは申込締切・申込期限・締切日などの日付です。ない場合はnullにしてください。"""
                     }
                 ]
             }]
@@ -165,6 +212,8 @@ def handle_image(event):
             msg += f"🕐 {time_str}\n"
         if extracted.get('location'):
             msg += f"📍 {extracted['location']}\n"
+        if extracted.get('application_deadline'):
+            msg += f"⚠️ 申込期限: {extracted['application_deadline']}\n"
         msg += "\n「登録して」と送ってくれたら保存します！"
 
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
@@ -211,6 +260,7 @@ def handle_message(event):
             service = get_calendar_service()
             cal_id = get_or_create_maybe_calendar(service)
 
+            # メインイベントを登録
             if extracted.get('date') and extracted.get('start_time'):
                 start_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['start_time']}:00")
                 start_dt = JST.localize(start_dt)
@@ -242,10 +292,24 @@ def handle_message(event):
                 return
 
             service.events().insert(calendarId=cal_id, body=event_body).execute()
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text=f"✅ 「気になるイベント」カレンダーに登録しました！\n\n📌 {extracted.get('title') or 'イベント'}")
-            )
+
+            # 申込期限があれば別イベントとして登録
+            deadline = extracted.get('application_deadline')
+            deadline_msg = ""
+            if deadline:
+                deadline_event = {
+                    'summary': f"【申込期限】{extracted.get('title') or 'イベント'}",
+                    'description': f"申込期限です。忘れずに！",
+                    'start': {'date': deadline},
+                    'end': {'date': deadline},
+                }
+                service.events().insert(calendarId=cal_id, body=deadline_event).execute()
+                deadline_msg = f"\n⚠️ 申込期限（{deadline}）も登録しました！\n前日と当日にLINEでお知らせします。"
+
+            reply = f"✅ 「気になるイベント」カレンダーに登録しました！\n\n📌 {extracted.get('title') or 'イベント'}"
+            reply += deadline_msg
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+
         except Exception as e:
             print(f"Calendar insert error: {e}")
             line_bot_api.reply_message(
@@ -326,6 +390,7 @@ def send_preparation_reminder():
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
+scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
 scheduler.start()
 
 if __name__ == '__main__':
