@@ -1,0 +1,154 @@
+import os
+import json
+import datetime
+import pytz
+from flask import Flask, request, abort
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from anthropic import Anthropic
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from apscheduler.schedulers.background import BackgroundScheduler
+
+app = Flask(__name__)
+
+line_bot_api = LineBotApi(os.environ['LINE_CHANNEL_ACCESS_TOKEN'])
+handler = WebhookHandler(os.environ['LINE_CHANNEL_SECRET'])
+anthropic_client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+
+JST = pytz.timezone('Asia/Tokyo')
+
+
+def get_calendar_service():
+    creds_info = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+    creds = Credentials(
+        token=creds_info.get('token'),
+        refresh_token=creds_info.get('refresh_token'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=creds_info.get('client_id'),
+        client_secret=creds_info.get('client_secret'),
+        scopes=creds_info.get('scopes'),
+    )
+    return build('calendar', 'v3', credentials=creds)
+
+
+def get_upcoming_events(days=7):
+    service = get_calendar_service()
+    now = datetime.datetime.now(JST)
+    end = now + datetime.timedelta(days=days)
+    events_result = service.events().list(
+        calendarId='primary',
+        timeMin=now.isoformat(),
+        timeMax=end.isoformat(),
+        maxResults=20,
+        singleEvents=True,
+        orderBy='startTime'
+    ).execute()
+    return events_result.get('items', [])
+
+
+def format_events(events):
+    if not events:
+        return "予定はありません。"
+    lines = []
+    for event in events:
+        start = event['start'].get('dateTime', event['start'].get('date'))
+        if 'T' in start:
+            dt = datetime.datetime.fromisoformat(start).astimezone(JST)
+            start_str = dt.strftime('%m/%d %H:%M')
+        else:
+            start_str = start
+        lines.append(f"・{start_str} {event['summary']}")
+    return '\n'.join(lines)
+
+
+@app.route('/callback', methods=['POST'])
+def callback():
+    signature = request.headers['X-Line-Signature']
+    body = request.get_data(as_text=True)
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        abort(400)
+    return 'OK'
+
+
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_message = event.message.text
+
+    try:
+        events = get_upcoming_events(days=14)
+        events_text = format_events(events)
+    except Exception:
+        events_text = "（カレンダー取得エラー）"
+
+    now_str = datetime.datetime.now(JST).strftime('%Y年%m月%d日 %H:%M')
+
+    response = anthropic_client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=1000,
+        system=f"""あなたはまきさんの個人秘書「まきの秘書」です。
+現在時刻: {now_str}
+
+【今後2週間の予定】
+{events_text}
+
+役割:
+- スケジュール確認・整理
+- やるべきことのリマインド
+- 事前準備が必要なことの提案
+- 親切で簡潔に日本語で返答する
+
+予定の追加・変更はGoogleカレンダーを直接操作するよう案内してください。""",
+        messages=[{'role': 'user', 'content': user_message}]
+    )
+
+    reply_text = response.content[0].text
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=reply_text)
+    )
+
+
+def send_morning_message():
+    try:
+        events = get_upcoming_events(days=1)
+        today_str = datetime.datetime.now(JST).strftime('%m月%d日')
+
+        if events:
+            msg = f"おはようございます！{today_str}の予定です😊\n\n"
+            msg += format_events(events)
+        else:
+            msg = f"おはようございます！{today_str}は予定がありません。\nゆっくり過ごせそうですね！"
+
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"Morning message error: {e}")
+
+
+def send_preparation_reminder():
+    try:
+        events = get_upcoming_events(days=3)
+        if not events:
+            return
+
+        user_id = os.environ['LINE_USER_ID']
+        msg = "【3日以内の予定】事前準備は大丈夫ですか？\n\n"
+        msg += format_events(events)
+        msg += "\n\n準備が必要なことがあれば教えてください！"
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"Preparation reminder error: {e}")
+
+
+scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
+scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
+scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
+scheduler.start()
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
