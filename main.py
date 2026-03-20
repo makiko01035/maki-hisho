@@ -1,11 +1,12 @@
 import os
 import json
+import base64
 import datetime
 import pytz
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageMessage
 from anthropic import Anthropic
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -18,6 +19,9 @@ handler = WebhookHandler(os.environ['LINE_CHANNEL_SECRET'])
 anthropic_client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
 
 JST = pytz.timezone('Asia/Tokyo')
+
+# 画像から抽出したイベント情報を一時保存（確認待ち）
+pending_events = {}
 
 
 def get_calendar_service():
@@ -33,6 +37,19 @@ def get_calendar_service():
     )
     creds.refresh(Request())
     return build('calendar', 'v3', credentials=creds)
+
+
+def get_or_create_maybe_calendar(service):
+    """「気になるイベント」カレンダーを取得または作成"""
+    calendars = service.calendarList().list().execute().get('items', [])
+    for cal in calendars:
+        if cal.get('summary') == '気になるイベント':
+            return cal['id']
+    new_cal = service.calendars().insert(body={
+        'summary': '気になるイベント',
+        'timeZone': 'Asia/Tokyo'
+    }).execute()
+    return new_cal['id']
 
 
 def get_upcoming_events(days=7):
@@ -91,6 +108,75 @@ def callback():
     return 'OK'
 
 
+@handler.add(MessageEvent, message=ImageMessage)
+def handle_image(event):
+    user_id = event.source.user_id
+    message_id = event.message.id
+
+    # LINEから画像をダウンロード
+    message_content = line_bot_api.get_message_content(message_id)
+    image_data = b''.join(chunk for chunk in message_content.iter_content())
+    image_base64 = base64.standard_b64encode(image_data).decode('utf-8')
+
+    # Claudeで画像からイベント情報を抽出
+    try:
+        response = anthropic_client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=500,
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': 'image/jpeg',
+                            'data': image_base64
+                        }
+                    },
+                    {
+                        'type': 'text',
+                        'text': """このチラシやプリントからイベント情報を抽出してください。
+以下のJSON形式のみ返してください（情報がない場合はnullにしてください）：
+{
+  "title": "イベント名",
+  "date": "YYYY-MM-DD",
+  "start_time": "HH:MM",
+  "end_time": "HH:MM",
+  "location": "場所",
+  "description": "その他メモ"
+}"""
+                    }
+                ]
+            }]
+        )
+
+        extracted = json.loads(response.content[0].text.strip())
+        pending_events[user_id] = extracted
+
+        msg = "📋 読み取れました！「気になるイベント」に登録しますね\n\n"
+        msg += f"📌 {extracted.get('title') or '（タイトル不明）'}\n"
+        if extracted.get('date'):
+            msg += f"📅 {extracted['date']}\n"
+        if extracted.get('start_time'):
+            time_str = extracted['start_time']
+            if extracted.get('end_time'):
+                time_str += f"〜{extracted['end_time']}"
+            msg += f"🕐 {time_str}\n"
+        if extracted.get('location'):
+            msg += f"📍 {extracted['location']}\n"
+        msg += "\n「登録して」と送ってくれたら保存します！"
+
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+
+    except Exception as e:
+        print(f"Image extract error: {e}")
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="画像からイベント情報を読み取れませんでした😢\n別の角度や明るさで撮り直してみてください。")
+        )
+
+
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_message = event.message.text
@@ -116,6 +202,56 @@ def handle_message(event):
             )
         except Exception as e:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f'エラー: {e}'))
+        return
+
+    # 画像確認後の「登録して」コマンド
+    if user_message == '登録して' and user_id in pending_events:
+        extracted = pending_events.pop(user_id)
+        try:
+            service = get_calendar_service()
+            cal_id = get_or_create_maybe_calendar(service)
+
+            if extracted.get('date') and extracted.get('start_time'):
+                start_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['start_time']}:00")
+                start_dt = JST.localize(start_dt)
+                if extracted.get('end_time'):
+                    end_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['end_time']}:00")
+                    end_dt = JST.localize(end_dt)
+                else:
+                    end_dt = start_dt + datetime.timedelta(hours=1)
+                event_body = {
+                    'summary': extracted.get('title') or 'イベント',
+                    'location': extracted.get('location') or '',
+                    'description': extracted.get('description') or '',
+                    'start': {'dateTime': start_dt.isoformat(), 'timeZone': 'Asia/Tokyo'},
+                    'end': {'dateTime': end_dt.isoformat(), 'timeZone': 'Asia/Tokyo'},
+                }
+            elif extracted.get('date'):
+                event_body = {
+                    'summary': extracted.get('title') or 'イベント',
+                    'location': extracted.get('location') or '',
+                    'description': extracted.get('description') or '',
+                    'start': {'date': extracted['date']},
+                    'end': {'date': extracted['date']},
+                }
+            else:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text="日付が読み取れなかったので登録できませんでした😢\n日付を教えてもらえますか？")
+                )
+                return
+
+            service.events().insert(calendarId=cal_id, body=event_body).execute()
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f"✅ 「気になるイベント」カレンダーに登録しました！\n\n📌 {extracted.get('title') or 'イベント'}")
+            )
+        except Exception as e:
+            print(f"Calendar insert error: {e}")
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f"登録中にエラーが発生しました😢\n{str(e)[:100]}")
+            )
         return
 
     try:
