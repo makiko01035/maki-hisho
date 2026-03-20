@@ -387,10 +387,58 @@ def send_preparation_reminder():
         print(f"Preparation reminder error: {e}")
 
 
+def send_famm_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="📸 【Famm更新】今月のFammの更新をお忘れなく！\n期限は今月9日です。"
+        ))
+    except Exception as e:
+        print(f"Famm reminder error: {e}")
+
+
+def send_famm_deadline_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="⚠️ 【Famm期限まで3日！】\nFammの更新期限は9日です。まだの方はお早めに！"
+        ))
+    except Exception as e:
+        print(f"Famm deadline reminder error: {e}")
+
+
+def send_yakuzen_blog_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="✍️ 【薬膳ブログ更新日】\n今日は薬膳ブログの更新日です！"
+        ))
+    except Exception as e:
+        print(f"Yakuzen blog reminder error: {e}")
+
+
+def send_sekisui_blog_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="🏠 【セキスイブログ更新日】\n今日はセキスイハイムブログの更新日です！"
+        ))
+    except Exception as e:
+        print(f"Sekisui blog reminder error: {e}")
+
+
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
+# 毎月1日朝9時：Famm更新リマインダー
+scheduler.add_job(send_famm_reminder, 'cron', day=1, hour=9, minute=0)
+# 毎月6日朝9時：Famm期限3日前リマインダー
+scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
+# 毎週火曜朝9時：薬膳ブログ更新リマインダー
+scheduler.add_job(send_yakuzen_blog_reminder, 'cron', day_of_week='tue', hour=9, minute=0)
+# 毎週木曜朝9時：セキスイブログ更新リマインダー
+scheduler.add_job(send_sekisui_blog_reminder, 'cron', day_of_week='thu', hour=9, minute=0)
 scheduler.start()
 
 if __name__ == '__main__':
