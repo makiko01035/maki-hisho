@@ -175,7 +175,7 @@ def handle_image(event):
                         'type': 'image',
                         'source': {
                             'type': 'base64',
-                            'media_type': 'image/jpeg',
+                            'media_type': 'image/png',
                             'data': image_base64
                         }
                     },
@@ -198,7 +198,10 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
             }]
         )
 
-        extracted = json.loads(response.content[0].text.strip())
+        raw_text = response.content[0].text.strip()
+        import re
+        json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+        extracted = json.loads(json_match.group() if json_match else raw_text)
         pending_events[user_id] = extracted
 
         msg = "📋 読み取れました！「気になるイベント」に登録しますね\n\n"
