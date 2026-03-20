@@ -39,15 +39,27 @@ def get_upcoming_events(days=7):
     service = get_calendar_service()
     now = datetime.datetime.now(JST)
     end = now + datetime.timedelta(days=days)
-    events_result = service.events().list(
-        calendarId='primary',
-        timeMin=now.isoformat(),
-        timeMax=end.isoformat(),
-        maxResults=20,
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
-    return events_result.get('items', [])
+
+    calendars = service.calendarList().list().execute().get('items', [])
+    all_events = []
+    for cal in calendars:
+        try:
+            result = service.events().list(
+                calendarId=cal['id'],
+                timeMin=now.isoformat(),
+                timeMax=end.isoformat(),
+                maxResults=20,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+            for event in result.get('items', []):
+                event['_calendar_name'] = cal.get('summary', '')
+            all_events.extend(result.get('items', []))
+        except Exception:
+            pass
+
+    all_events.sort(key=lambda e: e['start'].get('dateTime', e['start'].get('date', '')))
+    return all_events
 
 
 def format_events(events):
@@ -61,7 +73,9 @@ def format_events(events):
             start_str = dt.strftime('%m/%d %H:%M')
         else:
             start_str = start
-        lines.append(f"・{start_str} {event['summary']}")
+        cal_name = event.get('_calendar_name', '')
+        cal_label = f"[{cal_name}] " if cal_name else ""
+        lines.append(f"・{start_str} {cal_label}{event['summary']}")
     return '\n'.join(lines)
 
 
