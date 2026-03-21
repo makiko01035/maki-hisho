@@ -213,9 +213,9 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
         )
 
         raw_text = response.content[0].text.strip()
-        import re
-        json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-        extracted = json.loads(json_match.group() if json_match else raw_text)
+        start = raw_text.find('{')
+        decoder = json.JSONDecoder()
+        extracted, _ = decoder.raw_decode(raw_text, start)
         pending_events[user_id] = extracted
 
         msg = "📋 読み取れました！「気になるイベント」に登録しますね\n\n"
