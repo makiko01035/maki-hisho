@@ -158,10 +158,16 @@ def handle_image(event):
     user_id = event.source.user_id
     message_id = event.message.id
 
-    # LINEから画像をダウンロード
-    message_content = line_bot_api.get_message_content(message_id)
-    image_data = b''.join(chunk for chunk in message_content.iter_content())
-    image_base64 = base64.standard_b64encode(image_data).decode('utf-8')
+    try:
+        # LINEから画像をダウンロード
+        message_content = line_bot_api.get_message_content(message_id)
+        image_data = b''.join(chunk for chunk in message_content.iter_content())
+        image_base64 = base64.standard_b64encode(image_data).decode('utf-8')
+    except Exception as e:
+        print(f"Image download error: {e}")
+        import traceback; traceback.print_exc()
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"画像の取得に失敗しました😢\nエラー: {str(e)[:100]}"))
+        return
 
     # Claudeで画像からイベント情報を抽出
     try:
@@ -223,9 +229,10 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
 
     except Exception as e:
         print(f"Image extract error: {e}")
+        import traceback; traceback.print_exc()
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="画像からイベント情報を読み取れませんでした😢\n別の角度や明るさで撮り直してみてください。")
+            TextSendMessage(text=f"画像の読み取りに失敗しました😢\nエラー: {str(e)[:150]}")
         )
 
 
