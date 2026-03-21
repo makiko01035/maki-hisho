@@ -181,7 +181,7 @@ def handle_image(event):
     try:
         response = anthropic_client.messages.create(
             model='claude-sonnet-4-6',
-            max_tokens=500,
+            max_tokens=2000,
             messages=[{
                 'role': 'user',
                 'content': [
