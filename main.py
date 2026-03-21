@@ -163,6 +163,14 @@ def handle_image(event):
         message_content = line_bot_api.get_message_content(message_id)
         image_data = b''.join(chunk for chunk in message_content.iter_content())
         image_base64 = base64.standard_b64encode(image_data).decode('utf-8')
+        if image_data[:4] == b'\x89PNG':
+            media_type = 'image/png'
+        elif image_data[:4] == b'RIFF':
+            media_type = 'image/webp'
+        elif image_data[:6] in (b'GIF87a', b'GIF89a'):
+            media_type = 'image/gif'
+        else:
+            media_type = 'image/jpeg'
     except Exception as e:
         print(f"Image download error: {e}")
         import traceback; traceback.print_exc()
@@ -181,7 +189,7 @@ def handle_image(event):
                         'type': 'image',
                         'source': {
                             'type': 'base64',
-                            'media_type': 'image/png',
+                            'media_type': media_type,
                             'data': image_base64
                         }
                     },
