@@ -195,43 +195,51 @@ def handle_image(event):
                     },
                     {
                         'type': 'text',
-                        'text': """このチラシやプリントからイベント情報を抽出してください。
-以下のJSON形式のみ返してください（情報がない場合はnullにしてください）：
-{
-  "title": "イベント名",
-  "date": "YYYY-MM-DD",
-  "start_time": "HH:MM",
-  "end_time": "HH:MM",
-  "location": "場所",
-  "description": "その他メモ",
-  "application_deadline": "YYYY-MM-DD"
-}
-application_deadlineは申込締切・申込期限・締切日などの日付です。ない場合はnullにしてください。"""
+                        'text': """このチラシやプリントから全てのイベント・日程情報を抽出してください。
+複数の日程がある場合は全て抽出してください。
+以下のJSON配列形式のみ返してください（情報がない場合はnullにしてください）：
+[
+  {
+    "title": "イベント名",
+    "date": "YYYY-MM-DD",
+    "start_time": "HH:MM",
+    "end_time": "HH:MM",
+    "location": "場所",
+    "description": "その他メモ",
+    "application_deadline": "YYYY-MM-DD"
+  }
+]
+application_deadlineは申込締切・申込期限・締切日などの日付です。ない場合はnullにしてください。
+必ずJSON配列（[...]）で返してください。"""
                     }
                 ]
             }]
         )
 
         raw_text = response.content[0].text.strip()
-        start = raw_text.find('{')
+        start = raw_text.find('[')
         decoder = json.JSONDecoder()
-        extracted, _ = decoder.raw_decode(raw_text, start)
-        pending_events[user_id] = extracted
+        extracted_list, _ = decoder.raw_decode(raw_text, start)
+        if isinstance(extracted_list, dict):
+            extracted_list = [extracted_list]
+        pending_events[user_id] = extracted_list
 
-        msg = "📋 読み取れました！「気になるイベント」に登録しますね\n\n"
-        msg += f"📌 {extracted.get('title') or '（タイトル不明）'}\n"
-        if extracted.get('date'):
-            msg += f"📅 {extracted['date']}\n"
-        if extracted.get('start_time'):
-            time_str = extracted['start_time']
-            if extracted.get('end_time'):
-                time_str += f"〜{extracted['end_time']}"
-            msg += f"🕐 {time_str}\n"
-        if extracted.get('location'):
-            msg += f"📍 {extracted['location']}\n"
-        if extracted.get('application_deadline'):
-            msg += f"⚠️ 申込期限: {extracted['application_deadline']}\n"
-        msg += "\n「登録して」と送ってくれたら保存します！"
+        msg = f"📋 {len(extracted_list)}件読み取れました！\n\n"
+        for i, ev in enumerate(extracted_list, 1):
+            msg += f"【{i}】📌 {ev.get('title') or '（タイトル不明）'}\n"
+            if ev.get('date'):
+                msg += f"　📅 {ev['date']}\n"
+            if ev.get('start_time'):
+                time_str = ev['start_time']
+                if ev.get('end_time'):
+                    time_str += f"〜{ev['end_time']}"
+                msg += f"　🕐 {time_str}\n"
+            if ev.get('location'):
+                msg += f"　📍 {ev['location']}\n"
+            if ev.get('application_deadline'):
+                msg += f"　⚠️ 申込期限: {ev['application_deadline']}\n"
+            msg += "\n"
+        msg += "「登録して」と送ってくれたら全て保存します！"
 
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
 
@@ -273,59 +281,59 @@ def handle_message(event):
 
     # 画像確認後の「登録して」コマンド
     if user_message == '登録して' and user_id in pending_events:
-        extracted = pending_events.pop(user_id)
+        extracted_list = pending_events.pop(user_id)
         try:
             service = get_calendar_service()
             cal_id = get_or_create_maybe_calendar(service)
+            registered = []
+            deadline_count = 0
 
-            # メインイベントを登録
-            if extracted.get('date') and extracted.get('start_time'):
-                start_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['start_time']}:00")
-                start_dt = JST.localize(start_dt)
-                if extracted.get('end_time'):
-                    end_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['end_time']}:00")
-                    end_dt = JST.localize(end_dt)
+            for extracted in extracted_list:
+                if extracted.get('date') and extracted.get('start_time'):
+                    start_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['start_time']}:00")
+                    start_dt = JST.localize(start_dt)
+                    if extracted.get('end_time'):
+                        end_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['end_time']}:00")
+                        end_dt = JST.localize(end_dt)
+                    else:
+                        end_dt = start_dt + datetime.timedelta(hours=1)
+                    event_body = {
+                        'summary': extracted.get('title') or 'イベント',
+                        'location': extracted.get('location') or '',
+                        'description': extracted.get('description') or '',
+                        'start': {'dateTime': start_dt.isoformat(), 'timeZone': 'Asia/Tokyo'},
+                        'end': {'dateTime': end_dt.isoformat(), 'timeZone': 'Asia/Tokyo'},
+                    }
+                elif extracted.get('date'):
+                    event_body = {
+                        'summary': extracted.get('title') or 'イベント',
+                        'location': extracted.get('location') or '',
+                        'description': extracted.get('description') or '',
+                        'start': {'date': extracted['date']},
+                        'end': {'date': extracted['date']},
+                    }
                 else:
-                    end_dt = start_dt + datetime.timedelta(hours=1)
-                event_body = {
-                    'summary': extracted.get('title') or 'イベント',
-                    'location': extracted.get('location') or '',
-                    'description': extracted.get('description') or '',
-                    'start': {'dateTime': start_dt.isoformat(), 'timeZone': 'Asia/Tokyo'},
-                    'end': {'dateTime': end_dt.isoformat(), 'timeZone': 'Asia/Tokyo'},
-                }
-            elif extracted.get('date'):
-                event_body = {
-                    'summary': extracted.get('title') or 'イベント',
-                    'location': extracted.get('location') or '',
-                    'description': extracted.get('description') or '',
-                    'start': {'date': extracted['date']},
-                    'end': {'date': extracted['date']},
-                }
-            else:
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    TextSendMessage(text="日付が読み取れなかったので登録できませんでした😢\n日付を教えてもらえますか？")
-                )
-                return
+                    continue
 
-            service.events().insert(calendarId=cal_id, body=event_body).execute()
+                service.events().insert(calendarId=cal_id, body=event_body).execute()
+                registered.append(extracted.get('title') or 'イベント')
 
-            # 申込期限があれば別イベントとして登録
-            deadline = extracted.get('application_deadline')
-            deadline_msg = ""
-            if deadline:
-                deadline_event = {
-                    'summary': f"【申込期限】{extracted.get('title') or 'イベント'}",
-                    'description': f"申込期限です。忘れずに！",
-                    'start': {'date': deadline},
-                    'end': {'date': deadline},
-                }
-                service.events().insert(calendarId=cal_id, body=deadline_event).execute()
-                deadline_msg = f"\n⚠️ 申込期限（{deadline}）も登録しました！\n前日と当日にLINEでお知らせします。"
+                deadline = extracted.get('application_deadline')
+                if deadline:
+                    deadline_event = {
+                        'summary': f"【申込期限】{extracted.get('title') or 'イベント'}",
+                        'description': '申込期限です。忘れずに！',
+                        'start': {'date': deadline},
+                        'end': {'date': deadline},
+                    }
+                    service.events().insert(calendarId=cal_id, body=deadline_event).execute()
+                    deadline_count += 1
 
-            reply = f"✅ 「気になるイベント」カレンダーに登録しました！\n\n📌 {extracted.get('title') or 'イベント'}"
-            reply += deadline_msg
+            reply = f"✅ {len(registered)}件を「気になるイベント」に登録しました！\n\n"
+            for title in registered:
+                reply += f"📌 {title}\n"
+            if deadline_count:
+                reply += f"\n⚠️ 申込期限{deadline_count}件も登録しました！前日と当日にお知らせします。"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
         except Exception as e:
