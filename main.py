@@ -20,8 +20,23 @@ anthropic_client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
 
 JST = pytz.timezone('Asia/Tokyo')
 
-# 画像から抽出したイベント情報を一時保存（確認待ち）
-pending_events = {}
+PENDING_FILE = '/tmp/pending_events.json'
+
+
+def load_pending_events():
+    try:
+        with open(PENDING_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_pending_events(data):
+    try:
+        with open(PENDING_FILE, 'w') as f:
+            json.dump(data, f)
+    except Exception as e:
+        print(f"pending_events save error: {e}")
 
 
 def get_calendar_service():
@@ -228,7 +243,9 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
         extracted_list, _ = decoder.raw_decode(raw_text, start)
         if isinstance(extracted_list, dict):
             extracted_list = [extracted_list]
+        pending_events = load_pending_events()
         pending_events[user_id] = extracted_list
+        save_pending_events(pending_events)
 
         msg = f"📋 {len(extracted_list)}件読み取れました！\n\n"
         for i, ev in enumerate(extracted_list, 1):
@@ -286,8 +303,10 @@ def handle_message(event):
         return
 
     # 画像確認後の「登録して」コマンド
+    pending_events = load_pending_events()
     if user_message == '登録して' and user_id in pending_events:
         extracted_list = pending_events.pop(user_id)
+        save_pending_events(pending_events)
         try:
             service = get_calendar_service()
             cal_id = get_or_create_maybe_calendar(service)
