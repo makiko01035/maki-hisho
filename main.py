@@ -152,6 +152,11 @@ def check_deadline_reminders():
         print(f"Deadline reminder error: {e}")
 
 
+@app.route('/ping')
+def ping():
+    return 'OK'
+
+
 @app.route('/trigger/morning', methods=['GET', 'POST'])
 def trigger_morning():
     send_morning_message()
