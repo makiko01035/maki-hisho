@@ -113,45 +113,40 @@ def format_events(events):
 
 
 def check_deadline_reminders():
-    """申込期限の前日・当日にLINE通知を送る"""
+    """申込期限の1週間前・3日前・前日・当日にLINE通知を送る"""
     try:
         service = get_calendar_service()
         cal_id = get_or_create_maybe_calendar(service)
         now = datetime.datetime.now(JST)
         today = now.date()
-        tomorrow = today + datetime.timedelta(days=1)
-
-        # 今日〜明日の「気になるイベント」カレンダーを取得
-        start = datetime.datetime.combine(today, datetime.time.min).astimezone(JST)
-        end = datetime.datetime.combine(tomorrow, datetime.time.max).astimezone(JST)
-
-        result = service.events().list(
-            calendarId=cal_id,
-            timeMin=start.isoformat(),
-            timeMax=end.isoformat(),
-            maxResults=20,
-            singleEvents=True,
-            orderBy='startTime'
-        ).execute()
-
-        deadline_events = [
-            e for e in result.get('items', [])
-            if '【申込期限】' in e.get('summary', '')
-        ]
-
-        if not deadline_events:
-            return
-
         user_id = os.environ['LINE_USER_ID']
-        for e in deadline_events:
-            title = e['summary'].replace('【申込期限】', '').strip()
-            date_str = e['start'].get('date', '')
-            if date_str:
-                event_date = datetime.date.fromisoformat(date_str)
-                if event_date == today:
-                    msg = f"⚠️ 【申込期限 今日！】\n「{title}」の申し込み期限は今日です！\nまだ申し込んでいなければ急いでください！"
-                else:
-                    msg = f"📢 【申込期限 明日！】\n「{title}」の申し込み期限は明日です！\n忘れずに申し込んでください！"
+
+        notify_days = {
+            0: ("⚠️", "今日", "まだ申し込んでいなければ急いでください！"),
+            1: ("📢", "明日", "忘れずに申し込んでください！"),
+            3: ("📌", "3日後", "早めに準備を始めてください！"),
+            7: ("📅", "1週間後", "早めに確認しておきましょう！"),
+        }
+
+        for days_ahead, (icon, label, action) in notify_days.items():
+            target_date = today + datetime.timedelta(days=days_ahead)
+            start = datetime.datetime.combine(target_date, datetime.time.min).astimezone(JST)
+            end = datetime.datetime.combine(target_date, datetime.time.max).astimezone(JST)
+
+            result = service.events().list(
+                calendarId=cal_id,
+                timeMin=start.isoformat(),
+                timeMax=end.isoformat(),
+                maxResults=20,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+
+            for e in result.get('items', []):
+                if '【申込期限】' not in e.get('summary', ''):
+                    continue
+                title = e['summary'].replace('【申込期限】', '').strip()
+                msg = f"{icon} 【申込期限 {label}！】\n「{title}」の申し込み期限は{label}です！\n{action}"
                 line_bot_api.push_message(user_id, TextSendMessage(text=msg))
     except Exception as e:
         print(f"Deadline reminder error: {e}")
@@ -302,6 +297,53 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f'エラー: {e}'))
         return
 
+    # 手動期限登録（「〇〇の期限 4月10日」など）
+    if any(kw in user_message for kw in ['の期限', 'の締切', 'の締め切り', 'の申込期限', 'の手続き期限']):
+        try:
+            parse_response = anthropic_client.messages.create(
+                model='claude-sonnet-4-6',
+                max_tokens=300,
+                messages=[{
+                    'role': 'user',
+                    'content': f"""以下のメッセージから手続き名と期限日を抽出してください。
+今日の日付: {datetime.datetime.now(JST).strftime('%Y-%m-%d')}
+メッセージ: {user_message}
+以下のJSON形式のみ返してください（他の文字は不要）:
+{{"title": "手続き名", "deadline": "YYYY-MM-DD"}}
+日付が不明な場合はdeadlineをnullにしてください。"""
+                }]
+            )
+            parsed = json.loads(parse_response.content[0].text.strip())
+            title = parsed.get('title')
+            deadline = parsed.get('deadline')
+
+            if title and deadline:
+                service = get_calendar_service()
+                cal_id = get_or_create_maybe_calendar(service)
+                deadline_event = {
+                    'summary': f"【申込期限】{title}",
+                    'description': '申込期限です。忘れずに！',
+                    'start': {'date': deadline},
+                    'end': {'date': deadline},
+                }
+                service.events().insert(calendarId=cal_id, body=deadline_event).execute()
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=f"✅ 登録しました！\n📌 {title}\n⚠️ 期限: {deadline}\n\n1週間前・3日前・前日・当日にお知らせします！")
+                )
+            else:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text="手続き名か期限日が読み取れませんでした😢\n例：「〇〇の期限 4月10日」のように送ってください！")
+                )
+        except Exception as e:
+            print(f"Manual deadline error: {e}")
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f"登録中にエラーが発生しました😢\n{str(e)[:100]}")
+            )
+        return
+
     # 画像確認後の「登録して」コマンド
     pending_events = load_pending_events()
     if user_message == '登録して' and user_id in pending_events:
@@ -358,7 +400,7 @@ def handle_message(event):
             for title in registered:
                 reply += f"📌 {title}\n"
             if deadline_count:
-                reply += f"\n⚠️ 申込期限{deadline_count}件も登録しました！前日と当日にお知らせします。"
+                reply += f"\n⚠️ 申込期限{deadline_count}件も登録しました！\n1週間前・3日前・前日・当日にお知らせします！"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
         except Exception as e:
