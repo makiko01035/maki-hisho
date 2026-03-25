@@ -530,6 +530,16 @@ def send_ebay_check_reminder():
         print(f"eBay check reminder error: {e}")
 
 
+def send_a8_check_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="📧 【A8審査確認】\nA8の審査結果メールが届いていませんか？\n\n審査が通っていたらClaudeに👇\n「○○のA8審査通った。リンク追加して」\n\n確認待ち：\n・ユーキャン\n・がくぶん\n・ヒューマンアカデミー"
+        ))
+    except Exception as e:
+        print(f"A8 check reminder error: {e}")
+
+
 def send_monthly_review_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -556,6 +566,8 @@ scheduler.add_job(send_sekisui_blog_reminder, 'cron', day_of_week='thu', hour=9,
 scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
 # 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
+# 毎週月曜朝9時：A8審査確認リマインダー（全審査通過後に削除してOK）
+scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
 scheduler.start()
 
 if __name__ == '__main__':
