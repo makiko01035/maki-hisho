@@ -504,7 +504,7 @@ def send_yakuzen_blog_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
         line_bot_api.push_message(user_id, TextSendMessage(
-            text="✍️ 【薬膳ブログ更新日】\n今日は薬膳ブログの更新日です！"
+            text="✍️ 【薬膳ブログ更新日・火曜日】\n今日は薬膳ブログ＋Pinterest投稿の日です！\n\nClaudeに👇と声かけしてね\n「Pinterest今週分お願い」"
         ))
     except Exception as e:
         print(f"Yakuzen blog reminder error: {e}")
@@ -514,10 +514,30 @@ def send_sekisui_blog_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
         line_bot_api.push_message(user_id, TextSendMessage(
-            text="🏠 【セキスイブログ更新日】\n今日はセキスイハイムブログの更新日です！"
+            text="🏠 【セキスイブログ更新日・木曜日】\n今日はセキスイブログの投稿日です！\n\n① 音声入力でネタを話す\n② テキストをClaudeに貼って👇\n「セキスイの記事投稿して」"
         ))
     except Exception as e:
         print(f"Sekisui blog reminder error: {e}")
+
+
+def send_ebay_check_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="📦 【eBayチェック日・土曜日】\n今日はeBayの確認日です！\n\nClaudeに👇と声かけしてね\n「eBay状況確認して、次やること教えて」"
+        ))
+    except Exception as e:
+        print(f"eBay check reminder error: {e}")
+
+
+def send_monthly_review_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="📊 【月初振り返り】\n今日は先月の振り返り日です！\n\nClaudeに👇と声かけしてね\n「先月の副業収支まとめて」\n「薬膳・セキスイの今月進捗教えて」\n「eBay今月の売上と反省点まとめて」"
+        ))
+    except Exception as e:
+        print(f"Monthly review reminder error: {e}")
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
@@ -532,6 +552,10 @@ scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
 scheduler.add_job(send_yakuzen_blog_reminder, 'cron', day_of_week='tue', hour=9, minute=0)
 # 毎週木曜朝9時：セキスイブログ更新リマインダー
 scheduler.add_job(send_sekisui_blog_reminder, 'cron', day_of_week='thu', hour=9, minute=0)
+# 毎週土曜朝9時：eBayチェックリマインダー
+scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
+# 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）
+scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
 scheduler.start()
 
 if __name__ == '__main__':
