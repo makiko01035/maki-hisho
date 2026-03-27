@@ -159,7 +159,8 @@ def ping():
 
 @app.route('/trigger/morning', methods=['GET', 'POST'])
 def trigger_morning():
-    send_morning_message()
+    import threading
+    threading.Thread(target=send_morning_message).start()
     return 'OK'
 
 
