@@ -457,13 +457,30 @@ def handle_message(event):
 def send_morning_message():
     try:
         events = get_upcoming_events(days=1)
-        today_str = datetime.datetime.now(JST).strftime('%m月%d日')
+        now = datetime.datetime.now(JST)
+        weekdays = ['月', '火', '水', '木', '金', '土', '日']
+        today_str = f"{now.strftime('%m月%d日')}({weekdays[now.weekday()]})"
+
+        msg = f"🌅 おはようございます！\n📅 {today_str}の予定\n"
 
         if events:
-            msg = f"おはようございます！{today_str}の予定です😊\n\n"
-            msg += format_events(events)
+            msg += "\n"
+            for event in events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                if 'T' in start:
+                    dt = datetime.datetime.fromisoformat(start).astimezone(JST)
+                    time_str = dt.strftime('%H:%M')
+                else:
+                    time_str = "終日"
+                title = event.get('summary', '（タイトルなし）')
+                cal_name = event.get('_calendar_name', '')
+                msg += f"⏰ {time_str}  {title}\n"
+                if cal_name:
+                    msg += f"   📂 {cal_name}\n"
+                msg += "\n"
+            msg += "今日も素敵な1日を！✨"
         else:
-            msg = f"おはようございます！{today_str}は予定がありません。\nゆっくり過ごせそうですね！"
+            msg += "\n予定はありません 🌸\nゆっくり過ごせそうですね！"
 
         user_id = os.environ['LINE_USER_ID']
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
@@ -557,7 +574,6 @@ def send_monthly_review_reminder():
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
-scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
 # 毎月1日朝9時：Famm更新リマインダー
