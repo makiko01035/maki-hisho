@@ -142,12 +142,33 @@ def upload_image_to_wp(wp_url, wp_user, wp_pass, img_data, filename):
     return None
 
 
+SEKISUI_CTA_BOX = '''<div style="background:#fdf8f3;border:2px solid #d4956a;border-radius:8px;padding:20px 24px;margin:32px 0;">
+  <p style="margin:0 0 16px;font-weight:bold;font-size:16px;color:#333;">&#127968; 家づくりで私が実際に検討したサービス</p>
+  <div style="margin-bottom:12px;padding:14px 16px;background:#fff;border-radius:6px;border-left:3px solid #e8730a;">
+    <p style="margin:0 0 6px;font-size:13px;color:#777;">後悔しない家づくりのために ／ 無料相談</p>
+    <a href="https://px.a8.net/svt/ejp?a8mat=4AZS0Q+G0X2QI+5OGA+5YJRM" rel="nofollow" style="display:inline-block;background:#e8730a;color:#fff;padding:9px 20px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;">家づくり相談所で無料相談する &#8594;</a>
+    <img border="0" width="1" height="1" src="https://www14.a8.net/0.gif?a8mat=4AZS0Q+G0X2QI+5OGA+5YJRM" alt="">
+  </div>
+  <div style="margin-bottom:12px;padding:14px 16px;background:#fff;border-radius:6px;border-left:3px solid #2a7dc9;">
+    <p style="margin:0 0 6px;font-size:13px;color:#777;">太陽光発電の費用を無料で一括比較</p>
+    <a href="https://px.a8.net/svt/ejp?a8mat=3BMB3B+DQ5TNE+3LME+5YJRM" rel="nofollow" style="display:inline-block;background:#2a7dc9;color:#fff;padding:9px 20px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;">ソーラーパートナーズで無料見積り &#8594;</a>
+    <img border="0" width="1" height="1" src="https://www11.a8.net/0.gif?a8mat=3BMB3B+DQ5TNE+3LME+5YJRM" alt="">
+  </div>
+  <div style="padding:14px 16px;background:#fff;border-radius:6px;border-left:3px solid #4caf50;">
+    <p style="margin:0 0 6px;font-size:13px;color:#777;">家さがし・家づくりの情報を無料でまとめて入手</p>
+    <a href="https://px.a8.net/svt/ejp?a8mat=4AZS0Q+FZ4RX6+5V18+5YJRM" rel="nofollow" style="display:inline-block;background:#4caf50;color:#fff;padding:9px 20px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold;">すまいのいろはPlusで無料相談 &#8594;</a>
+    <img border="0" width="1" height="1" src="https://www11.a8.net/0.gif?a8mat=4AZS0Q+FZ4RX6+5V18+5YJRM" alt="">
+  </div>
+</div>'''
+
+
 def post_to_sekisui_wp(title, content_md):
     wp_url = os.environ.get('SEKISUI_WP_URL', 'https://order-sekisui.com')
     wp_user = os.environ.get('SEKISUI_WP_USER', 'makiko01035')
     wp_pass = os.environ['SEKISUI_WP_APP_PASSWORD']
 
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
+    html = html.replace('<!-- sekisui-affiliate-cta -->', SEKISUI_CTA_BOX)
     data = {'title': title, 'content': html, 'status': 'publish'}
 
     img_result = fetch_pexels_image_for_wp(title)
