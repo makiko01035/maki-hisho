@@ -148,7 +148,7 @@ def post_to_sekisui_wp(title, content_md):
     wp_pass = os.environ['SEKISUI_WP_APP_PASSWORD']
 
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
-    data = {'title': title, 'content': html, 'status': 'draft'}
+    data = {'title': title, 'content': html, 'status': 'publish'}
 
     img_result = fetch_pexels_image_for_wp(title)
     if img_result:
