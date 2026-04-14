@@ -24,6 +24,7 @@
 - 毎朝7時：今日の予定をLINEに送信
 - 毎週日曜20時：3日以内の予定リマインド
 - 話しかけに対してClaudeが返答（カレンダー情報も参照）
+- **セキスイブログ記事作成・即公開**（LINEから「セキスイ記事書きたい」で起動）
 
 ---
 
@@ -69,6 +70,10 @@ git push origin main
 - `ANTHROPIC_API_KEY`
 - `GOOGLE_CREDENTIALS`（デスクトップアプリOAuth認証情報JSON）
 - `LINE_USER_ID`: U16db70df5ef0ed2d73189eee5620669e
+- `SEKISUI_WP_URL`: https://order-sekisui.com
+- `SEKISUI_WP_USER`: makiko01035
+- `SEKISUI_WP_APP_PASSWORD`: セキスイWP用アプリパスワード
+- `PEXELS_API_KEY`: アイキャッチ画像取得用
 
 ---
 
