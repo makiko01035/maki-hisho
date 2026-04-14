@@ -2,7 +2,10 @@ import os
 import json
 import base64
 import datetime
+import threading
 import pytz
+import requests
+import markdown as md_lib
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -21,6 +24,7 @@ anthropic_client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
 JST = pytz.timezone('Asia/Tokyo')
 
 PENDING_FILE = '/tmp/pending_events.json'
+SEKISUI_SESSION_FILE = '/tmp/sekisui_sessions.json'
 
 
 def load_pending_events():
@@ -37,6 +41,147 @@ def save_pending_events(data):
             json.dump(data, f)
     except Exception as e:
         print(f"pending_events save error: {e}")
+
+
+def load_sekisui_sessions():
+    try:
+        with open(SEKISUI_SESSION_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_sekisui_sessions(data):
+    try:
+        with open(SEKISUI_SESSION_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"sekisui_sessions save error: {e}")
+
+
+def suggest_sekisui_themes():
+    response = anthropic_client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=400,
+        messages=[{
+            'role': 'user',
+            'content': """セキスイハイムで家を建てた施主が書くブログ向けに、
+注文住宅を検討中の読者に役立つ記事テーマを3つ提案してください。
+施主の実体験を盛り込める具体的なテーマにしてください。
+以下の形式だけ返してください：
+1. テーマ名
+2. テーマ名
+3. テーマ名"""
+        }]
+    )
+    return response.content[0].text.strip()
+
+
+def generate_sekisui_article(user_input):
+    response = anthropic_client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=3000,
+        messages=[{
+            'role': 'user',
+            'content': f"""セキスイハイムで家を建てた施主のブログ記事を書いてください。
+
+施主からの情報：{user_input}
+
+条件：
+- 1500〜2000文字程度
+- 注文住宅を検討中の方向け
+- 実体験を自然に盛り込む（「私の場合は〜」「実際に〜でした」など）
+- 見出し（##）を使って3〜4セクションに分ける
+- Markdown形式で出力
+- 最初の行は「# タイトル」形式
+- 記事末尾に「<!-- sekisui-affiliate-cta -->」を1行追加"""
+        }]
+    )
+    return response.content[0].text.strip()
+
+
+def fetch_pexels_image_for_wp(keyword):
+    pexels_key = os.environ.get('PEXELS_API_KEY')
+    if not pexels_key:
+        return None
+    try:
+        res = requests.get(
+            'https://api.pexels.com/v1/search',
+            headers={'Authorization': pexels_key},
+            params={'query': keyword, 'per_page': 1, 'orientation': 'landscape'},
+            timeout=10
+        )
+        photos = res.json().get('photos', [])
+        if not photos:
+            return None
+        img_res = requests.get(photos[0]['src']['large2x'], timeout=10)
+        if img_res.status_code != 200:
+            return None
+        return img_res.content, f"pexels_{photos[0]['id']}.jpg"
+    except Exception as e:
+        print(f"Pexels error: {e}")
+        return None
+
+
+def upload_image_to_wp(wp_url, wp_user, wp_pass, img_data, filename):
+    try:
+        res = requests.post(
+            f'{wp_url}/wp-json/wp/v2/media',
+            auth=(wp_user, wp_pass),
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'image/jpeg',
+            },
+            data=img_data,
+            timeout=30
+        )
+        if res.status_code == 201:
+            return res.json()['id']
+    except Exception as e:
+        print(f"Image upload error: {e}")
+    return None
+
+
+def post_to_sekisui_wp(title, content_md):
+    wp_url = os.environ.get('SEKISUI_WP_URL', 'https://order-sekisui.com')
+    wp_user = os.environ.get('SEKISUI_WP_USER', 'makiko01035')
+    wp_pass = os.environ['SEKISUI_WP_APP_PASSWORD']
+
+    html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
+    data = {'title': title, 'content': html, 'status': 'draft'}
+
+    img_result = fetch_pexels_image_for_wp(title)
+    if img_result:
+        img_data, filename = img_result
+        media_id = upload_image_to_wp(wp_url, wp_user, wp_pass, img_data, filename)
+        if media_id:
+            data['featured_media'] = media_id
+
+    res = requests.post(
+        f'{wp_url}/wp-json/wp/v2/posts',
+        auth=(wp_user, wp_pass),
+        json=data,
+        timeout=30
+    )
+    if res.status_code == 201:
+        post = res.json()
+        return post['id'], post['link']
+    raise Exception(f"WP投稿エラー: {res.status_code}")
+
+
+def process_sekisui_article(user_id, user_input):
+    try:
+        article_md = generate_sekisui_article(user_input)
+        lines = article_md.split('\n')
+        title = lines[0].lstrip('# ').strip()
+        content = '\n'.join(lines[1:]).lstrip('\n')
+        post_id, _ = post_to_sekisui_wp(title, content)
+        edit_url = f"https://order-sekisui.com/wp-admin/post.php?post={post_id}&action=edit"
+        msg = f"✅ セキスイ記事を下書き保存しました！\n\n📝 {title}\n\n確認・公開はこちら：\n{edit_url}"
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"Sekisui article error: {e}")
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 記事作成中にエラーが発生しました。\n{str(e)[:100]}"))
 
 
 def get_calendar_service():
@@ -159,7 +304,6 @@ def ping():
 
 @app.route('/trigger/morning', methods=['GET', 'POST'])
 def trigger_morning():
-    import threading
     threading.Thread(target=send_morning_message).start()
     return 'OK'
 
@@ -415,6 +559,25 @@ def handle_message(event):
                 event.reply_token,
                 TextSendMessage(text=f"登録中にエラーが発生しました😢\n{str(e)[:100]}")
             )
+        return
+
+    # セキスイブログ：作成中セッションチェック
+    sekisui_sessions = load_sekisui_sessions()
+    if user_id in sekisui_sessions and sekisui_sessions[user_id] == 'waiting_for_content':
+        del sekisui_sessions[user_id]
+        save_sekisui_sessions(sekisui_sessions)
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✍️ 記事を作成中です...少しお待ちください！（1〜2分かかります）"))
+        threading.Thread(target=process_sekisui_article, args=(user_id, user_message)).start()
+        return
+
+    # セキスイブログ：キーワード検出 → テーマ提案
+    sekisui_keywords = ['セキスイ記事', 'セキスイブログ', 'セキスイ 記事', 'order-sekisui']
+    if any(kw in user_message for kw in sekisui_keywords):
+        themes = suggest_sekisui_themes()
+        sekisui_sessions[user_id] = 'waiting_for_content'
+        save_sekisui_sessions(sekisui_sessions)
+        msg = f"🏠 セキスイブログ記事を作りましょう！\n\nテーマ候補：\n{themes}\n\n番号と実体験・エピソードを一緒に教えてください！\n例：「2番で。先月の電気代が想像より安くて驚いた」"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 
     try:

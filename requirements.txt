@@ -7,3 +7,5 @@ google-auth-oauthlib==1.2.1
 apscheduler==3.10.4
 pytz==2024.2
 gunicorn==23.0.0
+requests==2.32.3
+markdown==3.7
