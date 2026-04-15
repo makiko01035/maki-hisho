@@ -890,23 +890,26 @@ def handle_message(event):
         state = session.get('state')
 
         if state == 'waiting_for_mode':
-            del yakuzen_sessions[user_id]
-            if any(kw in user_message for kw in ['新規', '作成', '新しい', '1', '①']):
+            import unicodedata
+            normalized = unicodedata.normalize('NFKC', user_message)
+            if any(kw in normalized for kw in ['新規', '作成', '新しい', '1', '①']):
+                del yakuzen_sessions[user_id]
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
                 save_yakuzen_sessions(yakuzen_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
                     text="✍️ 薬膳記事を新規作成します！\n\nテーマや書きたいことを教えてください。\n例：「春の花粉症に効く食材」「更年期のほてりに薬膳」"
                 ))
-            elif any(kw in user_message for kw in ['リライト', '更新', '既存', '2', '②']):
+            elif any(kw in normalized for kw in ['リライト', '更新', '既存', '2', '②']):
+                del yakuzen_sessions[user_id]
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_rewrite_keyword'}
                 save_yakuzen_sessions(yakuzen_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
                     text="🔄 リライトする記事のキーワードを教えてください！\n例：「冷え性」「貧血」「春の食材」"
                 ))
             else:
-                save_yakuzen_sessions(yakuzen_sessions)
+                # セッションはそのまま残して再入力を促す
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="「新規作成」または「リライト」と教えてください！"
+                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！"
                 ))
             return
 
