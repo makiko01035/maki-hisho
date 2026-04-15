@@ -448,8 +448,42 @@ def get_pinterest_board_id(board_name):
     return os.environ.get(env_key, '')
 
 
+def get_pinterest_access_token():
+    """refresh_tokenでaccess_tokenを取得。なければ静的トークンを使用"""
+    app_id = os.environ.get('PINTEREST_APP_ID')
+    app_secret = os.environ.get('PINTEREST_APP_SECRET')
+    refresh_token = os.environ.get('PINTEREST_REFRESH_TOKEN')
+    if all([app_id, app_secret, refresh_token]):
+        try:
+            import base64
+            creds = base64.b64encode(f"{app_id}:{app_secret}".encode()).decode()
+            res = requests.post(
+                'https://api.pinterest.com/v5/oauth/token',
+                headers={
+                    'Authorization': f'Basic {creds}',
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                data={
+                    'grant_type': 'refresh_token',
+                    'refresh_token': refresh_token,
+                    'scope': 'pins:write,boards:read'
+                },
+                timeout=15
+            )
+            if res.status_code == 200:
+                data = res.json()
+                new_refresh = data.get('refresh_token')
+                if new_refresh:
+                    print(f"[Pinterest] New refresh_token (update Render env): {new_refresh}")
+                return data.get('access_token')
+            print(f"[Pinterest] Token refresh failed: {res.status_code} {res.text[:200]}")
+        except Exception as e:
+            print(f"[Pinterest] Token refresh error: {e}")
+    return os.environ.get('PINTEREST_ACCESS_TOKEN')
+
+
 def post_pin_to_pinterest(pin_title, description, board_id, link, image_url):
-    access_token = os.environ.get('PINTEREST_ACCESS_TOKEN')
+    access_token = get_pinterest_access_token()
     if not access_token or not board_id:
         return False, '環境変数未設定'
     res = requests.post(
@@ -717,6 +751,88 @@ def check_deadline_reminders():
 @app.route('/ping')
 def ping():
     return 'OK'
+
+
+@app.route('/auth/pinterest')
+def auth_pinterest():
+    app_id = os.environ.get('PINTEREST_APP_ID', '')
+    if not app_id:
+        return 'PINTEREST_APP_ID が設定されていません。Renderに設定してください。', 400
+    redirect_uri = 'https://maki-hisho.onrender.com/auth/pinterest/callback'
+    auth_url = (
+        f"https://www.pinterest.com/oauth/"
+        f"?client_id={app_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&response_type=code"
+        f"&scope=pins:write,boards:read"
+        f"&state=maki"
+    )
+    return f'''<html><body>
+<h2>Pinterest認証</h2>
+<p><a href="{auth_url}" style="font-size:20px;padding:10px;background:#e60023;color:#fff;text-decoration:none;border-radius:6px;">
+Pinterestで認証する</a></p>
+</body></html>'''
+
+
+@app.route('/auth/pinterest/callback')
+def auth_pinterest_callback():
+    code = request.args.get('code')
+    if not code:
+        return f'エラー: codeが取得できませんでした。{request.args}', 400
+    app_id = os.environ.get('PINTEREST_APP_ID')
+    app_secret = os.environ.get('PINTEREST_APP_SECRET')
+    redirect_uri = 'https://maki-hisho.onrender.com/auth/pinterest/callback'
+    import base64
+    creds = base64.b64encode(f"{app_id}:{app_secret}".encode()).decode()
+    res = requests.post(
+        'https://api.pinterest.com/v5/oauth/token',
+        headers={'Authorization': f'Basic {creds}', 'Content-Type': 'application/x-www-form-urlencoded'},
+        data={'grant_type': 'authorization_code', 'code': code, 'redirect_uri': redirect_uri},
+        timeout=15
+    )
+    if res.status_code == 200:
+        data = res.json()
+        return f'''<html><body>
+<h2>✅ 認証成功！</h2>
+<p>以下をRenderの環境変数にコピペしてください：</p>
+<p><b>PINTEREST_REFRESH_TOKEN:</b><br>
+<textarea rows="3" cols="80">{data.get('refresh_token', '')}</textarea></p>
+<p><small>（access_tokenは自動更新されるので不要です）</small></p>
+<p>次に <a href="/auth/pinterest/boards">ボードIDを確認する</a></p>
+</body></html>'''
+    return f'エラー: {res.status_code} {res.text}', 400
+
+
+@app.route('/auth/pinterest/boards')
+def auth_pinterest_boards():
+    access_token = get_pinterest_access_token()
+    if not access_token:
+        return 'PINTEREST_REFRESH_TOKEN または PINTEREST_ACCESS_TOKEN が設定されていません。', 400
+    res = requests.get(
+        'https://api.pinterest.com/v5/boards',
+        headers={'Authorization': f'Bearer {access_token}'},
+        params={'page_size': 25},
+        timeout=15
+    )
+    if res.status_code == 200:
+        boards = res.json().get('items', [])
+        rows = ''.join(
+            f"<tr><td>{b['name']}</td><td><code>{b['id']}</code></td></tr>"
+            for b in boards
+        )
+        return f'''<html><body>
+<h2>Pinterestボード一覧</h2>
+<table border="1" cellpadding="6">
+<tr><th>ボード名</th><th>ID（Renderに設定する値）</th></tr>
+{rows}
+</table>
+<p>対応する環境変数：<br>
+季節の養生 → PINTEREST_BOARD_SEASONAL<br>
+薬膳レシピ → PINTEREST_BOARD_RECIPE<br>
+薬膳の基礎知識 → PINTEREST_BOARD_BASICS<br>
+薬膳資格 → PINTEREST_BOARD_QUALIF</p>
+</body></html>'''
+    return f'エラー: {res.status_code} {res.text}', 400
 
 
 @app.route('/trigger/morning', methods=['GET', 'POST'])
