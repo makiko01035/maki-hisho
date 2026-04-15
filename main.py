@@ -1409,6 +1409,14 @@ def handle_message(event):
         )
         return
 
+    # 社内ダッシュボード
+    if user_message in ['会社', 'ダッシュボード']:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text='📊 まきの会社 ダッシュボード\nhttps://maki-hisho.onrender.com/company')
+        )
+        return
+
     # カレンダー一覧を確認するコマンド
     if user_message == 'カレンダー一覧':
         try:
