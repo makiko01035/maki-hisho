@@ -892,6 +892,7 @@ def handle_message(event):
         if state == 'waiting_for_mode':
             import unicodedata
             normalized = unicodedata.normalize('NFKC', user_message)
+            print(f"[DEBUG] waiting_for_mode: raw={repr(user_message)} normalized={repr(normalized)}")
             if any(kw in normalized for kw in ['新規', '作成', '新しい', '1', '①']):
                 del yakuzen_sessions[user_id]
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
