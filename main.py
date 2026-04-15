@@ -97,6 +97,120 @@ def search_yakuzen_posts(keyword):
     return []
 
 
+def get_all_yakuzen_posts():
+    wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+    res = requests.get(
+        f'{wp_url}/wp-json/wp/v2/posts',
+        auth=(wp_user, wp_pass),
+        params={'per_page': 100, 'status': 'publish', '_fields': 'id,title,date'},
+        timeout=20
+    )
+    if res.status_code == 200:
+        return res.json()
+    return []
+
+
+def auto_select_yakuzen_post(posts):
+    """季節に合った記事を1本自動選択"""
+    today = datetime.date.today()
+    month = today.month
+    season_hint = {
+        1: "冬・乾燥・冷え・免疫",
+        2: "冬から春へ・花粉準備・肝",
+        3: "春・花粉症・肝・デトックス",
+        4: "春・花粉症・気の巡り・肝",
+        5: "晩春・初夏・梅雨準備・脾胃",
+        6: "梅雨・湿気・脾・むくみ",
+        7: "夏・暑気・心・熱中症",
+        8: "真夏・心・夏バテ・冷え",
+        9: "初秋・肺・乾燥・免疫",
+        10: "秋・肺・乾燥・便秘",
+        11: "晩秋・腎・冷え・疲労回復",
+        12: "冬・腎・冷え・年末養生",
+    }.get(month, "季節の養生")
+
+    post_list_text = '\n'.join([
+        f"ID:{p['id']} タイトル:{p['title']['rendered']}"
+        for p in posts[:80]
+    ])
+    import re as _re
+    response = anthropic_client.messages.create(
+        model='claude-haiku-4-5-20251001',
+        max_tokens=200,
+        messages=[{
+            'role': 'user',
+            'content': f"""今日は{today}（{month}月）です。
+キーワード：{season_hint}
+
+以下は薬膳ブログの記事一覧です。この季節にリライトするのに最適な記事を1本選んでください。
+タイトルが古い形式（◇◆■□などの記号入り）なら優先的に選んでください。
+
+{post_list_text}
+
+以下のJSON形式のみで回答（説明不要）：
+{{"id": 記事ID, "reason": "選んだ理由（1文）"}}"""
+        }]
+    )
+    raw = response.content[0].text.strip()
+    match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    return None
+
+
+def auto_rewrite_yakuzen(user_id):
+    try:
+        posts = get_all_yakuzen_posts()
+        if not posts:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の取得に失敗しました。"))
+            return
+
+        selected = auto_select_yakuzen_post(posts)
+        if not selected:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の選択に失敗しました。"))
+            return
+
+        post_id = selected['id']
+        reason = selected.get('reason', '')
+
+        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+        res = requests.get(
+            f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+            auth=(wp_user, wp_pass),
+            params={'_fields': 'id,title,content'},
+            timeout=15
+        )
+        if res.status_code != 200:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の取得に失敗しました。"))
+            return
+
+        post = res.json()
+        post_title = post['title']['rendered']
+        post_content = post['content']['rendered']
+
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"📄 「{post_title}」をリライト中...\n理由：{reason}\n\n少しお待ちください！"
+        ))
+
+        article_md = generate_yakuzen_rewrite(post_title, post_content)
+        lines = article_md.split('\n')
+        new_title = lines[0].lstrip('# ').strip()
+        new_content = '\n'.join(lines[1:]).lstrip('\n')
+
+        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish')
+        pin_msg = try_post_to_pinterest(new_title, link, new_content)
+
+        msg = f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}"
+        if pin_msg:
+            msg += f"\n\n{pin_msg}"
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+
+    except Exception as e:
+        print(f"Auto rewrite error: {e}")
+        import traceback; traceback.print_exc()
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
+
+
 def generate_yakuzen_article(topic):
     response = anthropic_client.messages.create(
         model='claude-sonnet-4-6',
@@ -892,7 +1006,6 @@ def handle_message(event):
         if state == 'waiting_for_mode':
             import unicodedata
             normalized = unicodedata.normalize('NFKC', user_message)
-            print(f"[DEBUG] waiting_for_mode: raw={repr(user_message)} normalized={repr(normalized)}")
             if any(kw in normalized for kw in ['新規', '作成', '新しい', '1', '①']):
                 del yakuzen_sessions[user_id]
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
@@ -902,11 +1015,11 @@ def handle_message(event):
                 ))
             elif any(kw in normalized for kw in ['リライト', '更新', '既存', '2', '②']):
                 del yakuzen_sessions[user_id]
-                yakuzen_sessions[user_id] = {'state': 'waiting_for_rewrite_keyword'}
                 save_yakuzen_sessions(yakuzen_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="🔄 リライトする記事のキーワードを教えてください！\n例：「冷え性」「貧血」「春の食材」"
+                    text="🌿 今の季節に合った記事を自動選択してリライトします！\n数分かかります、そのままお待ちください..."
                 ))
+                threading.Thread(target=auto_rewrite_yakuzen, args=(user_id,)).start()
             else:
                 # セッションはそのまま残して再入力を促す
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
@@ -921,48 +1034,6 @@ def handle_message(event):
             threading.Thread(target=process_yakuzen_new_article, args=(user_id, user_message)).start()
             return
 
-        elif state == 'waiting_for_rewrite_keyword':
-            del yakuzen_sessions[user_id]
-            save_yakuzen_sessions(yakuzen_sessions)
-            try:
-                posts = search_yakuzen_posts(user_message)
-                if not posts:
-                    line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                        text=f"「{user_message}」に関する記事が見つかりませんでした😢\n別のキーワードで試してください！"
-                    ))
-                    return
-                post = posts[0]
-                post_id = post['id']
-                post_title = post['title']['rendered']
-                post_content = post['content']['rendered']
-                yakuzen_sessions[user_id] = {
-                    'state': 'waiting_for_rewrite_confirm',
-                    'post_id': post_id,
-                    'post_title': post_title,
-                    'post_content': post_content
-                }
-                save_yakuzen_sessions(yakuzen_sessions)
-                msg = f"📄 この記事をリライトしますか？\n\n「{post_title}」\n\n「リライトして」と送ると開始します！\n追加の指示があれば一緒にどうぞ。\n例：「リライトして。SEO重視で」"
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
-            except Exception as e:
-                print(f"Yakuzen search error: {e}")
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"記事の検索中にエラーが発生しました😢\n{str(e)[:100]}"))
-            return
-
-        elif state == 'waiting_for_rewrite_confirm':
-            if any(kw in user_message for kw in ['リライト', 'して', 'はい', 'ok', 'OK', 'yes']):
-                post_id = session['post_id']
-                post_title = session['post_title']
-                post_content = session['post_content']
-                del yakuzen_sessions[user_id]
-                save_yakuzen_sessions(yakuzen_sessions)
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🔄 リライト中です...少しお待ちください！（1〜2分かかります）"))
-                threading.Thread(target=process_yakuzen_rewrite, args=(user_id, post_id, post_title, post_content, user_message)).start()
-            else:
-                del yakuzen_sessions[user_id]
-                save_yakuzen_sessions(yakuzen_sessions)
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="キャンセルしました！また「薬膳記事」と声をかけてください🌿"))
-            return
 
     # 薬膳ブログ：キーワード検出
     yakuzen_keywords = ['薬膳記事', '薬膳ブログ', '薬膳 記事', '薬膳リライト', 'foodmakehealth', '薬膳の記事']
