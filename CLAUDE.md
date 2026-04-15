@@ -25,6 +25,7 @@
 - 毎週日曜20時：3日以内の予定リマインド
 - 話しかけに対してClaudeが返答（カレンダー情報も参照）
 - **セキスイブログ記事作成・即公開**（LINEから「セキスイ記事書きたい」で起動）
+- **薬膳ブログ新規作成・リライト**（LINEから「薬膳記事」で起動）
 
 ---
 
@@ -74,6 +75,9 @@ git push origin main
 - `SEKISUI_WP_USER`: makiko01035
 - `SEKISUI_WP_APP_PASSWORD`: セキスイWP用アプリパスワード
 - `PEXELS_API_KEY`: アイキャッチ画像取得用
+- `YAKUZEN_WP_URL`: https://foodmakehealth.com（デフォルト値あり）
+- `YAKUZEN_WP_USER`: 薬膳WPユーザー名（デフォルト: makiko01035）
+- `YAKUZEN_WP_APP_PASSWORD`: 薬膳WP用アプリパスワード（**要設定**）
 
 ---
 
