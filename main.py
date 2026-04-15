@@ -753,6 +753,449 @@ def ping():
     return 'OK'
 
 
+@app.route('/company')
+def company_dashboard():
+    now = datetime.datetime.now(JST)
+    return f'''<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>まきの会社 | Company Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --gold: #c9a84c;
+    --gold-light: #e8c96a;
+    --black: #0a0a0a;
+    --dark: #111111;
+    --card: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e0e0e0;
+    --muted: #888888;
+  }}
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{
+    background: var(--black);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }}
+
+  /* ヘッダー */
+  header {{
+    border-bottom: 1px solid var(--border);
+    padding: 40px 48px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }}
+  .logo {{
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    color: var(--gold);
+    letter-spacing: 2px;
+  }}
+  .logo span {{
+    display: block;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--muted);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }}
+  .timestamp {{
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-align: right;
+  }}
+  .timestamp strong {{
+    display: block;
+    font-size: 20px;
+    color: var(--gold-light);
+    font-weight: 400;
+  }}
+
+  /* メインコンテンツ */
+  main {{ padding: 48px; }}
+
+  /* ミッション */
+  .mission {{
+    border-left: 2px solid var(--gold);
+    padding-left: 24px;
+    margin-bottom: 56px;
+  }}
+  .mission h2 {{
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 12px;
+  }}
+  .mission p {{
+    font-size: 22px;
+    font-weight: 300;
+    line-height: 1.8;
+    color: var(--text);
+  }}
+  .mission p em {{
+    font-style: normal;
+    color: var(--gold-light);
+    font-weight: 400;
+  }}
+
+  /* セクションタイトル */
+  .section-title {{
+    font-size: 11px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 24px;
+  }}
+
+  /* 目標メーター */
+  .goal-section {{ margin-bottom: 56px; }}
+  .goal-card {{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 32px 40px;
+    display: flex;
+    align-items: center;
+    gap: 48px;
+  }}
+  .goal-label {{
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }}
+  .goal-amount {{
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    color: var(--gold);
+    line-height: 1;
+  }}
+  .goal-amount span {{ font-size: 18px; color: var(--muted); }}
+  .goal-divider {{
+    width: 1px;
+    height: 60px;
+    background: var(--border);
+    flex-shrink: 0;
+  }}
+  .goal-vision {{
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 2;
+  }}
+  .goal-vision strong {{ color: var(--gold-light); font-weight: 400; }}
+
+  /* 部署カード */
+  .departments {{
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 56px;
+  }}
+  .dept-card {{
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }}
+  .dept-card:hover {{ border-color: var(--gold); }}
+  .dept-card::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gold), transparent);
+  }}
+  .dept-priority {{
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 16px;
+  }}
+  .dept-name {{
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    color: var(--text);
+    margin-bottom: 8px;
+  }}
+  .dept-target {{
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }}
+  .dept-target strong {{ color: var(--gold-light); font-weight: 400; }}
+  .dept-items {{ list-style: none; }}
+  .dept-items li {{
+    font-size: 13px;
+    color: var(--muted);
+    padding: 5px 0;
+    padding-left: 14px;
+    position: relative;
+    line-height: 1.6;
+  }}
+  .dept-items li::before {{
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--border);
+  }}
+
+  /* 週次スケジュール */
+  .schedule-section {{ margin-bottom: 56px; }}
+  .schedule-table {{
+    width: 100%;
+    border-collapse: collapse;
+  }}
+  .schedule-table th, .schedule-table td {{
+    padding: 16px 20px;
+    text-align: left;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+  }}
+  .schedule-table th {{
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }}
+  .schedule-table td {{ color: var(--text); font-weight: 300; }}
+  .schedule-table td:first-child {{
+    color: var(--gold);
+    font-weight: 400;
+    width: 120px;
+  }}
+  .schedule-table td:nth-child(2) {{
+    color: var(--muted);
+    width: 140px;
+    font-size: 12px;
+  }}
+
+  /* LINE機能一覧 */
+  .line-section {{ margin-bottom: 56px; }}
+  .line-grid {{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }}
+  .line-item {{
+    background: var(--card);
+    padding: 20px 24px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }}
+  .line-keyword {{
+    font-family: monospace;
+    font-size: 12px;
+    background: #0f0f0f;
+    border: 1px solid var(--border);
+    color: var(--gold);
+    padding: 4px 10px;
+    border-radius: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }}
+  .line-desc {{
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    padding-top: 2px;
+  }}
+
+  /* フッター */
+  footer {{
+    border-top: 1px solid var(--border);
+    padding: 24px 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }}
+  footer p {{ font-size: 11px; color: var(--muted); letter-spacing: 1px; }}
+  .status-dot {{
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: #4caf50;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }}
+  @keyframes pulse {{
+    0%, 100% {{ opacity: 1; }}
+    50% {{ opacity: 0.4; }}
+  }}
+
+  @media (max-width: 768px) {{
+    header {{ padding: 24px; flex-direction: column; align-items: flex-start; gap: 16px; }}
+    main {{ padding: 24px; }}
+    .departments {{ grid-template-columns: 1fr; }}
+    .goal-card {{ flex-direction: column; gap: 24px; align-items: flex-start; }}
+    .goal-divider {{ width: 40px; height: 1px; }}
+    .line-grid {{ grid-template-columns: 1fr; }}
+    footer {{ flex-direction: column; gap: 8px; padding: 24px; }}
+  }}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    Maki &amp; Co.
+    <span>Private Company Dashboard</span>
+  </div>
+  <div class="timestamp">
+    <strong>{now.strftime('%Y.%m.%d')}</strong>
+    {now.strftime('%H:%M')} JST
+  </div>
+</header>
+
+<main>
+
+  <!-- ミッション -->
+  <div class="mission">
+    <h2>Mission</h2>
+    <p>副業収入を<em>月50万円</em>以上に育て、<br>
+    <em>海外移住・開業</em>という未来の自由を手に入れる。</p>
+  </div>
+
+  <!-- 月収目標 -->
+  <div class="goal-section">
+    <p class="section-title">Revenue Target</p>
+    <div class="goal-card">
+      <div>
+        <div class="goal-label">Monthly Goal</div>
+        <div class="goal-amount">50<span>万円 / 月</span></div>
+      </div>
+      <div class="goal-divider"></div>
+      <div class="goal-vision">
+        <strong>物販部</strong>　40〜50万円（最優先）<br>
+        <strong>ブログ部</strong>　数万円（蓄積型・長期資産）<br>
+        <strong>秘書部</strong>　時間節約・業務自動化
+      </div>
+    </div>
+  </div>
+
+  <!-- 部署 -->
+  <div class="departments">
+    <div class="dept-card">
+      <div class="dept-priority">★★★ 最優先 — 物販部</div>
+      <div class="dept-name">eBay Sales</div>
+      <div class="dept-target">月収目標 <strong>40〜50万円</strong></div>
+      <ul class="dept-items">
+        <li>メルカリ仕入れ → eBay販売</li>
+        <li>無在庫→有在庫移行中</li>
+        <li>4月目標：250品出品</li>
+        <li>利益目標：1〜5万円</li>
+      </ul>
+    </div>
+    <div class="dept-card">
+      <div class="dept-priority">★★ — ブログ部</div>
+      <div class="dept-name">Blog &amp; SEO</div>
+      <div class="dept-target">月収目標 <strong>数万円（蓄積型）</strong></div>
+      <ul class="dept-items">
+        <li>薬膳ブログ：約120記事</li>
+        <li>セキスイブログ：34記事</li>
+        <li>アフィリエイト収益化進行中</li>
+        <li>Search Console流入増が目標</li>
+      </ul>
+    </div>
+    <div class="dept-card">
+      <div class="dept-priority">★★ — 秘書部</div>
+      <div class="dept-name">Secretary</div>
+      <div class="dept-target">役割 <strong>時間節約・完全自動化</strong></div>
+      <ul class="dept-items">
+        <li>LINEボット稼働中</li>
+        <li>毎朝7時：予定通知</li>
+        <li>Googleカレンダー管理</li>
+        <li>ブログ自動投稿</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 週次スケジュール -->
+  <div class="schedule-section">
+    <p class="section-title">Weekly Schedule</p>
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th>Day</th>
+          <th>Department</th>
+          <th>Task</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>毎朝 7:00</td><td>秘書部</td><td>今日の予定をLINEに自動送信</td></tr>
+        <tr><td>毎週日曜 20:00</td><td>秘書部</td><td>3日以内の予定リマインド</td></tr>
+        <tr><td>火曜日</td><td>ブログ部</td><td>薬膳ブログ リライト2本 + Pinterestピン</td></tr>
+        <tr><td>木曜日</td><td>ブログ部</td><td>セキスイブログ 記事投稿</td></tr>
+        <tr><td>随時</td><td>物販部</td><td>eBayタイトル生成・出品サポート</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- LINE機能 -->
+  <div class="line-section">
+    <p class="section-title">LINE Functions — @296wjwwj</p>
+    <div class="line-grid">
+      <div class="line-item">
+        <span class="line-keyword">薬膳記事</span>
+        <span class="line-desc">薬膳ブログメニュー表示（新規作成 / リライト）</span>
+      </div>
+      <div class="line-item">
+        <span class="line-keyword">セキスイ記事</span>
+        <span class="line-desc">セキスイブログ記事作成フロー起動</span>
+      </div>
+      <div class="line-item">
+        <span class="line-keyword">画像送信</span>
+        <span class="line-desc">チラシからイベント情報を読み取り</span>
+      </div>
+      <div class="line-item">
+        <span class="line-keyword">登録して</span>
+        <span class="line-desc">読み取ったイベントをGoogleカレンダーに登録</span>
+      </div>
+      <div class="line-item">
+        <span class="line-keyword">〇〇の期限 4月10日</span>
+        <span class="line-desc">申込期限をカレンダーに登録＋リマインド設定</span>
+      </div>
+      <div class="line-item">
+        <span class="line-keyword">自由入力</span>
+        <span class="line-desc">Claudeが返答（カレンダー情報も参照）</span>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <p><span class="status-dot"></span>All systems operational — Render / maki-hisho.onrender.com</p>
+  <p>© 2026 Maki &amp; Co. — Built with Claude Code</p>
+</footer>
+
+</body>
+</html>'''
+
+
 @app.route('/auth/pinterest')
 def auth_pinterest():
     app_id = os.environ.get('PINTEREST_APP_ID', '')
