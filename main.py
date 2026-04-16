@@ -1843,6 +1843,89 @@ def handle_message(event):
         threading.Thread(target=process_sekisui_article, args=(user_id, user_message)).start()
         return
 
+    # ========== プリント管理 ==========
+
+    # プリント一覧
+    if user_message in ['プリント一覧', 'プリント確認', 'プリントリスト']:
+        prints = load_prints()
+        user_prints = [p for p in prints.get(user_id, []) if not p.get('done')]
+        if not user_prints:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📭 保存中のプリントはありません！\n「プリント」と送って写真を撮ると保存できます📄"))
+        else:
+            msg = f"📄 プリント一覧（{len(user_prints)}件）\n\n"
+            for p in user_prints:
+                msg += f"【No.{p['id']}】{p.get('title') or '（タイトル不明）'}\n"
+                msg += f"  🏷️ {p.get('category') or '不明'}"
+                if p.get('deadline'):
+                    msg += f"  ⚠️ 締切:{p['deadline']}"
+                if p.get('amount'):
+                    msg += f"  💴{p['amount']}"
+                msg += "\n"
+            msg += "\n「プリント完了 番号」で完了済みにできます"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+        return
+
+    # プリント完了
+    import re as _re
+    m = _re.match(r'^プリント完了\s*(\d+)$', user_message.strip())
+    if m:
+        target_id = int(m.group(1))
+        prints = load_prints()
+        user_prints = prints.get(user_id, [])
+        found = False
+        for p in user_prints:
+            if p['id'] == target_id:
+                p['done'] = True
+                found = True
+                break
+        if found:
+            save_prints(prints)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ No.{target_id} を完了にしました！お疲れさまです🎉"))
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"No.{target_id} が見つかりませんでした。「プリント一覧」で番号を確認してください。"))
+        return
+
+    # プリント締切をカレンダー登録
+    m2 = _re.match(r'^プリント登録\s*(\d+)$', user_message.strip())
+    if m2:
+        target_id = int(m2.group(1))
+        prints = load_prints()
+        user_prints = prints.get(user_id, [])
+        target_print = next((p for p in user_prints if p['id'] == target_id), None)
+        if not target_print:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"No.{target_id} が見つかりませんでした。"))
+            return
+        if not target_print.get('deadline'):
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"No.{target_id}「{target_print.get('title')}」には締切日がありません。"))
+            return
+        try:
+            service = get_calendar_service()
+            cal_id = get_or_create_maybe_calendar(service)
+            deadline_event = {
+                'summary': f"【プリント締切】{target_print.get('title') or 'プリント'}",
+                'description': f"カテゴリ: {target_print.get('category') or ''}\n集金: {target_print.get('amount') or ''}\n持ち物: {target_print.get('items') or ''}",
+                'start': {'date': target_print['deadline']},
+                'end': {'date': target_print['deadline']},
+            }
+            service.events().insert(calendarId=cal_id, body=deadline_event).execute()
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"✅ カレンダーに登録しました！\n📌 {target_print.get('title')}\n⚠️ 締切: {target_print['deadline']}\n\n1週間前・3日前・前日にお知らせします！"
+            ))
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"登録エラー: {str(e)[:100]}"))
+        return
+
+    # プリントモード開始（写真を待つ）
+    print_trigger_keywords = ['プリント', 'プリントきた', 'プリント撮る', '学校のプリント', 'おたより', 'お知らせ来た']
+    if any(kw in user_message for kw in print_trigger_keywords):
+        print_sessions = load_print_sessions()
+        print_sessions[user_id] = 'waiting_for_print_image'
+        save_print_sessions(print_sessions)
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(
+            text="📄 プリントの写真を送ってください！\n\n撮影のコツ：\n・平らに置いて撮る\n・文字がはっきり見えるように\n・プリント全体が入るように"
+        ))
+        return
+
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
     if any(kw in user_message for kw in ebay_research_keywords):
