@@ -1460,53 +1460,62 @@ def send_monthly_review_reminder():
 
 # ========== X（Twitter）自動投稿 ==========
 
-X_POST_TOPICS = [
-    # LINE秘書ボット系（多め）
-    ("LINE秘書ボットをゼロから作った話", "#AI副業 #LINE #Claude"),
-    ("チラシ画像をLINEに送るとGoogleカレンダーに自動登録される仕組みを作った", "#AI副業 #自動化 #LINE"),
-    ("LINEに「登録して」と送るだけでイベントがカレンダーに入る仕組み", "#AI副業 #LINE #自動化"),
-    ("子どもの習い事チラシをLINEに送ったらカレンダー登録が秒で終わった", "#AI副業 #子育て中ママ #LINE"),
-    ("申込期限をLINEに送ると1週間前・3日前・前日に自動でリマインドしてくれる", "#AI副業 #LINE #自動化"),
-    ("毎朝7時にLINEで今日の予定が届く仕組みを自分で作った", "#AI副業 #LINE #自動化"),
-    ("LINEボットに話しかけるとClaudeが予定を見ながら返事をくれる", "#AI副業 #LINE #Claude"),
-    ("LINE秘書ボットを作ったら予定の管理がほぼゼロ工数になった", "#AI副業 #子育て中ママ #時短"),
-    # ブログ・その他
-    ("薬膳ブログをLINEから1タップで投稿できるようにした", "#AI副業 #ブログ自動化 #Claude"),
-    ("セキスイブログの記事をAIが自動生成して即公開する仕組み", "#AI副業 #ブログ #自動化"),
-    ("eBay商品タイトルをAIで自動生成する方法", "#AI副業 #eBay #物販"),
-    ("Renderで月0円のサーバーを運用している話", "#AI副業 #Claude #個人開発"),
-    ("医療職×子育て中でもAI副業できる理由", "#AI副業 #子育て中ママ #副業"),
-    ("Claude Codeで自分だけのAI会社を作った", "#ClaudeCode #AI副業 #副業"),
-    ("プログラミング知識ゼロからLINEボットを作った体験談", "#AI副業 #Claude #初心者"),
-    ("時間がない医療職がAI副業を続けられる理由", "#AI副業 #医療職 #副業"),
+# 実績ベースのツイートストック（gitコミット履歴から生成）
+TWEET_STOCK = [
+    "子どもの習い事チラシをLINEに送ったら、AIが日時を読み取ってGoogleカレンダーに自動登録してくれた🙌 もう手入力しなくていい。 #AI副業 #子育て中ママ #LINE",
+    "申込期限をLINEに送るだけで、1週間前・3日前・前日に自動でリマインドが来る仕組みを作った✨ 締切忘れがゼロになった。 #AI副業 #自動化 #LINE",
+    "チラシに複数のイベントが書いてあっても全部拾ってカレンダーに入れてくれる。1個しか対応してなかったのを改良した😄 #AI副業 #LINE #自動化",
+    "Renderが再起動しても登録待ちデータが消えない仕組みを追加。「登録したのに消えた」が起きなくなった🔧 #AI副業 #個人開発 #Claude",
+    "毎朝7時に今日の予定がLINEに届く🌅 自分で作ったリマインダー。地味だけど毎日助かってる。 #AI副業 #LINE #自動化",
+    "医療職で働きながらLINEボットを作り続けて1ヶ月弱。気づいたら20個以上の自動化が動いてた😳 #AI副業 #医療職 #ClaudeCode",
+    "セキスイブログの記事、LINEで「書いて」と送るだけで書いてくれて即公開まで全自動になった✍️ #AI副業 #ブログ自動化 #Claude",
+    "薬膳ブログのリライトも自動化。季節に合った記事をAIが選んで、リライトして、公開まで全部やってくれる🌿 #AI副業 #ブログ #自動化",
+    "eBayのリサーチをLINEから起動できるようにした。出先でもスマホから商品調査が始められる📱 #AI副業 #eBay #物販",
+    "Pinterest連携のOAuth認証を実装した。審査待ちで今はまだ使えないけど、通った瞬間に動き出せる準備は完了🔧 #AI副業 #自動化 #Claude",
+    "Xに毎日自動投稿する仕組みを作った。投稿ネタを考えなくていいって本当にラク😌 #AI副業 #X #自動化",
+    "学校のプリント管理もLINEボットに追加。写真送ったら内容を読み取って管理してくれる📄 #AI副業 #子育て中ママ #LINE",
+    "noteに「プログラミングゼロからClaudeで秘書ボットを作るまで」の記事を書いた。4月30日公開予定📝 #AI副業 #note #Claude",
+    "A8.netの審査確認リマインダーを追加。毎週月曜に自動で「確認した？」と届く。忘れっぽい自分に最適 #AI副業 #アフィリエイト #自動化",
+    "月初の振り返りリマインダー、毎月1日に自動で届くように設定。習慣化ってこうやって作るんだと気づいた #AI副業 #習慣化 #自動化",
+    "無料サーバーRenderがスリープしないようにpingエンドポイントを追加。月0円で24時間稼働を維持してる #AI副業 #個人開発 #Render",
+    "タイムアウトエラーをバックグラウンド処理に変えて解決。エラーログ見ながらClaudeと一緒にデバッグするの得意になってきた🔍 #AI副業 #個人開発 #Claude",
+    "22時開始のイベントが翌0時で終わるとき、終了日時が翌日になる処理を追加。細かいバグこそちゃんと潰す🗓️ #AI副業 #個人開発 #自動化",
+    "プログラミング経験ゼロでもClaude Codeがあれば本当に作れる。コードは書けないけど「どうなってほしいか」を伝えることならできる😊 #AI副業 #ClaudeCode #初心者",
+    "月0円で24時間動き続けるサーバーを運用中。RenderとGitHubを組み合わせたら無料でデプロイまで全自動になった #AI副業 #個人開発 #Render",
+    "医療職×子育て中で時間がない分、「自動化するか/しないか」の判断が早くなった。作って損したことが一度もない #AI副業 #医療職 #副業",
+    "薬膳ブログにアフィリエイトのCTAを記事末尾に自動挿入する機能を追加✨ 記事書くたびに忘れてたのがゼロになった #AI副業 #ブログ #アフィリエイト",
+    "LINEから「会社」と送るだけで自分のAI会社の状況が一覧で見られるダッシュボードを作った👀 #AI副業 #ClaudeCode #自動化",
+    "画像から複数イベントを抽出するJSONパースが不安定だったのを修正。「なんか登録されなかった」が起きなくなった #AI副業 #個人開発 #Claude",
+    "main.pyが大きくなったのでモジュール分割してリファクタリング。コードが読みやすくなると次の機能追加がスムーズ #AI副業 #個人開発 #ClaudeCode",
+    "LINEボット1本で、ブログ投稿・カレンダー管理・eBayリサーチ・プリント管理が全部できる。スマホだけで副業が完結しつつある📱 #AI副業 #LINE #自動化",
+    "「秘書部が司令塔」という概念を導入した。どこに何を頼めばいいか迷わなくなった。AIに役割を持たせると全然違う😮 #AI副業 #ClaudeCode #自動化",
+    "子どもが寝た後の1〜2時間でここまで作れるようになった。コードが書けなくても「作りたいもの」が明確なら進める #AI副業 #子育て中ママ #副業",
+    "薬膳ブログ120記事・セキスイブログ34記事。記事数が増えるほど自動化の恩恵が大きくなってきた📈 #AI副業 #ブログ #アフィリエイト",
+    "Google CalendarのOAuth認証をLINEボットに組み込んだ。最初は一番難しかったのに今では当たり前に使いこなしてる🔑 #AI副業 #個人開発 #Google",
+    "エラーが出たらログを貼ってClaudeに聞く。それだけで大体解決する。デバッグが怖くなくなった💪 #AI副業 #ClaudeCode #初心者",
+    "eBayとメルカリを組み合わせた物販も始めてる。仕入れ→出品の流れをいずれ自動化したい #AI副業 #eBay #物販",
+    "Famm締切リマインダーを追加。毎月忘れてたのがゼロになった。小さい自動化ほど日常が楽になる #AI副業 #子育て中ママ #自動化",
+    "「登録して」と送ってもデータがないときのエラーメッセージを改善。使う人のことを考えたUXを少しずつ磨いてる #AI副業 #個人開発 #LINE",
+    "ChatGPTじゃなくてClaude Codeを使ってる理由：ファイルを直接読み書きできて、コードを実行しながら作れるから。会話型との差がでかい #AI副業 #ClaudeCode #Claude",
+    "1ヶ月弱でコミット数50以上。毎日少しずつでも積み上げるとこんなに変わる #AI副業 #ClaudeCode #副業",
+    "LINE秘書ボットを作って一番変わったこと：「あれ、今日何の予定あったっけ」がゼロになった。地味だけど毎日助かってる #AI副業 #LINE #子育て中ママ",
+    "セキスイブログとPexels APIを連携。記事のアイキャッチ画像も自動で取得するようにした🖼️ #AI副業 #ブログ自動化 #Claude",
+    "Renderの環境変数を10個以上管理してる。最初は何が何かわからなかったのに今は全部把握できてる #AI副業 #個人開発 #Render",
+    "週次ルーティン通知を設定：月曜A8確認、火曜薬膳ブログ、木曜セキスイブログ、土曜eBayチェック。週の動きが自然に決まってきた #AI副業 #副業 #習慣化",
 ]
 
 
-def generate_x_post():
-    today = datetime.datetime.now(JST)
-    start_date = datetime.datetime(2026, 4, 16, tzinfo=JST)
-    day_num = (today - start_date).days
-    topic, hashtags = X_POST_TOPICS[day_num % len(X_POST_TOPICS)]
+def get_tweet_for_slot(slot):
+    """slot: 0=朝(8:30), 1=昼(12:30), 2=夜(19:30)"""
+    start = datetime.datetime(2026, 4, 16, tzinfo=JST)
+    now = datetime.datetime.now(JST)
+    days = max(0, (now - start).days)
+    index = (days * 3 + slot) % len(TWEET_STOCK)
+    return TWEET_STOCK[index]
 
-    prompt = f"""あなたは医療職・子育て中・AI副業実践中の「まき」としてXに投稿します。
-テーマ：{topic}
-使うハッシュタグ：{hashtags}
 
-条件：
-- 本文＋ハッシュタグ合計で140文字以内
-- 実体験ベースの口語体（「〜した」「〜できた」など）
-- 共感・驚き・ためになる内容
-- 絵文字を1〜2個
-- ハッシュタグは末尾にまとめる
-
-投稿文のみ返してください。"""
-
-    response = anthropic_client.messages.create(
-        model='claude-haiku-4-5-20251001',
-        max_tokens=200,
-        messages=[{'role': 'user', 'content': prompt}]
-    )
-    return response.content[0].text.strip()
+def generate_x_post(slot=0):
+    return get_tweet_for_slot(slot)
 
 
 def send_note_reminder():
@@ -1519,30 +1528,56 @@ def send_note_reminder():
         print(f"Note reminder error: {e}")
 
 
+def _get_x_client():
+    import tweepy
+    api_key = os.environ.get('X_API_KEY')
+    api_secret = os.environ.get('X_API_SECRET')
+    access_token = os.environ.get('X_ACCESS_TOKEN')
+    access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET')
+    if not all([api_key, api_secret, access_token, access_token_secret]):
+        return None
+    return tweepy.Client(
+        consumer_key=api_key,
+        consumer_secret=api_secret,
+        access_token=access_token,
+        access_token_secret=access_token_secret
+    )
+
+
+def _post_tweet(slot):
+    client = _get_x_client()
+    if not client:
+        print("X API keys not configured, skipping post")
+        return
+    post_text = generate_x_post(slot)
+    client.create_tweet(text=post_text)
+    print(f"X post (slot={slot}) successful: {post_text[:50]}...")
+
+
 def post_to_x_daily():
+    """毎朝8:30 投稿（slot=0）"""
     try:
-        api_key = os.environ.get('X_API_KEY')
-        api_secret = os.environ.get('X_API_SECRET')
-        access_token = os.environ.get('X_ACCESS_TOKEN')
-        access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET')
-
-        if not all([api_key, api_secret, access_token, access_token_secret]):
-            print("X API keys not configured, skipping post")
-            return
-
-        import tweepy
-        client = tweepy.Client(
-            consumer_key=api_key,
-            consumer_secret=api_secret,
-            access_token=access_token,
-            access_token_secret=access_token_secret
-        )
-
-        post_text = generate_x_post()
-        client.create_tweet(text=post_text)
-        print(f"X post successful: {post_text[:50]}...")
+        _post_tweet(0)
     except Exception as e:
-        print(f"X post error: {e}")
+        print(f"X post error (morning): {e}")
+
+
+def post_to_x_noon():
+    """毎日12:30 投稿（slot=1）— 奇数日のみ実行して2〜3本/日を交互に"""
+    try:
+        if datetime.datetime.now(JST).day % 2 == 0:
+            return
+        _post_tweet(1)
+    except Exception as e:
+        print(f"X post error (noon): {e}")
+
+
+def post_to_x_evening():
+    """毎日19:30 投稿（slot=2）"""
+    try:
+        _post_tweet(2)
+    except Exception as e:
+        print(f"X post error (evening): {e}")
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
@@ -1562,8 +1597,10 @@ scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, m
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
 # 毎週月曜朝9時：A8審査確認リマインダー（全審査通過後に削除してOK）
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
-# 毎日朝8時30分：X（Twitter）自動投稿
+# 毎日朝8:30・昼12:30（奇数日のみ）・夜19:30：X（Twitter）自動投稿（2〜3本/日）
 scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
+scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
+scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
 # 4月30日朝9時：noteリマインド（X投稿2週間分溜まったタイミング）
 scheduler.add_job(send_note_reminder, 'cron', month=4, day=30, hour=9, minute=0)
 scheduler.start()
