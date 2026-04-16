@@ -12,6 +12,7 @@
 |-------------|--------|
 | eBay・メルカリ・物販に関すること | 物販部 `C:/Users/nyank/ebay/` |
 | ブログ・SEO・記事に関すること | ブログ部 `C:/Users/nyank/blog-automation/` |
+| X投稿・SNS・広報に関すること | 広報部（同フォルダ内） |
 | カレンダー・スケジュール・リマインド | 秘書部（自分で対応） |
 | どこに聞けばよいか分からない相談 | 秘書部（自分で判断・振り分け） |
 | 会社全体の方針・改善 | 秘書部（自分で対応・CLAUDE.md更新） |
@@ -96,6 +97,7 @@ git push origin main
 - `PINTEREST_APP_SECRET`: 未設定（Trial拒否のため保留）
 - `PINTEREST_REFRESH_TOKEN`: 未設定（同上）
 - `PINTEREST_BOARD_SEASONAL` / `PINTEREST_BOARD_RECIPE` / `PINTEREST_BOARD_BASICS` / `PINTEREST_BOARD_QUALIF`: 未設定
+- `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET`: 広報部X自動投稿用（設定状況は広報部CLAUDE.md参照）
 
 ---
 
@@ -127,6 +129,26 @@ git push origin main
 - Instagram Graph APIもMeta審査が必要でPinterestと同様に困難
 - Instagram→Pinterest自動フローはMetaのAPI制限で現在は使えない
 - 代替案：Zapierを使えばWP新記事→Instagram→Pinterestの自動化が可能（画像作成は手動）
+
+---
+
+## 広報部
+
+- Xアカウント：@kvision_m
+- 毎朝8:30に自動投稿
+- テーマ：AI副業実体験（LINE秘書ボット・カレンダー自動登録など）
+- 目的：認知拡大 → フォロワー獲得 → note・コンサルへの導線
+- 将来目標：フォロワー1,000人でnote有料記事販売開始
+
+---
+
+## トラブルシューティング
+
+### Google認証エラー（「登録中にエラーが発生しました」）
+- `https://maki-hisho.onrender.com/check-creds` を開く
+- `OK` → 認証情報は正常、別の原因
+- `JSON parse error` → RenderのGOOGLE_CREDENTIALSが壊れている
+  → `credentials_for_render.txt` の内容をRenderに貼り直す
 
 ---
 
