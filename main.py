@@ -1388,6 +1388,35 @@ def send_preparation_reminder():
         print(f"Preparation reminder error: {e}")
 
 
+def send_hsbc_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        now = datetime.datetime.now(JST)
+        month = now.month
+
+        # USD/JPY レート取得（無料API）
+        rate_text = ""
+        try:
+            res = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
+            data = res.json()
+            usd_jpy = data["rates"]["JPY"]
+            hkd_usd = data["rates"]["HKD"]
+            hkd_jpy = usd_jpy / hkd_usd
+            rate_text = f"\n📊 今日のレート\nUSD/JPY: {usd_jpy:.1f}円\nHKD/JPY: {hkd_jpy:.2f}円"
+        except Exception:
+            rate_text = "\n（レート取得失敗）"
+
+        msg = (
+            f"🏦 【HSBC {month}月の換金リマインダー】\n"
+            f"今月のHKD↔USD換金を忘れずに！\n"
+            f"少額でOK。口座維持のための換金です。{rate_text}\n\n"
+            f"HSBCアプリ → 外貨両替 → HKD→USD（または逆）"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"HSBC reminder error: {e}")
+
+
 def send_famm_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -1583,6 +1612,8 @@ def post_to_x_evening():
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
+# 毎月1日朝8時30分：HSBC換金リマインダー
+scheduler.add_job(send_hsbc_reminder, 'cron', day=1, hour=8, minute=30)
 # 毎月1日朝9時：Famm更新リマインダー
 scheduler.add_job(send_famm_reminder, 'cron', day=1, hour=9, minute=0)
 # 毎月6日朝9時：Famm期限3日前リマインダー
