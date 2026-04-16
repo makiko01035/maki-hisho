@@ -27,6 +27,8 @@ JST = pytz.timezone('Asia/Tokyo')
 PENDING_FILE = '/tmp/pending_events.json'
 SEKISUI_SESSION_FILE = '/tmp/sekisui_sessions.json'
 YAKUZEN_SESSION_FILE = '/tmp/yakuzen_sessions.json'
+PRINTS_FILE = '/tmp/school_prints.json'
+PRINT_SESSION_FILE = '/tmp/print_sessions.json'
 
 
 def load_pending_events():
@@ -75,6 +77,38 @@ def save_yakuzen_sessions(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"yakuzen_sessions save error: {e}")
+
+
+def load_prints():
+    try:
+        with open(PRINTS_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_prints(data):
+    try:
+        with open(PRINTS_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"prints save error: {e}")
+
+
+def load_print_sessions():
+    try:
+        with open(PRINT_SESSION_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_print_sessions(data):
+    try:
+        with open(PRINT_SESSION_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"print_sessions save error: {e}")
 
 
 def get_yakuzen_wp_creds():
@@ -1461,6 +1495,86 @@ def handle_image(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"画像の取得に失敗しました😢\nエラー: {str(e)[:100]}"))
         return
 
+    # プリントセッションチェック
+    print_sessions = load_print_sessions()
+    if user_id in print_sessions and print_sessions[user_id] == 'waiting_for_print_image':
+        del print_sessions[user_id]
+        save_print_sessions(print_sessions)
+        try:
+            response = anthropic_client.messages.create(
+                model='claude-sonnet-4-6',
+                max_tokens=1000,
+                messages=[{
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'image',
+                            'source': {
+                                'type': 'base64',
+                                'media_type': media_type,
+                                'data': image_base64
+                            }
+                        },
+                        {
+                            'type': 'text',
+                            'text': """これは学校や習い事から届いたプリント・お知らせです。
+以下のJSON形式で情報を抽出してください（情報がない場合はnullにしてください）：
+{
+  "title": "プリント名・タイトル",
+  "category": "カテゴリ（行事/提出物/集金/持ち物/アンケート/連絡/その他）",
+  "deadline": "締切・提出期限（YYYY-MM-DD形式、ない場合はnull）",
+  "amount": "集金額（例：500円、ない場合はnull）",
+  "items": "持ち物・提出物の内容（ない場合はnull）",
+  "notes": "その他重要なメモ（ない場合はnull）"
+}
+JSON形式のみ返してください。"""
+                        }
+                    ]
+                }]
+            )
+            raw_text = response.content[0].text.strip()
+            import re
+            if '```' in raw_text:
+                match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+                if match:
+                    raw_text = match.group(1).strip()
+            start = raw_text.find('{')
+            end = raw_text.rfind('}')
+            print_data = json.loads(raw_text[start:end+1])
+
+            prints = load_prints()
+            user_prints = prints.get(user_id, [])
+            new_id = max([p['id'] for p in user_prints], default=0) + 1
+            print_data['id'] = new_id
+            print_data['created_at'] = datetime.date.today().isoformat()
+            print_data['done'] = False
+            user_prints.append(print_data)
+            prints[user_id] = user_prints
+            save_prints(prints)
+
+            msg = f"📄 プリントを保存しました！（No.{new_id}）\n\n"
+            msg += f"📌 {print_data.get('title') or '（タイトル不明）'}\n"
+            msg += f"🏷️ {print_data.get('category') or '不明'}\n"
+            if print_data.get('deadline'):
+                msg += f"⚠️ 締切: {print_data['deadline']}\n"
+            if print_data.get('amount'):
+                msg += f"💴 集金: {print_data['amount']}\n"
+            if print_data.get('items'):
+                msg += f"🎒 持ち物: {print_data['items']}\n"
+            if print_data.get('notes'):
+                msg += f"📝 メモ: {print_data['notes']}\n"
+
+            if print_data.get('deadline'):
+                msg += f"\n「プリント登録 {new_id}」で締切をカレンダーに登録できます！"
+
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+        except Exception as e:
+            print(f"Print extract error: {e}")
+            import traceback; traceback.print_exc()
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"プリントの読み取りに失敗しました😢\nエラー: {str(e)[:100]}"))
+        return
+
+
     # Claudeで画像からイベント情報を抽出
     try:
         response = anthropic_client.messages.create(
@@ -2000,6 +2114,16 @@ def generate_x_post():
     return response.content[0].text.strip()
 
 
+def send_note_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="📝 【noteリマインド】\nX投稿が2週間分溜まりました！\n\nnoteに記事を貼る準備ができたら、Claude Codeに\n「noteに記事貼りたい」と声かけてね✨\n\n下書きは保存してあるのでいつでも対応できます！"
+        ))
+    except Exception as e:
+        print(f"Note reminder error: {e}")
+
+
 def post_to_x_daily():
     try:
         api_key = os.environ.get('X_API_KEY')
@@ -2045,6 +2169,8 @@ scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
 # 毎日朝8時30分：X（Twitter）自動投稿
 scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
+# 4月30日朝9時：noteリマインド（X投稿2週間分溜まったタイミング）
+scheduler.add_job(send_note_reminder, 'cron', month=4, day=30, hour=9, minute=0)
 scheduler.start()
 
 if __name__ == '__main__':
