@@ -880,6 +880,21 @@ def ping():
     return 'OK'
 
 
+@app.route('/check-creds')
+def check_creds():
+    """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
+    try:
+        raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+        parsed = json.loads(raw)
+        keys = list(parsed.keys())
+        scopes = parsed.get('scopes', [])
+        has_refresh = bool(parsed.get('refresh_token'))
+        return f"OK\nkeys: {keys}\nscopes: {scopes}\nhas_refresh_token: {has_refresh}\nfirst_30_chars: {raw[:30]}"
+    except Exception as e:
+        raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+        return f"JSON parse error: {e}\nfirst_80_chars: {raw[:80]}", 500
+
+
 @app.route('/company')
 def company_dashboard():
     now = datetime.datetime.now(JST)
@@ -1688,10 +1703,20 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
         except Exception as e:
-            print(f"Calendar insert error: {e}")
+            import traceback
+            tb = traceback.format_exc()
+            print(f"Calendar insert error: {e}\n{tb}")
+            # どのステップで失敗したか判別
+            err_str = str(e)
+            if 'GOOGLE_CREDENTIALS' in tb or 'json' in err_str.lower():
+                detail = f"Google認証情報の読み込みエラー:\n{err_str[:120]}"
+            elif 'HttpError' in err_str or 'googleapis' in err_str:
+                detail = f"GoogleカレンダーAPIエラー:\n{err_str[:120]}"
+            else:
+                detail = err_str[:120]
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=f"登録中にエラーが発生しました😢\n{str(e)[:100]}")
+                TextSendMessage(text=f"登録中にエラーが発生しました😢\n{detail}")
             )
         return
 
