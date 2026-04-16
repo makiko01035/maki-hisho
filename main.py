@@ -1486,9 +1486,24 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
         )
 
         raw_text = response.content[0].text.strip()
+        # Markdownコードブロックを除去
+        if '```' in raw_text:
+            import re
+            match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
+            if match:
+                raw_text = match.group(1).strip()
+        # JSON配列を抽出してパース
         start = raw_text.find('[')
-        decoder = json.JSONDecoder()
-        extracted_list, _ = decoder.raw_decode(raw_text, start)
+        end = raw_text.rfind(']')
+        if start == -1 or end == -1:
+            # 配列がない場合はオブジェクトを探す
+            start = raw_text.find('{')
+            end = raw_text.rfind('}')
+            json_str = raw_text[start:end+1]
+            extracted_list = [json.loads(json_str)]
+        else:
+            json_str = raw_text[start:end+1]
+            extracted_list = json.loads(json_str)
         if isinstance(extracted_list, dict):
             extracted_list = [extracted_list]
         pending_events = load_pending_events()
