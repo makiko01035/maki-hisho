@@ -1949,6 +1949,80 @@ def send_monthly_review_reminder():
         print(f"Monthly review reminder error: {e}")
 
 
+# ========== X（Twitter）自動投稿 ==========
+
+X_POST_TOPICS = [
+    ("LINE秘書ボットをゼロから作った話", "#AI副業 #Claude #子育て中ママ"),
+    ("チラシ画像を送るとGoogleカレンダーに自動登録される仕組みを作った", "#AI副業 #自動化 #Claude"),
+    ("薬膳ブログをLINEから1タップで投稿できるようにした", "#AI副業 #ブログ自動化 #Claude"),
+    ("セキスイブログの記事をAIが自動生成して即公開する仕組み", "#AI副業 #ブログ #自動化"),
+    ("eBay商品タイトルをAIで自動生成する方法", "#AI副業 #eBay #物販"),
+    ("Renderで月0円のサーバーを運用している話", "#AI副業 #Claude #個人開発"),
+    ("医療職×子育て中でもAI副業できる理由", "#AI副業 #子育て中ママ #副業"),
+    ("Claude Codeで自分だけのAI会社を作った", "#ClaudeCode #AI副業 #副業"),
+    ("Googleカレンダー連携で予定管理を完全自動化した", "#AI副業 #自動化 #Claude"),
+    ("アフィリエイトブログをAIで半自動化した話", "#AI副業 #アフィリエイト #ブログ"),
+    ("プログラミング知識ゼロからLINEボットを作った体験談", "#AI副業 #Claude #初心者"),
+    ("Claude Codeと1日どう付き合っているか", "#ClaudeCode #AI副業 #副業"),
+    ("子育て中でも副業できるAIの使い方", "#AI副業 #子育て中ママ #時短"),
+    ("副業を始めてAIで変わったこと", "#AI副業 #Claude #副業"),
+    ("時間がない医療職がAI副業を続けられる理由", "#AI副業 #医療職 #副業"),
+]
+
+
+def generate_x_post():
+    today = datetime.datetime.now(JST)
+    start_date = datetime.datetime(2026, 4, 16, tzinfo=JST)
+    day_num = (today - start_date).days
+    topic, hashtags = X_POST_TOPICS[day_num % len(X_POST_TOPICS)]
+
+    prompt = f"""あなたは医療職・子育て中・AI副業実践中の「まき」としてXに投稿します。
+テーマ：{topic}
+使うハッシュタグ：{hashtags}
+
+条件：
+- 本文＋ハッシュタグ合計で140文字以内
+- 実体験ベースの口語体（「〜した」「〜できた」など）
+- 共感・驚き・ためになる内容
+- 絵文字を1〜2個
+- ハッシュタグは末尾にまとめる
+
+投稿文のみ返してください。"""
+
+    response = anthropic_client.messages.create(
+        model='claude-haiku-4-5-20251001',
+        max_tokens=200,
+        messages=[{'role': 'user', 'content': prompt}]
+    )
+    return response.content[0].text.strip()
+
+
+def post_to_x_daily():
+    try:
+        api_key = os.environ.get('X_API_KEY')
+        api_secret = os.environ.get('X_API_SECRET')
+        access_token = os.environ.get('X_ACCESS_TOKEN')
+        access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET')
+
+        if not all([api_key, api_secret, access_token, access_token_secret]):
+            print("X API keys not configured, skipping post")
+            return
+
+        import tweepy
+        client = tweepy.Client(
+            consumer_key=api_key,
+            consumer_secret=api_secret,
+            access_token=access_token,
+            access_token_secret=access_token_secret
+        )
+
+        post_text = generate_x_post()
+        client.create_tweet(text=post_text)
+        print(f"X post successful: {post_text[:50]}...")
+    except Exception as e:
+        print(f"X post error: {e}")
+
+
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
@@ -1966,6 +2040,8 @@ scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, m
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
 # 毎週月曜朝9時：A8審査確認リマインダー（全審査通過後に削除してOK）
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
+# 毎日朝8時30分：X（Twitter）自動投稿
+scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
 scheduler.start()
 
 if __name__ == '__main__':
