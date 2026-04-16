@@ -1708,8 +1708,8 @@ def handle_message(event):
             print(f"Calendar insert error: {e}\n{tb}")
             # どのステップで失敗したか判別
             err_str = str(e)
-            if 'GOOGLE_CREDENTIALS' in tb or 'json' in err_str.lower():
-                detail = f"Google認証情報の読み込みエラー:\n{err_str[:120]}"
+            if 'GOOGLE_CREDENTIALS' in tb or ('json' in err_str.lower() and 'double quotes' in err_str.lower()):
+                detail = "Google認証情報が壊れています😢\n\nRenderの GOOGLE_CREDENTIALS を credentials_for_render.txt の内容で更新してください。"
             elif 'HttpError' in err_str or 'googleapis' in err_str:
                 detail = f"GoogleカレンダーAPIエラー:\n{err_str[:120]}"
             else:
