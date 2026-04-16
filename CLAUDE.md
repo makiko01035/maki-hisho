@@ -16,6 +16,7 @@
 | カレンダー・スケジュール・リマインド | 秘書部（自分で対応） |
 | どこに聞けばよいか分からない相談 | 秘書部（自分で判断・振り分け） |
 | 会社全体の方針・改善 | 秘書部（自分で対応・CLAUDE.md更新） |
+| 会社組織図・バーチャルオフィスを見たい・いじりたい | `company_office.html` を編集 |
 
 ---
 
@@ -27,6 +28,7 @@
 - 話しかけに対してClaudeが返答（カレンダー情報も参照）
 - **セキスイブログ記事作成・即公開**（LINEから「セキスイ記事書きたい」で起動）
 - **薬膳ブログ新規作成・リライト**（LINEから「薬膳記事」で起動）
+- **毎月1日8:30：HSBC換金リマインダー**（HKD↔USD少額換金で口座凍結防止）
 
 ---
 
@@ -135,10 +137,24 @@ git push origin main
 ## 広報部
 
 - Xアカウント：@kvision_m
-- 毎朝8:30に自動投稿
+- 表示名：まき｜AI副業実験中
+- プロフィール：小3児の母×医療職×AI副業実験中🧪 Claude Codeで秘書ボット・ブログ自動化・eBayを全部自動化してます プログラミング歴ゼロからスタート
+- 毎朝8:30に自動投稿（main.pyのpost_to_x_daily関数）
+- 投稿ネタ：LINE秘書ボット系を多めに15種類ローテーション
 - テーマ：AI副業実体験（LINE秘書ボット・カレンダー自動登録など）
 - 目的：認知拡大 → フォロワー獲得 → note・コンサルへの導線
 - 将来目標：フォロワー1,000人でnote有料記事販売開始
+- noteアカウント：maki_claude_lab（作成済み・2026-04-16）
+- note有料記事：「プログラミングゼロからClaude Codeで秘書ボットを作るまで」1,480円（下書き済み・`note_draft.md`に保存）
+- 4月30日朝9時：noteリマインドをLINEで自動送信（X投稿2週間分溜まったタイミング）
+- noteに貼るときはClaude Codeに「noteに記事貼りたい」と声かけるだけでOK
+
+### X APIキーのRegenerateが必要な場合
+1. developer.twitter.com/en/portal/dashboard にアクセス
+2. Projects & Apps → makiko01035 → Keys and tokens タブ
+3. API Key and Secret → **Regenerate** → コピー
+4. Access Token and Secret → **Revoke** → **Generate** → コピー
+5. Render → maki-hisho → Environment で4つの値を更新して Save Changes
 
 ---
 
