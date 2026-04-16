@@ -1417,6 +1417,26 @@ def send_hsbc_reminder():
         print(f"HSBC reminder error: {e}")
 
 
+def send_zaitage_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        msg = (
+            "🏠【在宅専門医 週次リマインダー】\n\n"
+            "今週も少しだけ進めよう！\n\n"
+            "📋 今すぐできること\n"
+            "・他施設研修 2か所目の問い合わせ\n"
+            "・ポートフォリオのテーマを1つ決める\n"
+            "・症例を1〜2例メモする\n\n"
+            "⚠️ 2026年10〜11月の受験登録を忘れずに！\n"
+            "実践者コースは2027年が実質ラストチャンス。\n\n"
+            "Notionで進捗確認👇\n"
+            "https://www.notion.so/344f8d6d41de818db44fc33af7cf39e5"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"Zaitage reminder error: {e}")
+
+
 def send_famm_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -1551,7 +1571,7 @@ def send_note_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
         line_bot_api.push_message(user_id, TextSendMessage(
-            text="📝 【noteリマインド】\nX投稿が2週間分溜まりました！\n\nnoteに記事を貼る準備ができたら、Claude Codeに\n「noteに記事貼りたい」と声かけてね✨\n\n下書きは保存してあるのでいつでも対応できます！"
+            text="📝 【noteリマインド】\n今月もX投稿が溜まりました！\n\nそろそろnote記事が書けそうなネタはありますか？\nClaude Codeに「note書きたい」と話しかけてみてね✨"
         ))
     except Exception as e:
         print(f"Note reminder error: {e}")
@@ -1628,12 +1648,14 @@ scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, m
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
 # 毎週月曜朝9時：A8審査確認リマインダー（全審査通過後に削除してOK）
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
+# 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
+scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minute=10)
 # 毎日朝8:30・昼12:30（奇数日のみ）・夜19:30：X（Twitter）自動投稿（2〜3本/日）
 scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
 scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
 scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
-# 4月30日朝9時：noteリマインド（X投稿2週間分溜まったタイミング）
-scheduler.add_job(send_note_reminder, 'cron', month=4, day=30, hour=9, minute=0)
+# 毎月末日朝9時：noteリマインド
+scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
 scheduler.start()
 
 if __name__ == '__main__':
