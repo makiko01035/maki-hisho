@@ -1623,6 +1623,8 @@ def handle_message(event):
                     if extracted.get('end_time'):
                         end_dt = datetime.datetime.fromisoformat(f"{extracted['date']}T{extracted['end_time']}:00")
                         end_dt = JST.localize(end_dt)
+                        if end_dt <= start_dt:
+                            end_dt += datetime.timedelta(days=1)
                     else:
                         end_dt = start_dt + datetime.timedelta(hours=1)
                     event_body = {
