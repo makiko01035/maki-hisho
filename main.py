@@ -1607,6 +1607,12 @@ def handle_message(event):
 
     # 画像確認後の「登録して」コマンド
     pending_events = load_pending_events()
+    if user_message == '登録して' and user_id not in pending_events:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="📋 登録するチラシ画像が見つかりません。\n\nもう一度チラシの画像を送ってから「登録して」と送ってください！")
+        )
+        return
     if user_message == '登録して' and user_id in pending_events:
         extracted_list = pending_events.pop(user_id)
         save_pending_events(pending_events)
