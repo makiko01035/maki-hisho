@@ -1629,10 +1629,10 @@ def send_note_reminder():
 
 def _get_x_client():
     import tweepy
-    api_key = os.environ.get('X_API_KEY')
-    api_secret = os.environ.get('X_API_SECRET')
-    access_token = os.environ.get('X_ACCESS_TOKEN')
-    access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET')
+    api_key = (os.environ.get('X_API_KEY') or '').strip()
+    api_secret = (os.environ.get('X_API_SECRET') or '').strip()
+    access_token = (os.environ.get('X_ACCESS_TOKEN') or '').strip()
+    access_token_secret = (os.environ.get('X_ACCESS_TOKEN_SECRET') or '').strip()
     if not all([api_key, api_secret, access_token, access_token_secret]):
         return None
     return tweepy.Client(
