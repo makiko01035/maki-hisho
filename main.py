@@ -235,6 +235,18 @@ def test_x_post():
         return f'Error: {e}', 500
 
 
+@app.route('/debug-x-keys')
+def debug_x_keys():
+    def mask(v):
+        return (v[:6] + '...' + v[-4:]) if v and len(v) > 10 else ('(empty)' if not v else v)
+    return {
+        'X_API_KEY': mask(os.environ.get('X_API_KEY')),
+        'X_API_SECRET': mask(os.environ.get('X_API_SECRET')),
+        'X_ACCESS_TOKEN': mask(os.environ.get('X_ACCESS_TOKEN')),
+        'X_ACCESS_TOKEN_SECRET': mask(os.environ.get('X_ACCESS_TOKEN_SECRET')),
+    }
+
+
 @app.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
