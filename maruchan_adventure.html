@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>まるちゃんタイピング大作戦</title>
+<style>
+  body {
+    margin: 0; background: #080818;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100vh; font-family: 'Courier New', monospace;
+    overflow: hidden; user-select: none;
+  }
+  canvas { border: 3px solid #ff69b4; border-radius: 10px; box-shadow: 0 0 30px rgba(255,105,180,0.4); }
+</style>
+</head>
+<body>
+<canvas id="game" width="760" height="440"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = 760, H = 440, FLOOR = 370;
+
+// ── 難易度設定 ────────────────────────────────────────────
+const DIFFICULTY = {
+  easy: {
+    label: 'かんたん',
+    color: '#66ffaa',
+    words: ['cat','dog','sun','red','run','hot','ice','fly','big','top',
+             'cup','map','bed','car','key','hi','bye','yes','no','go'],
+    spawnInterval: 280, enemySpeed: 0.55, maxEnemies: 2,
+  },
+  normal: {
+    label: 'ふつう',
+    color: '#FFD700',
+    words: ['apple','light','cloud','flame','magic','music','power','space',
+             'dream','lucky','japan','candy','happy','tiger','bunny',
+             'hoshi','tsuki','yuki','kaze','sakura','ramen','ninja','anime'],
+    spawnInterval: 200, enemySpeed: 0.85, maxEnemies: 3,
+  },
+  hard: {
+    label: 'むずかしい',
+    color: '#ff6677',
+    words: ['thunder','crystal','rainbow','journey','harmony','freedom',
+             'diamond','victory','fantasy','princess','adventure','beautiful',
+             'hiragana','katakana','samurai','origami','chocolate','butterfly',
+             'strawberry','sunflower','shinkansen','programming'],
+    spawnInterval: 140, enemySpeed: 1.2, maxEnemies: 4,
+  },
+};
+
+// ── State ────────────────────────────────────────────────
+let mode = 'title'; // title | play | result
+let diff = null;
+let score = 0, combo = 0, maxCombo = 0;
+let totalTyped = 0, totalMiss = 0;
+let frame = 0, spawnTimer = 0;
+let missFlash = 0;
+
+const player = { x: W/2, y: FLOOR-36, facing: 1, atkAnim: 0 };
+let enemies = [], particles = [], floats = [], stars = [];
+
+for (let i = 0; i < 55; i++)
+  stars.push({ x: Math.random()*W, y: Math.random()*H*0.75, r: Math.random()*1.8+0.5, t: Math.random()*Math.PI*2 });
+
+let currentInput = '';
+let target = null;
+
+// ── Spawn / defeat ────────────────────────────────────────
+function spawnEnemy() {
+  const words = diff.words;
+  const word = words[Math.floor(Math.random()*words.length)];
+  const fromLeft = Math.random() < 0.5;
+  enemies.push({
+    x: fromLeft ? -45 : W+45,
+    y: FLOOR - 32,
+    w: 32, h: 32,
+    vx: (fromLeft ? 1 : -1) * diff.enemySpeed,
+    word, typed: 0,
+    alive: true, walk: 0,
+    type: ['waddle','hothead','chilly','spark'][Math.floor(Math.random()*4)],
+  });
+}
+
+const TYPE_COLOR = { waddle:'#FF8C00', hothead:'#FF4500', chilly:'#77CCEE', spark:'#FFD700' };
+
+function addParticles(x, y, color) {
+  for (let i = 0; i < 14; i++) {
+    const a = Math.random()*Math.PI*2, s = 2+Math.random()*5;
+    particles.push({ x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s-2, life: 30, max: 30, color });
+  }
+}
+
+function addFloat(x, y, text, color) {
+  floats.push({ x, y, text, color, life: 50, max: 50 });
+}
+
+function defeatEnemy(e) {
+  e.alive = false;
+  combo++; if (combo > maxCombo) maxCombo = combo;
+  const pts = (combo >= 5 ? 300 : combo >= 3 ? 200 : 100);
+  score += pts;
+  addParticles(e.x+e.w/2, e.y+e.h/2, TYPE_COLOR[e.type]);
+  addFloat(e.x+e.w/2, e.y-8, combo>=3 ? `${combo}COMBO! +${pts}` : `+${pts}`, combo>=3?'#FFD700':'#fff');
+  player.atkAnim = 12;
+  currentInput = ''; target = null;
+}
+
+// ── Input ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey) return;
+  e.preventDefault();
+  const k = e.key;
+
+  if (mode === 'title') {
+    if (k === '1') startGame('easy');
+    if (k === '2') startGame('normal');
+    if (k === '3') startGame('hard');
+    return;
+  }
+  if (mode === 'result') {
+    if (k === ' ' || k === 'Enter') { mode = 'title'; }
+    return;
+  }
+
+  if (k.length !== 1) return;
+  const ch = k.toLowerCase();
+
+  // Find match
+  let found = null;
+
+  // Keep current target if still valid
+  if (target && target.alive) {
+    if (target.word[target.typed] === ch) { found = target; }
+  }
+
+  // Try to find new target starting with ch
+  if (!found) {
+    for (const en of enemies) {
+      if (!en.alive) continue;
+      if (en.word[en.typed === 0 ? 0 : en.typed] === ch && en === target) { found = en; break; }
+    }
+    // New target: enemy whose word starts with ch (from position 0)
+    if (!found) {
+      for (const en of enemies) {
+        if (!en.alive) continue;
+        if (en.word[0] === ch) { found = en; found.typed = 0; break; }
+      }
+    }
+  }
+
+  if (!found) {
+    // Miss
+    totalMiss++;
+    combo = 0;
+    missFlash = 10;
+    if (target) target.typed = 0;
+    target = null; currentInput = '';
+    addFloat(player.x, player.y-20, 'ミス！', '#ff4466');
+    return;
+  }
+
+  // Correct
+  found.typed++;
+  totalTyped++;
+  currentInput = found.word.slice(0, found.typed);
+  target = found;
+  player.facing = found.x < player.x ? -1 : 1;
+  player.atkAnim = 6;
+  if (found.typed >= found.word.length) defeatEnemy(found);
+});
+
+function startGame(d) {
+  diff = DIFFICULTY[d];
+  score = 0; combo = 0; maxCombo = 0;
+  totalTyped = 0; totalMiss = 0;
+  enemies = []; particles = []; floats = [];
+  currentInput = ''; target = null;
+  player.facing = 1; player.atkAnim = 0;
+  spawnTimer = 0; frame = 0;
+  spawnEnemy();
+  mode = 'play';
+}
+
+// ── Update ────────────────────────────────────────────────
+function update() {
+  frame++;
+  for (const s of stars) s.t += 0.035;
+  if (mode !== 'play') return;
+
+  // Spawn
+  spawnTimer++;
+  const liveCount = enemies.filter(e=>e.alive).length;
+  if (spawnTimer >= diff.spawnInterval && liveCount < diff.maxEnemies) {
+    spawnEnemy(); spawnTimer = 0;
+  }
+
+  // Enemies
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    e.walk++; e.x += e.vx;
+    if (Math.abs((e.x+e.w/2) - player.x) < 30) {
+      e.alive = false;
+      missFlash = 15;
+      combo = 0;
+      if (target === e) { target = null; currentInput = ''; }
+      addFloat(player.x, player.y-25, 'やられた！', '#ff4466');
+    }
+  }
+
+  enemies = enemies.filter(e => e.alive || true).filter(e => e.alive || (e.x < -80 || e.x > W+80));
+  enemies = enemies.filter(e => e.alive);
+
+  for (const p of particles) { p.x+=p.vx; p.y+=p.vy; p.vy+=0.14; p.life--; }
+  for (const f of floats)    { f.y -= 0.9; f.life--; }
+  particles = particles.filter(p=>p.life>0);
+  floats    = floats.filter(f=>f.life>0);
+
+  if (player.atkAnim>0) player.atkAnim--;
+  if (missFlash>0)      missFlash--;
+
+  // Auto-end after 90 seconds
+  if (frame > 90*60) { mode = 'result'; }
+}
+
+// ── Draw helpers ──────────────────────────────────────────
+function drawBg() {
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#060614'); g.addColorStop(1,'#121244');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  for (const s of stars) {
+    ctx.fillStyle=`rgba(255,255,255,${0.3+0.7*Math.abs(Math.sin(s.t))})`;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+  if (missFlash>0) {
+    ctx.fillStyle=`rgba(255,0,60,${missFlash/15*0.2})`; ctx.fillRect(0,0,W,H);
+  }
+}
+
+function drawFloor() {
+  const g = ctx.createLinearGradient(0,FLOOR,0,H);
+  g.addColorStop(0,'#4e8a5a'); g.addColorStop(0.12,'#2d4a30'); g.addColorStop(1,'#1a2e1c');
+  ctx.fillStyle=g; ctx.fillRect(0,FLOOR,W,H-FLOOR);
+  ctx.fillStyle='rgba(255,255,255,0.08)'; ctx.fillRect(0,FLOOR,W,3);
+}
+
+function drawPlayer() {
+  const cx=player.x, cy=player.y+18;
+  const eo=player.facing*3;
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.beginPath(); ctx.ellipse(cx,FLOOR+4,16,5,0,0,Math.PI*2); ctx.fill();
+  // Body
+  ctx.fillStyle='#FF69B4';
+  ctx.beginPath(); ctx.ellipse(cx,cy,20,20,0,0,Math.PI*2); ctx.fill();
+  // Highlight
+  ctx.fillStyle='rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.ellipse(cx-6,cy-7,8,5,-0.3,0,Math.PI*2); ctx.fill();
+  // Blush
+  ctx.fillStyle='rgba(255,80,120,0.45)';
+  ctx.beginPath(); ctx.ellipse(cx-10,cy+3,5,3,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+10,cy+3,5,3,0,0,Math.PI*2); ctx.fill();
+  // Eyes
+  ctx.fillStyle='#111';
+  ctx.beginPath(); ctx.ellipse(cx-6+eo,cy-1,2.5,3,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+6+eo,cy-1,2.5,3,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='white';
+  ctx.beginPath(); ctx.arc(cx-5+eo,cy-2,1,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+7+eo,cy-2,1,0,Math.PI*2); ctx.fill();
+  // Feet
+  ctx.fillStyle='#cc2266';
+  const step=Math.sin(frame*0.15)*2;
+  ctx.beginPath(); ctx.ellipse(cx-8,cy+18+step,6,4,-0.2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+8,cy+18-step,6,4, 0.2,0,Math.PI*2); ctx.fill();
+  // Attack beam
+  if (player.atkAnim>0) {
+    const a=player.atkAnim/12;
+    ctx.strokeStyle=`rgba(255,255,100,${a})`; ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(cx+player.facing*22, cy);
+    ctx.lineTo(cx+player.facing*(22+a*120), cy);
+    ctx.stroke();
+    ctx.shadowColor='#FFD700'; ctx.shadowBlur=14;
+    ctx.fillStyle=`rgba(255,220,0,${a})`;
+    ctx.beginPath(); ctx.arc(cx+player.facing*(22+a*120),cy,6,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+  }
+}
+
+function drawEnemy(e) {
+  const cx=e.x+e.w/2, cy=e.y+e.h/2;
+  const bob=Math.sin(e.walk*0.18)*2.5;
+  const isTarget=target===e;
+
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.18)';
+  ctx.beginPath(); ctx.ellipse(cx,FLOOR+3,12,4,0,0,Math.PI*2); ctx.fill();
+
+  // Body
+  ctx.fillStyle=TYPE_COLOR[e.type];
+  ctx.beginPath(); ctx.ellipse(cx,cy+bob,e.w/2,e.h/2,0,0,Math.PI*2); ctx.fill();
+  if (isTarget) {
+    ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(cx,cy+bob,e.w/2+3,e.h/2+3,0,0,Math.PI*2); ctx.stroke();
+  }
+  // Eyes
+  const fd=e.vx>0?0.08:-0.08;
+  ctx.fillStyle='#222';
+  ctx.beginPath(); ctx.ellipse(cx-e.w*0.2+fd*e.w,cy-e.h*0.05+bob,e.w*0.1,e.h*0.13,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx+e.w*0.2+fd*e.w,cy-e.h*0.05+bob,e.w*0.1,e.h*0.13,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='white';
+  ctx.beginPath(); ctx.arc(cx-e.w*0.14+fd*e.w,cy-e.h*0.1+bob,e.w*0.04,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+e.w*0.24+fd*e.w,cy-e.h*0.1+bob,e.w*0.04,0,Math.PI*2); ctx.fill();
+
+  // Word bubble
+  const word=e.word;
+  ctx.font='bold 16px Courier New';
+  const tw=ctx.measureText(word).width;
+  const bx=cx-tw/2-8, by=e.y-38+bob;
+  ctx.fillStyle=isTarget?'rgba(255,255,255,0.16)':'rgba(0,0,0,0.6)';
+  ctx.strokeStyle=isTarget?'rgba(255,255,255,0.7)':'rgba(255,255,255,0.15)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.roundRect(bx,by,tw+16,26,6); ctx.fill(); ctx.stroke();
+  // Triangle pointer
+  ctx.fillStyle=isTarget?'rgba(255,255,255,0.16)':'rgba(0,0,0,0.6)';
+  ctx.beginPath(); ctx.moveTo(cx-5,e.y-12+bob); ctx.lineTo(cx+5,e.y-12+bob); ctx.lineTo(cx,e.y-6+bob); ctx.fill();
+
+  // Letters
+  let dx=cx-tw/2;
+  for (let i=0;i<word.length;i++) {
+    if (i<e.typed) {
+      ctx.fillStyle='#44FF88'; ctx.shadowColor='#00ff66'; ctx.shadowBlur=5;
+    } else if (i===e.typed && isTarget) {
+      ctx.fillStyle=`hsl(${frame*5%360},100%,72%)`; ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=8;
+    } else {
+      ctx.fillStyle=isTarget?'#fff':'#999'; ctx.shadowBlur=0;
+    }
+    ctx.fillText(word[i],dx,by+19);
+    dx+=ctx.measureText(word[i]).width;
+  }
+  ctx.shadowBlur=0;
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha=p.life/p.max;
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*(p.life/p.max),0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawFloats() {
+  ctx.textAlign='center';
+  for (const f of floats) {
+    ctx.globalAlpha=f.life/f.max;
+    ctx.font='bold 14px Courier New';
+    ctx.fillStyle=f.color; ctx.shadowColor=f.color; ctx.shadowBlur=8;
+    ctx.fillText(f.text,f.x,f.y);
+  }
+  ctx.globalAlpha=1; ctx.shadowBlur=0; ctx.textAlign='left';
+}
+
+function drawHUD() {
+  // Score (top right)
+  ctx.font='bold 20px Courier New'; ctx.fillStyle='#fff';
+  ctx.textAlign='right';
+  ctx.shadowColor='#ff69b4'; ctx.shadowBlur=6;
+  ctx.fillText(`SCORE  ${score}`, W-14, 30);
+  ctx.shadowBlur=0;
+
+  // Difficulty badge (top right)
+  ctx.font='13px Courier New'; ctx.fillStyle=diff.color;
+  ctx.fillText(diff.label, W-14, 50);
+  ctx.textAlign='left';
+
+  // Combo
+  if (combo>=2) {
+    ctx.textAlign='center';
+    ctx.font=`bold ${14+Math.min(combo,8)}px Courier New`;
+    const cc=combo>=5?'#FFD700':'#ff99cc';
+    ctx.fillStyle=cc; ctx.shadowColor=cc; ctx.shadowBlur=10;
+    ctx.fillText(`${combo} COMBO`, W/2, H-16);
+    ctx.shadowBlur=0; ctx.textAlign='left';
+  }
+
+  // Accuracy
+  const total=totalTyped+totalMiss;
+  if (total>=5) {
+    const acc=Math.round(totalTyped/total*100);
+    ctx.font='13px Courier New';
+    ctx.fillStyle=acc>=90?'#66ffaa':acc>=70?'#ffdd44':'#ff6666';
+    ctx.fillText(`精度 ${acc}%`, 14, H-16);
+  }
+
+  // Timer
+  const sec=Math.max(0, 90-Math.floor(frame/60));
+  ctx.font='13px Courier New'; ctx.fillStyle='#888';
+  ctx.textAlign='center';
+  ctx.fillText(`${sec}秒`, W/2, 22);
+  ctx.textAlign='left';
+}
+
+function drawTitle() {
+  drawBg(); drawFloor();
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,H);
+
+  ctx.textAlign='center';
+  ctx.font='bold 38px Courier New';
+  ctx.fillStyle='#FF69B4'; ctx.shadowColor='#ff69b4'; ctx.shadowBlur=18;
+  ctx.fillText('まるちゃんタイピング大作戦', W/2, 100);
+  ctx.shadowBlur=0;
+
+  ctx.font='15px Courier New'; ctx.fillStyle='#aaa';
+  ctx.fillText('単語を打ち込んで敵を倒そう！  ミスしても大丈夫 ◎', W/2, 140);
+
+  // Difficulty buttons
+  const diffs = [
+    { key:'1', id:'easy',   label:'１  かんたん',   sub:'短い英単語  ゆっくり',   color:'#66ffaa' },
+    { key:'2', id:'normal', label:'２  ふつう',      sub:'少し長い単語  普通スピード', color:'#FFD700' },
+    { key:'3', id:'hard',   label:'３  むずかしい',  sub:'長い単語  速い！',       color:'#ff6677' },
+  ];
+  diffs.forEach((d, i) => {
+    const bx=W/2-150, by=185+i*70, bw=300, bh=55;
+    const hover=Math.sin(frame*0.05+i)*2;
+    ctx.fillStyle='rgba(255,255,255,0.06)';
+    ctx.strokeStyle=d.color+'88'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(bx,by+hover,bw,bh,10); ctx.fill(); ctx.stroke();
+    ctx.font=`bold 20px Courier New`; ctx.fillStyle=d.color;
+    ctx.shadowColor=d.color; ctx.shadowBlur=8;
+    ctx.fillText(d.label, W/2, by+hover+26);
+    ctx.shadowBlur=0;
+    ctx.font='13px Courier New'; ctx.fillStyle='#aaa';
+    ctx.fillText(d.sub, W/2, by+hover+44);
+  });
+
+  // Small player
+  const px=W/2, py=415;
+  ctx.fillStyle='#FF69B4'; ctx.beginPath(); ctx.arc(px,py,16,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#111';
+  ctx.beginPath(); ctx.arc(px-5,py,2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(px+5,py,2,0,Math.PI*2); ctx.fill();
+
+  ctx.textAlign='left';
+}
+
+function drawResult() {
+  drawBg();
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';
+
+  ctx.font='bold 34px Courier New'; ctx.fillStyle='#FFD700';
+  ctx.shadowColor='#FFD700'; ctx.shadowBlur=14;
+  ctx.fillText('おつかれさま！', W/2, 100);
+  ctx.shadowBlur=0;
+
+  ctx.font='16px Courier New'; ctx.fillStyle=diff.color;
+  ctx.fillText(`【 ${diff.label} 】`, W/2, 135);
+
+  const total=totalTyped+totalMiss;
+  const acc=total>0?Math.round(totalTyped/total*100):100;
+  const rows=[
+    ['スコア',     `${score} 点`,         '#ff99cc'],
+    ['最大コンボ', `${maxCombo} COMBO`,    '#FFD700'],
+    ['正確度',     `${acc} %`,            acc>=90?'#66ffaa':acc>=70?'#ffdd44':'#ff6666'],
+    ['打鍵数',     `${totalTyped} 打`,     '#88ccff'],
+    ['ミス数',     `${totalMiss} 回`,      '#ff8877'],
+  ];
+  rows.forEach(([label,val,color],i) => {
+    ctx.font='15px Courier New'; ctx.fillStyle='#888';
+    ctx.fillText(label, W/2-60, 190+i*42);
+    ctx.font='bold 22px Courier New'; ctx.fillStyle=color;
+    ctx.shadowColor=color; ctx.shadowBlur=7;
+    ctx.fillText(val, W/2+80, 190+i*42);
+    ctx.shadowBlur=0;
+  });
+
+  if (Math.sin(frame*0.08)>0) {
+    ctx.font='bold 16px Courier New'; ctx.fillStyle='#FFD700';
+    ctx.shadowColor='#FFD700'; ctx.shadowBlur=10;
+    ctx.fillText('[ Space または Enter でタイトルに戻る ]', W/2, 415);
+    ctx.shadowBlur=0;
+  }
+  ctx.textAlign='left';
+}
+
+// ── Main loop ─────────────────────────────────────────────
+function loop() {
+  update();
+  if      (mode==='title')  drawTitle();
+  else if (mode==='result') drawResult();
+  else {
+    drawBg(); drawFloor();
+    drawParticles();
+    for (const e of enemies) drawEnemy(e);
+    drawPlayer();
+    drawFloats();
+    drawHUD();
+  }
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
