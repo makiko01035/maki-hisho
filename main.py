@@ -228,11 +228,20 @@ def ping():
 
 @app.route('/test-x-post')
 def test_x_post():
+    import tweepy
     try:
-        _post_tweet(0)
-        return 'X post attempted - check logs', 200
+        client = _get_x_client()
+        if not client:
+            return 'Error: client is None (keys missing)', 500
+        post_text = generate_x_post(0)
+        resp = client.create_tweet(text=post_text)
+        return f'Success: {resp}', 200
+    except tweepy.errors.Unauthorized as e:
+        return f'401 Unauthorized - response: {e.response.text if hasattr(e, "response") else str(e)}', 401
+    except tweepy.errors.Forbidden as e:
+        return f'403 Forbidden - response: {e.response.text if hasattr(e, "response") else str(e)}', 403
     except Exception as e:
-        return f'Error: {e}', 500
+        return f'Error ({type(e).__name__}): {e}', 500
 
 
 @app.route('/debug-x-keys')
