@@ -244,6 +244,23 @@ def test_x_post():
         return f'Error ({type(e).__name__}): {e}', 500
 
 
+@app.route('/debug-x-auth')
+def debug_x_auth():
+    import tweepy, requests
+    api_key = os.environ.get('X_API_KEY', '')
+    api_secret = os.environ.get('X_API_SECRET', '')
+    access_token = os.environ.get('X_ACCESS_TOKEN', '')
+    access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET', '')
+    # OAuth1.0aでGET /2/users/me を叩いてみる（読み取りのみ）
+    try:
+        from requests_oauthlib import OAuth1
+        auth = OAuth1(api_key, api_secret, access_token, access_token_secret)
+        r = requests.get('https://api.twitter.com/2/users/me', auth=auth)
+        return {'status': r.status_code, 'body': r.json()}, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/debug-x-keys')
 def debug_x_keys():
     def mask(v):
