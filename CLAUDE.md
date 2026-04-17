@@ -137,7 +137,7 @@ git push origin main
 
 ## 広報部
 
-- Xアカウント：@kvision_m
+- Xアカウント：@maki_claude_lab
 - 表示名：まき｜AI副業実験中
 - プロフィール：小3児の母×医療職×AI副業実験中🧪 Claude Codeで秘書ボット・ブログ自動化・eBayを全部自動化してます プログラミング歴ゼロからスタート
 - 毎朝8:30に自動投稿（main.pyのpost_to_x_daily関数）
@@ -152,9 +152,9 @@ git push origin main
 - noteに貼るときはClaude Codeに「noteに記事貼りたい」と声かけるだけでOK
 
 ### X APIキーのRegenerateが必要な場合
-1. developer.twitter.com/en/portal/dashboard にアクセス
-2. Projects & Apps → makiko01035 → Keys and tokens タブ
-3. API Key and Secret → **Regenerate** → コピー
+1. console.x.com にアクセス（@maki_claude_labでログイン）
+2. アプリ → アプリをクリック → OAuth 1.0キー
+3. コンシューマーキー → **再生成** → コピー
 4. Access Token and Secret → **Revoke** → **Generate** → コピー
 5. Render → maki-hisho → Environment で4つの値を更新して Save Changes
 
