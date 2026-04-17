@@ -226,6 +226,15 @@ def ping():
     return 'OK'
 
 
+@app.route('/test-x-post')
+def test_x_post():
+    try:
+        _post_tweet(0)
+        return 'X post attempted - check logs', 200
+    except Exception as e:
+        return f'Error: {e}', 500
+
+
 @app.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
