@@ -881,6 +881,20 @@ def auth_pinterest_boards():
     return f'エラー: {res.status_code} {res.text}', 400
 
 
+@app.route('/ebay-callback')
+def ebay_callback():
+    code = request.args.get('code')
+    if not code:
+        return 'codeパラメータが見つかりません。', 400
+    return f'''<html><head><meta charset="utf-8"></head><body>
+<h2>eBay認証成功！</h2>
+<p>以下のcodeをClaude Codeに貼り付けてください：</p>
+<textarea rows="4" cols="80" onclick="this.select()">{code}</textarea>
+<br><br>
+<p style="color:gray">このページを閉じてOKです。</p>
+</body></html>'''
+
+
 @app.route('/trigger/morning', methods=['GET', 'POST'])
 def trigger_morning():
     threading.Thread(target=send_morning_message).start()
