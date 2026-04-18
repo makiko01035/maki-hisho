@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>まきの会社 - バーチャルオフィス</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; image-rendering: pixelated; }
+
+  body {
+    background: #0d0d1a;
+    font-family: 'Press Start 2P', monospace;
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(180deg, #1a0030 0%, #0d0d1a 100%);
+    border-bottom: 3px solid #ff69b4;
+  }
+
+  .header h1 {
+    font-size: 14px;
+    color: #ff69b4;
+    text-shadow: 0 0 10px #ff69b4, 2px 2px 0 #800040;
+    letter-spacing: 2px;
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .header .subtitle {
+    font-size: 7px;
+    color: #aaa;
+    margin-top: 8px;
+  }
+
+  @keyframes glow {
+    from { text-shadow: 0 0 5px #ff69b4, 2px 2px 0 #800040; }
+    to   { text-shadow: 0 0 20px #ff69b4, 0 0 40px #ff00aa, 2px 2px 0 #800040; }
+  }
+
+  .office {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 16px;
+    padding: 20px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* 社長エリア */
+  .ceo-area {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, #1a0030, #2d0050);
+    border: 3px solid #ffd700;
+    border-radius: 4px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative;
+  }
+
+  .ceo-area::before {
+    content: '👑 社長室';
+    position: absolute;
+    top: -12px;
+    left: 16px;
+    background: #ffd700;
+    color: #0d0d1a;
+    font-size: 8px;
+    padding: 2px 8px;
+  }
+
+  /* 部署ボックス */
+  .dept {
+    background: #111128;
+    border: 3px solid;
+    border-radius: 4px;
+    padding: 14px;
+    position: relative;
+    min-height: 220px;
+    overflow: hidden;
+  }
+
+  .dept::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, currentColor, transparent);
+  }
+
+  .dept-hisho  { border-color: #00ffff; color: #00ffff; }
+  .dept-bussan { border-color: #ff6b35; color: #ff6b35; }
+  .dept-blog   { border-color: #7fff00; color: #7fff00; }
+  .dept-kouhou { border-color: #ff69b4; color: #ff69b4; }
+
+  .dept-label {
+    font-size: 8px;
+    position: absolute;
+    top: -12px;
+    left: 12px;
+    background: #0d0d1a;
+    padding: 2px 8px;
+    border: 2px solid currentColor;
+  }
+
+  .dept-sublabel {
+    font-size: 6px;
+    color: #666;
+    margin-top: 18px;
+    margin-bottom: 10px;
+  }
+
+  /* ピクセルキャラクター */
+  .pixel-char {
+    width: 32px;
+    height: 32px;
+    display: inline-block;
+    position: relative;
+  }
+
+  /* SVGベースのピクセルキャラ */
+  .char-maki svg,
+  .char-ai svg { width: 32px; height: 32px; }
+
+  .scene {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .agent {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .agent-name {
+    font-size: 5px;
+    text-align: center;
+    max-width: 48px;
+  }
+
+  /* 吹き出し */
+  .bubble {
+    background: #1a1a2e;
+    border: 2px solid;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 5px;
+    line-height: 1.6;
+    margin-top: 4px;
+    position: relative;
+    max-width: 140px;
+    animation: fadeInBubble 0.5s ease;
+  }
+
+  .bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 10px;
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid;
+    border-top-color: inherit;
+  }
+
+  @keyframes fadeInBubble {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .bubble-cyan  { border-color: #00ffff; color: #00ffff; }
+  .bubble-orange{ border-color: #ff6b35; color: #ff6b35; }
+  .bubble-green { border-color: #7fff00; color: #7fff00; }
+  .bubble-pink  { border-color: #ff69b4; color: #ff69b4; }
+  .bubble-gold  { border-color: #ffd700; color: #ffd700; }
+
+  /* デスク */
+  .desk {
+    width: 36px;
+    height: 8px;
+    background: #3a2a1a;
+    border-top: 3px solid #7a5a3a;
+    border-radius: 2px;
+    margin-top: 2px;
+  }
+
+  .monitor {
+    width: 24px;
+    height: 18px;
+    background: #0a0a1e;
+    border: 2px solid #4a4a8a;
+    border-radius: 2px;
+    position: absolute;
+    bottom: 12px;
+    left: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+  }
+
+  .desk-wrap {
+    position: relative;
+    width: 36px;
+  }
+
+  /* KPI */
+  .kpi-area {
+    grid-column: 1 / -1;
+    background: #0a0a14;
+    border: 2px solid #333;
+    padding: 14px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .kpi-item {
+    flex: 1;
+    min-width: 140px;
+    background: #111128;
+    border: 2px solid #333;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .kpi-label { font-size: 5px; color: #888; margin-bottom: 6px; }
+  .kpi-val   { font-size: 11px; }
+
+  .kpi-cyan   .kpi-val { color: #00ffff; text-shadow: 0 0 8px #00ffff; }
+  .kpi-orange .kpi-val { color: #ff6b35; text-shadow: 0 0 8px #ff6b35; }
+  .kpi-green  .kpi-val { color: #7fff00; text-shadow: 0 0 8px #7fff00; }
+  .kpi-pink   .kpi-val { color: #ff69b4; text-shadow: 0 0 8px #ff69b4; }
+
+  /* 点滅ドット */
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: blink 1.2s step-end infinite;
+  }
+  .dot-on  { background: #00ff00; }
+  .dot-off { animation: none; background: #333; }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0; }
+  }
+
+  /* 歩くアニメ */
+  @keyframes walk {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-3px); }
+  }
+  .walking { animation: walk 0.6s steps(2) infinite; }
+
+  /* タイピングアニメ */
+  @keyframes type {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-2px); }
+  }
+  .typing { animation: type 0.4s steps(2) infinite; }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 6px;
+    color: #444;
+    border-top: 2px solid #1a1a2e;
+  }
+
+  /* ライブ感演出 */
+  .live-badge {
+    display: inline-block;
+    background: #ff0000;
+    color: #fff;
+    font-size: 6px;
+    padding: 2px 6px;
+    animation: blink 1s step-end infinite;
+    margin-left: 8px;
+  }
+
+  /* ===== 社内チャット ===== */
+  .chat-area {
+    max-width: 960px;
+    margin: 0 auto 20px;
+    background: #0a0a14;
+    border: 2px solid #2a2a44;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    background: #111128;
+    padding: 8px 14px;
+    font-size: 9px;
+    color: #aaa;
+    border-bottom: 2px solid #1e1e3a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .chat-log {
+    height: 280px;
+    overflow-y: auto;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scroll-behavior: smooth;
+  }
+
+  .chat-log::-webkit-scrollbar { width: 4px; }
+  .chat-log::-webkit-scrollbar-track { background: #0a0a14; }
+  .chat-log::-webkit-scrollbar-thumb { background: #2a2a44; border-radius: 2px; }
+
+  .chat-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    animation: fadeInBubble 0.3s ease;
+  }
+
+  .chat-msg.maki { flex-direction: row-reverse; }
+
+  .chat-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    border: 2px solid;
+  }
+
+  .chat-body { max-width: 72%; }
+  .chat-msg.maki .chat-body { text-align: right; }
+
+  .chat-name { font-size: 7px; margin-bottom: 3px; opacity: 0.8; }
+
+  .chat-text {
+    font-size: 8px;
+    line-height: 1.8;
+    background: #111128;
+    padding: 6px 9px;
+    border-radius: 2px;
+    border-left: 3px solid;
+    display: inline-block;
+  }
+
+  .chat-msg.maki .chat-text { border-left: none; border-right: 3px solid #ffd700; }
+
+  .chat-time { font-size: 6px; color: #444; margin-top: 3px; }
+
+  /* エージェント別カラー */
+  .agent-hisho  .chat-avatar { border-color: #00ffff; background: #001a22; }
+  .agent-hisho  .chat-text   { border-color: #00ffff; color: #00ffff; }
+  .agent-hisho  .chat-name   { color: #00ffff; }
+  .agent-bussan .chat-avatar { border-color: #ff6b35; background: #220e00; }
+  .agent-bussan .chat-text   { border-color: #ff6b35; color: #ff6b35; }
+  .agent-bussan .chat-name   { color: #ff6b35; }
+  .agent-blog   .chat-avatar { border-color: #7fff00; background: #0a1500; }
+  .agent-blog   .chat-text   { border-color: #7fff00; color: #7fff00; }
+  .agent-blog   .chat-name   { color: #7fff00; }
+  .agent-kouhou .chat-avatar { border-color: #ff69b4; background: #1a0011; }
+  .agent-kouhou .chat-text   { border-color: #ff69b4; color: #ff69b4; }
+  .agent-kouhou .chat-name   { color: #ff69b4; }
+  .maki         .chat-text   { color: #ffd700; }
+  .maki         .chat-name   { color: #ffd700; }
+
+  /* タイピングインジケーター */
+  .typing-dots { display: flex; gap: 3px; align-items: center; }
+  .typing-dots span {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: typingDot 1s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingDot {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40%           { transform: scale(1);   opacity: 1;   }
+  }
+
+  /* 入力エリア */
+  .chat-input-area {
+    border-top: 2px solid #1e1e3a;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0d0d1a;
+  }
+
+  .chat-input-label { font-size: 8px; color: #ffd700; white-space: nowrap; }
+
+  .chat-input-area input {
+    flex: 1;
+    background: #111128;
+    border: 2px solid #2a2a44;
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 7px 9px;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .chat-input-area input:focus { border-color: #ffd700; }
+  .chat-input-area input::placeholder { color: #444; }
+
+  .chat-input-area button {
+    background: #ffd700;
+    color: #0d0d1a;
+    border: none;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .chat-input-area button:hover { background: #ffbb00; }
+  .chat-input-area button:active { transform: translateY(1px); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏢 まきの会社 - AI バーチャルオフィス</h1>
+  <div class="subtitle">
+    <span class="dot dot-on"></span> LIVE
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    社長: まき &nbsp;|&nbsp; AI社員: Claude
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    <span id="clock"></span>
+  </div>
+</div>
+
+<div class="office">
+
+  <!-- 社長エリア -->
+  <div class="ceo-area">
+    <div>
+      <!-- まき社長ピクセルキャラ -->
+      <svg width="40" height="48" viewBox="0 0 10 12" xmlns="http://www.w3.org/2000/svg" class="walking">
+        <!-- 髪 -->
+        <rect x="2" y="0" width="6" height="1" fill="#3a1a0a"/>
+        <rect x="1" y="1" width="8" height="1" fill="#5a2a0a"/>
+        <rect x="1" y="2" width="8" height="1" fill="#5a2a0a"/>
+        <!-- 顔 -->
+        <rect x="2" y="2" width="6" height="4" fill="#ffcc99"/>
+        <!-- 目 -->
+        <rect x="3" y="3" width="1" height="1" fill="#222"/>
+        <rect x="6" y="3" width="1" height="1" fill="#222"/>
+        <!-- 口（笑顔） -->
+        <rect x="3" y="5" width="1" height="1" fill="#cc7755"/>
+        <rect x="4" y="6" width="2" height="1" fill="#cc7755"/>
+        <rect x="6" y="5" width="1" height="1" fill="#cc7755"/>
+        <!-- 体（ピンク服） -->
+        <rect x="2" y="6" width="6" height="4" fill="#ff69b4"/>
+        <!-- 腕 -->
+        <rect x="0" y="7" width="2" height="2" fill="#ff69b4"/>
+        <rect x="8" y="7" width="2" height="2" fill="#ff69b4"/>
+        <!-- 脚 -->
+        <rect x="3" y="10" width="2" height="2" fill="#885533"/>
+        <rect x="6" y="10" width="2" height="2" fill="#885533"/>
+        <!-- 王冠 -->
+        <rect x="2" y="0" width="1" height="1" fill="#ffd700"/>
+        <rect x="5" y="0" width="1" height="1" fill="#ffd700"/>
+        <rect x="7" y="0" width="1" height="1" fill="#ffd700"/>
+      </svg>
+    </div>
+    <div>
+      <div style="font-size:9px; color:#ffd700; margin-bottom:6px;">👑 まき社長</div>
+      <div style="font-size:6px; color:#aaa; line-height:1.8;">
+        医療職・子育て中・副業中<br>
+        <span class="dot dot-on"></span> 判断業務のみ担当<br>
+        作業はすべてAI社員に委任
+      </div>
+    </div>
+    <div style="margin-left:auto;">
+      <div class="bubble bubble-gold" style="max-width:180px;">
+        今日も判断だけ任せて！<br>
+        作業はClaudeに全部やって<br>
+        もらってます✨
+      </div>
+    </div>
+  </div>
+
+  <!-- 秘書部 -->
+  <div class="dept dept-hisho">
+    <div class="dept-label">🤖 秘書部（司令塔）</div>
+    <div class="dept-sublabel">カレンダー管理・LINE通知・振り分け</div>
+
+    <div class="scene">
+      <div class="agent">
+        <!-- AIキャラ（秘書） -->
+        <svg width="32" height="36" viewBox="0 0 8 9" xmlns="http://www.w3.org/2000/svg" class="typing">
+          <rect x="1" y="0" width="6" height="5" fill="#002244"/>
+          <rect x="2" y="1" width="4" height="3" fill="#00ccff"/>
+          <rect x="2" y="4" width="4" height="4" fill="#00aacc"/>
+          <rect x="0" y="5" width="2" height="2" fill="#00aacc"/>
+          <rect x="6" y="5" width="2" height="2" fill="#00aacc"/>
+          <rect x="2" y="8" width="2" height="1" fill="#005577"/>
+          <rect x="5" y="8" width="2" height="1" fill="#005577"/>
+          <!-- アンテナ -->
+          <rect x="3" y="0" width="1" height="1" fill="#00ffff"/>
+          <rect x="5" y="0" width="1" height="1" fill="#00ffff"/>
+        </svg>
+        <div class="agent-name" style="color:#00ffff;">Claude<br>（秘書）</div>
+      </div>
+
+      <div>
+        <div class="bubble bubble-cyan">
+          📅 今日の予定を<br>
+          LINE送信完了！<br>
+          <span class="dot dot-on"></span> 毎朝7:00稼働中
+        </div>
+        <div class="desk-wrap" style="margin-top:8px;">
+          <div class="monitor">📱</div>
+          <div class="desk"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; font-size:5px; color:#00ffff; opacity:0.7; line-height:2;">
+      LINE ID: @296wjwwj<br>
+      HOST: maki-hisho.onrender.com
+    </div>
+  </div>
+
+  <!-- 物販部 -->
+  <div class="dept dept-bussan">
+    <div class="dept-label">🛒 物販部（最優先★★★）</div>
+    <div class="dept-sublabel">メルカリ仕入れ → eBay販売</div>
+
+    <div class="scene">
+      <div class="agent">
+        <svg width="32" height="36" viewBox="0 0 8 9" xmlns="http://www.w3.org/2000/svg" class="typing">
+          <rect x="1" y="0" width="6" height="5" fill="#331100"/>
+          <rect x="2" y="1" width="4" height="3" fill="#ff6b35"/>
+          <rect x="2" y="4" width="4" height="4" fill="#cc4400"/>
+          <rect x="0" y="5" width="2" height="2" fill="#cc4400"/>
+          <rect x="6" y="5" width="2" height="2" fill="#cc4400"/>
+          <rect x="2" y="8" width="2" height="1" fill="#662200"/>
+          <rect x="5" y="8" width="2" height="1" fill="#662200"/>
+          <rect x="3" y="0" width="1" height="1" fill="#ff8855"/>
+          <rect x="5" y="0" width="1" height="1" fill="#ff8855"/>
+        </svg>
+        <div class="agent-name" style="color:#ff6b35;">Claude<br>（物販）</div>
+      </div>
+
+      <div>
+        <div class="bubble bubble-orange">
+          🏷️ eBayタイトル生成中<br>
+          出品サポート実行中<br>
+          目標: 250品/月
+        </div>
+        <div class="desk-wrap" style="margin-top:8px;">
+          <div class="monitor">🖥️</div>
+          <div class="desk"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; font-size:5px; color:#ff6b35; opacity:0.7; line-height:2;">
+      月収目標: 40〜50万円<br>
+      DIR: C:/Users/nyank/ebay/
+    </div>
+  </div>
+
+  <!-- ブログ部 -->
+  <div class="dept dept-blog">
+    <div class="dept-label">✍️ ブログ部・IT部</div>
+    <div class="dept-sublabel">薬膳ブログ・セキスイブログ自動化</div>
+
+    <div class="scene">
+      <div class="agent">
+        <svg width="32" height="36" viewBox="0 0 8 9" xmlns="http://www.w3.org/2000/svg" class="typing">
+          <rect x="1" y="0" width="6" height="5" fill="#001100"/>
+          <rect x="2" y="1" width="4" height="3" fill="#7fff00"/>
+          <rect x="2" y="4" width="4" height="4" fill="#55cc00"/>
+          <rect x="0" y="5" width="2" height="2" fill="#55cc00"/>
+          <rect x="6" y="5" width="2" height="2" fill="#55cc00"/>
+          <rect x="2" y="8" width="2" height="1" fill="#228800"/>
+          <rect x="5" y="8" width="2" height="1" fill="#228800"/>
+          <rect x="3" y="0" width="1" height="1" fill="#aaffaa"/>
+          <rect x="5" y="0" width="1" height="1" fill="#aaffaa"/>
+        </svg>
+        <div class="agent-name" style="color:#7fff00;">Claude<br>（ブログ）</div>
+      </div>
+
+      <div>
+        <div class="bubble bubble-green">
+          🌿 薬膳記事120本稼働<br>
+          セキスイ記事34本<br>
+          毎週自動リライト中
+        </div>
+        <div class="desk-wrap" style="margin-top:8px;">
+          <div class="monitor">📝</div>
+          <div class="desk"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; font-size:5px; color:#7fff00; opacity:0.7; line-height:2;">
+      火: 薬膳リライト2本<br>
+      木: セキスイ投稿
+    </div>
+  </div>
+
+  <!-- 広報部 -->
+  <div class="dept dept-kouhou">
+    <div class="dept-label">📢 広報部</div>
+    <div class="dept-sublabel">X自動投稿・note・フォロワー獲得</div>
+
+    <div class="scene">
+      <div class="agent">
+        <svg width="32" height="36" viewBox="0 0 8 9" xmlns="http://www.w3.org/2000/svg" class="typing">
+          <rect x="1" y="0" width="6" height="5" fill="#330022"/>
+          <rect x="2" y="1" width="4" height="3" fill="#ff69b4"/>
+          <rect x="2" y="4" width="4" height="4" fill="#cc3388"/>
+          <rect x="0" y="5" width="2" height="2" fill="#cc3388"/>
+          <rect x="6" y="5" width="2" height="2" fill="#cc3388"/>
+          <rect x="2" y="8" width="2" height="1" fill="#880044"/>
+          <rect x="5" y="8" width="2" height="1" fill="#880044"/>
+          <rect x="3" y="0" width="1" height="1" fill="#ffaacc"/>
+          <rect x="5" y="0" width="1" height="1" fill="#ffaacc"/>
+        </svg>
+        <div class="agent-name" style="color:#ff69b4;">Claude<br>（広報）</div>
+      </div>
+
+      <div>
+        <div class="bubble bubble-pink">
+          🐦 @kvision_m<br>
+          毎朝8:30自動投稿<br>
+          フォロワー1000人目標
+        </div>
+        <div class="desk-wrap" style="margin-top:8px;">
+          <div class="monitor">📣</div>
+          <div class="desk"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px; font-size:5px; color:#ff69b4; opacity:0.7; line-height:2;">
+      note: maki_claude_lab<br>
+      有料記事: 1,480円（準備中）
+    </div>
+  </div>
+
+  <!-- KPIボード -->
+  <div class="kpi-area">
+    <div style="font-size:7px; color:#888; width:100%; margin-bottom:4px;">📊 KPI ダッシュボード</div>
+    <div class="kpi-item kpi-orange">
+      <div class="kpi-label">物販 月収目標</div>
+      <div class="kpi-val">50万円</div>
+    </div>
+    <div class="kpi-item kpi-green">
+      <div class="kpi-label">薬膳記事数</div>
+      <div class="kpi-val">120本</div>
+    </div>
+    <div class="kpi-item kpi-pink">
+      <div class="kpi-label">Xフォロワー目標</div>
+      <div class="kpi-val">1,000人</div>
+    </div>
+    <div class="kpi-item kpi-cyan">
+      <div class="kpi-label">LINE通知</div>
+      <div class="kpi-val">毎朝7:00</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 社内チャット -->
+<div class="chat-area">
+  <div class="chat-header">
+    💬 社内チャット
+    <span class="live-badge">LIVE</span>
+    <span style="margin-left:auto; font-size:5px; color:#555;">AI社員たちが作業報告中 ↓ まき社長も話しかけてみて</span>
+  </div>
+  <div class="chat-log" id="chatLog"></div>
+  <div class="chat-input-area">
+    <div class="chat-input-label">👑 まき社長</div>
+    <input type="text" id="chatInput" placeholder="社員に話しかける..." maxlength="60" />
+    <button id="chatSend">送信</button>
+  </div>
+</div>
+
+<footer>
+  まきの会社 © 2026 &nbsp;|&nbsp; Powered by Claude Code &nbsp;|&nbsp; AI社員: Claude Sonnet
+</footer>
+
+<script>
+  // 時計
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('clock').textContent = h + ':' + m + ':' + s;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ===== 社内チャット =====
+  const agents = {
+    hisho:  { name: 'Claude（秘書）',   emoji: '🤖', cls: 'agent-hisho',  color: '#00ffff' },
+    bussan: { name: 'Claude（物販）',   emoji: '🛒', cls: 'agent-bussan', color: '#ff6b35' },
+    blog:   { name: 'Claude（ブログ）', emoji: '✍️', cls: 'agent-blog',   color: '#7fff00' },
+    kouhou: { name: 'Claude（広報）',   emoji: '📢', cls: 'agent-kouhou', color: '#ff69b4' },
+  };
+
+  const autoMessages = [
+    { agent: 'hisho',  text: '📅 今朝7:00の予定通知、LINE送信完了しました。今日の予定は3件です。' },
+    { agent: 'bussan', text: '🏷️ eBayタイトル生成完了。本日5品出品しました。今月累計: 42品' },
+    { agent: 'blog',   text: '🌿 薬膳ブログ「春の食材特集」リライト完了。WordPress投稿済みです。' },
+    { agent: 'kouhou', text: '🐦 @kvision_m 8:30投稿完了。インプレッション: 127。フォロワー+2名。' },
+    { agent: 'hisho',  text: '📋 来週の予定を確認しました。火曜に小児科の予約があります。' },
+    { agent: 'bussan', text: '💰 本日の価格調査完了。利益率25%以上の商品を8件発見しました。' },
+    { agent: 'blog',   text: '🏠 セキスイブログ「ハイム平屋の費用感」記事の下書き完成しました。' },
+    { agent: 'kouhou', text: '✨ X投稿ストック残り38本。来週分まで余裕があります。' },
+    { agent: 'hisho',  text: '🔔 明後日の締め切りリマインダーをセットしました。前日20時に通知します。' },
+    { agent: 'bussan', text: '📦 メルカリ仕入れ候補を12件リストアップしました。ご確認ください。' },
+    { agent: 'blog',   text: '📈 薬膳ブログ、Google検索流入が先週比+15%です。いい感じです！' },
+    { agent: 'kouhou', text: '📝 note記事「プログラミングゼロからClaude Codeで秘書ボット」下書き更新しました。' },
+    { agent: 'hisho',  text: '💱 HSBCリマインダー設定済み。毎月1日8:30にLINEで通知します。' },
+    { agent: 'bussan', text: '🎯 今月の出品ペース順調です。月末までに250品達成できる見込みです。' },
+    { agent: 'blog',   text: '🔍 セキスイブログ、Search Consoleに初めて流入を確認！0件から脱出しました！' },
+    { agent: 'kouhou', text: '🎉 フォロワー数が先月比+48名。1,000人目標まであと着々と近づいています！' },
+    { agent: 'hisho',  text: '🗂️ 学校プリントの期限、来週火曜の申し込みをカレンダーに登録しました。' },
+    { agent: 'bussan', text: '🔄 無在庫→有在庫移行の準備を進めています。仕入れ先リスト作成中。' },
+    { agent: 'blog',   text: '🌸 季節に合わせた薬膳テーマを選定しました。次は「梅雨の湿気対策」記事です。' },
+    { agent: 'kouhou', text: '💡 新しいXネタを考えました。「LINEから写真1枚でカレンダー登録」の体験談投稿します。' },
+  ];
+
+  const agentReplies = {
+    hisho:  [
+      'はい！すぐ対応します。カレンダーを確認しますね。',
+      '承知しました。スケジュール調整しておきます。',
+      'かしこまりました。LINE通知の設定を変更します。',
+      'ご確認ありがとうございます。引き続き管理します！',
+      'まかせてください！今すぐ処理します。',
+    ],
+    bussan: [
+      '了解です！eBayのリサーチを進めますね。',
+      '価格調査完了しました。良い商品見つかりそうです！',
+      '出品作業、全力で進めます！250品目指します。',
+      'メルカリ仕入れ候補を絞り込んでいます。少々お待ちを。',
+      'タイトル最適化してeBay検索上位狙います！',
+    ],
+    blog:   [
+      'はい！すぐに記事作成にとりかかります。',
+      '薬膳ブログのリライトを優先します。',
+      'SEO対策を強化して流入を増やします！',
+      'セキスイ記事、今週中にアップしますね。',
+      'キーワード調査して一番刺さる記事書きます！',
+    ],
+    kouhou: [
+      'X投稿ネタを追加します！どんな内容がいいですか？',
+      'フォロワー獲得、全力で取り組みます！',
+      'note記事の最終確認をしておきますね。',
+      '広報活動、引き続きがんばります！認知拡大中です。',
+      '実績ベースのリアルな投稿で共感を集めます！',
+    ],
+  };
+
+  function nowTime() {
+    const d = new Date();
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+
+  function appendChatMsg(agentKey, text, isMaki) {
+    const log = document.getElementById('chatLog');
+    const div = document.createElement('div');
+
+    if (isMaki) {
+      div.className = 'chat-msg maki';
+      div.innerHTML = `
+        <div class="chat-avatar" style="border-color:#ffd700;background:#1a1000;">👑</div>
+        <div class="chat-body">
+          <div class="chat-name" style="color:#ffd700;">まき社長</div>
+          <div class="chat-text" style="border-color:#ffd700;color:#ffd700;">${text}</div>
+          <div class="chat-time">${nowTime()}</div>
+        </div>`;
+    } else {
+      const a = agents[agentKey];
+      div.className = 'chat-msg ' + a.cls;
+      div.innerHTML = `
+        <div class="chat-avatar">${a.emoji}</div>
+        <div class="chat-body">
+          <div class="chat-name">${a.name}</div>
+          <div class="chat-text">${text}</div>
+          <div class="chat-time">${nowTime()}</div>
+        </div>`;
+    }
+
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function showTypingIndicator(agentKey) {
+    const log = document.getElementById('chatLog');
+    const a = agents[agentKey];
+    const div = document.createElement('div');
+    div.id = 'typingInd';
+    div.className = 'chat-msg ' + a.cls;
+    div.innerHTML = `
+      <div class="chat-avatar">${a.emoji}</div>
+      <div class="chat-body">
+        <div class="chat-name">${a.name}</div>
+        <div class="chat-text" style="border-color:${a.color};color:${a.color};">
+          <div class="typing-dots" style="color:${a.color};">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>`;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function removeTypingIndicator() {
+    const el = document.getElementById('typingInd');
+    if (el) el.remove();
+  }
+
+  let msgIdx = 0;
+  function scheduleNextMsg() {
+    const delay = 3500 + Math.random() * 5500;
+    setTimeout(() => {
+      const msg = autoMessages[msgIdx % autoMessages.length];
+      msgIdx++;
+      showTypingIndicator(msg.agent);
+      setTimeout(() => {
+        removeTypingIndicator();
+        appendChatMsg(msg.agent, msg.text, false);
+        scheduleNextMsg();
+      }, 1000 + Math.random() * 1200);
+    }, delay);
+  }
+
+  function sendMakiMsg() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+    appendChatMsg(null, text, true);
+    input.value = '';
+
+    const keys = Object.keys(agents);
+    const respKey = keys[Math.floor(Math.random() * keys.length)];
+    const pool = agentReplies[respKey];
+    const reply = pool[Math.floor(Math.random() * pool.length)];
+
+    setTimeout(() => {
+      showTypingIndicator(respKey);
+      setTimeout(() => {
+        removeTypingIndicator();
+        appendChatMsg(respKey, reply, false);
+      }, 1000 + Math.random() * 1000);
+    }, 400);
+  }
+
+  document.getElementById('chatSend').addEventListener('click', sendMakiMsg);
+  document.getElementById('chatInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendMakiMsg();
+  });
+
+  // 起動メッセージ（順番に表示）
+  const bootMsgs = [
+    { agent: 'hisho',  text: '🌅 おはようございます！全部署、本日の稼働を開始します。', delay: 600 },
+    { agent: 'bussan', text: '🛒 物販部、起動完了。eBayリサーチを開始します。',         delay: 1600 },
+    { agent: 'blog',   text: '✍️ ブログ部、準備完了。本日の記事作業を進めます。',        delay: 2500 },
+    { agent: 'kouhou', text: '📢 広報部、稼働中。本日のX投稿は8:30に送信済みです。',     delay: 3400 },
+  ];
+  bootMsgs.forEach(m => {
+    setTimeout(() => appendChatMsg(m.agent, m.text, false), m.delay);
+  });
+  setTimeout(scheduleNextMsg, 4800);
+
+  // 吹き出しをランダムに切り替え
+  const hishoBubbles = [
+    '📅 今日の予定を<br>LINE送信完了！<br><span style="color:#0f0">●</span> 毎朝7:00稼働中',
+    '📋 カレンダー<br>同期完了！<br>予定3件あり',
+    '🔔 リマインダー<br>セット済み！<br>忘れ物ゼロ作戦',
+  ];
+  const bussanBubbles = [
+    '🏷️ eBayタイトル<br>生成中...<br>出品250品目標',
+    '📦 メルカリ仕入れ<br>リサーチ中...',
+    '💰 価格調査完了<br>利益率チェックOK',
+  ];
+  const blogBubbles = [
+    '🌿 薬膳記事<br>リライト完了！<br>WordPress投稿済み',
+    '🏠 セキスイ記事<br>作成中...<br>SEO最適化中',
+    '📈 Search Console<br>流入改善中！',
+  ];
+  const kouhouBubbles = [
+    '🐦 @kvision_m<br>毎朝8:30投稿<br>フォロワー増加中',
+    '📝 note記事<br>準備中...<br>1,480円で販売予定',
+    '✨ X投稿ストック<br>40本以上あり！',
+  ];
+
+  function rotateBubble(bubbleEl, pool) {
+    let i = 0;
+    setInterval(() => {
+      i = (i + 1) % pool.length;
+      bubbleEl.innerHTML = pool[i];
+    }, 4000);
+  }
+
+  // 吹き出しを取得してローテーション
+  window.addEventListener('load', () => {
+    const bubbles = document.querySelectorAll('.bubble');
+    if (bubbles[1]) rotateBubble(bubbles[1], hishoBubbles);
+    if (bubbles[2]) rotateBubble(bubbles[2], bussanBubbles);
+    if (bubbles[3]) rotateBubble(bubbles[3], blogBubbles);
+    if (bubbles[4]) rotateBubble(bubbles[4], kouhouBubbles);
+  });
+</script>
+</body>
+</html>
