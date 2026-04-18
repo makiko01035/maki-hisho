@@ -17,7 +17,7 @@
 </head>
 <body>
 <canvas id="game" width="480" height="600"></canvas>
-<div id="controls">← ↓ ↑ → キーでノーツをたたこう ｜ M でBGM ON/OFF ｜ ESC でタイトルへ</div>
+<div id="controls">F G H J キーでノーツをたたこう ｜ M でBGM ON/OFF ｜ ESC でタイトルへ</div>
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -90,67 +90,75 @@ function playSE(freq, dur, type = 'sine', vol = 0.15) {
   osc.start(); osc.stop(audioCtx.currentTime + dur);
 }
 
+// ── ステージ設定 ────────────────────────────────────────
+const STAGES = [
+  {
+    id: 0, label: 'かんたん', color: '#34d399', glow: 'rgba(52,211,153,0.4)',
+    speed: 3.5, interval: 0.7, duration: 60,
+    pattern: [
+      0,-1,-1,2,-1,-1,1,-1,-1,3,-1,-1,
+      0,-1,2,-1,-1,1,-1,3,-1,-1,0,-1,
+    ],
+  },
+  {
+    id: 1, label: 'ふつう', color: '#60a5fa', glow: 'rgba(96,165,250,0.4)',
+    speed: 5, interval: 0.44, duration: 60,
+    pattern: [
+      0,-1,2,-1,1,-1,3,-1,
+      0,2,-1,1,0,-1,3,-1,
+      1,3,0,-1,2,1,-1,3,
+      0,-1,0,2,1,-1,3,-1,
+    ],
+  },
+  {
+    id: 2, label: 'むずかしい', color: '#f87171', glow: 'rgba(248,113,113,0.4)',
+    speed: 7, interval: 0.28, duration: 90,
+    pattern: [
+      0,2,1,3,0,-1,2,1,
+      3,1,0,2,-1,3,1,0,
+      2,0,3,1,2,-1,0,3,
+      1,3,2,0,1,2,-1,3,
+      0,1,2,3,0,2,1,-1,
+      3,0,2,1,3,-1,0,2,
+    ],
+  },
+];
+
 // ── ゲーム定数 ──────────────────────────────────────────
 const LANES = 4;
 const LANE_W = 90;
 const OFFSET_X = (W - LANE_W * LANES) / 2;
 const HIT_Y = H - 80;
 const JUDGE_Y = { perfect: 35, good: 65 };
-const NOTE_SPEED = 5;
 const NOTE_R = 22;
 const COLORS = ['#f87171','#fb923c','#34d399','#60a5fa'];
-const KEYS = ['ArrowLeft','ArrowDown','ArrowUp','ArrowRight'];
-const LABELS = ['←','↓','↑','→'];
-const BPM_SEC = 60 / BPM;
-const NOTES_PER_BEAT = 2;
+const KEYS = ['f','g','h','j'];
+const LABELS = ['F','G','H','J'];
 
 // ── 状態 ────────────────────────────────────────────────
-let scene = 'title'; // title | play | result
+let scene = 'title'; // title | select | play | result
+let currentStage = STAGES[1];
 let notes = [], score = 0, combo = 0, maxCombo = 0;
 let totalNotes = 0, perfectCount = 0, goodCount = 0, missCount = 0;
 let effects = [];
 let keyFlash = [0,0,0,0];
-let maru = { y: HIT_Y - 60, jump: 0, bobT: 0 };
-let gameTime = 0, gameDuration = 60;
+let maru = { y: 0, jump: 0 };
+let gameTime = 0;
 let lastNoteTime = 0;
 let notePattern = [];
 let patternIdx = 0;
-let bgColor = 0;
 
-function buildPattern() {
-  // リズムパターン（0〜3のレーン番号、-1は休符）
-  const base = [
-    0,-1,2,-1,1,-1,3,-1,
-    0,2,-1,1,0,-1,3,-1,
-    1,3,0,-1,2,1,-1,3,
-    0,-1,0,2,1,-1,3,-1,
-    2,-1,1,3,0,2,-1,1,
-    0,3,-1,2,1,-1,0,3,
-  ];
-  notePattern = base;
-}
+// 途中終了ボタン領域
+const QUIT_BTN = { x: W - 68, y: 8, w: 60, h: 28 };
 
-function spawnNote() {
-  if (patternIdx >= notePattern.length) patternIdx = 0;
-  const lane = notePattern[patternIdx++];
-  if (lane >= 0) {
-    notes.push({ lane, y: -NOTE_R, hit: false });
-    totalNotes++;
-  }
-}
-
-function laneX(lane) {
-  return OFFSET_X + lane * LANE_W + LANE_W / 2;
-}
-
-function resetGame() {
+function resetGame(stage) {
+  currentStage = stage;
   notes = []; score = 0; combo = 0; maxCombo = 0;
   totalNotes = 0; perfectCount = 0; goodCount = 0; missCount = 0;
   effects = []; keyFlash = [0,0,0,0];
   gameTime = 0; lastNoteTime = 0; patternIdx = 0;
-  bgColor = 0;
-  buildPattern();
-  maru.y = HIT_Y - 60; maru.jump = 0; maru.bobT = 0;
+  notePattern = stage.pattern;
+  maru.y = HIT_Y - 60; maru.jump = 0;
   bgmIdx = 0; bassIdx = 0;
   if (audioCtx) {
     bgmNext = audioCtx.currentTime + 0.05;
@@ -158,12 +166,16 @@ function resetGame() {
   }
 }
 
+function laneX(lane) {
+  return OFFSET_X + lane * LANE_W + LANE_W / 2;
+}
+
 // ── 入力 ────────────────────────────────────────────────
-const keyDown = new Set();
 window.addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.key === 'Escape') {
-    if (scene === 'play' || scene === 'result') { scene = 'title'; return; }
+    if (scene === 'play') { scene = 'select'; return; }
+    if (scene === 'select' || scene === 'result') { scene = 'title'; return; }
   }
   if (e.key === 'm' || e.key === 'M') {
     bgmOn = !bgmOn;
@@ -174,30 +186,70 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (scene === 'title') {
-    if (e.key === ' ' || e.key === 'Enter' || KEYS.includes(e.key)) {
-      initAudio();
-      resetGame();
-      scene = 'play';
-    }
-    return;
+    if (e.key === ' ' || e.key === 'Enter') { scene = 'select'; return; }
   }
   if (scene === 'result') {
-    if (e.key === ' ' || e.key === 'Enter') {
-      initAudio();
-      resetGame();
-      scene = 'play';
-    }
-    return;
+    if (e.key === ' ' || e.key === 'Enter') { scene = 'select'; return; }
   }
   if (scene === 'play') {
-    const li = KEYS.indexOf(e.key);
-    if (li >= 0) {
-      keyFlash[li] = 8;
-      judgeHit(li);
+    const li = KEYS.indexOf(e.key.toLowerCase());
+    if (li >= 0) { keyFlash[li] = 8; judgeHit(li); }
+  }
+});
+
+// クリック処理
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (W / rect.width);
+  const cy = (e.clientY - rect.top) * (H / rect.height);
+
+  if (scene === 'title') {
+    // もどるボタン
+    if (cx >= W/2-60 && cx <= W/2+60 && cy >= H-60 && cy <= H-24) {
+      window.location.href = '/game';
+    }
+    // スタートボタン
+    if (cx >= W/2-80 && cx <= W/2+80 && cy >= 370 && cy <= 410) {
+      scene = 'select';
+    }
+  }
+  if (scene === 'select') {
+    // ステージカード
+    STAGES.forEach((s, i) => {
+      const bx = W/2 - 130 + i * 90, by = 260, bw = 80, bh = 100;
+      if (cx >= bx && cx <= bx+bw && cy >= by && cy <= by+bh) {
+        initAudio();
+        resetGame(s);
+        scene = 'play';
+      }
+    });
+    // もどる
+    if (cx >= W/2-50 && cx <= W/2+50 && cy >= H-55 && cy <= H-25) {
+      scene = 'title';
+    }
+  }
+  if (scene === 'play') {
+    // 途中終了ボタン
+    if (cx >= QUIT_BTN.x && cx <= QUIT_BTN.x+QUIT_BTN.w &&
+        cy >= QUIT_BTN.y && cy <= QUIT_BTN.y+QUIT_BTN.h) {
+      scene = 'result';
+    }
+  }
+  if (scene === 'result') {
+    // もう一度
+    if (cx >= W/2-80 && cx <= W/2+80 && cy >= H-90 && cy <= H-55) {
+      initAudio();
+      resetGame(currentStage);
+      scene = 'play';
+    }
+    // ステージ選択へ
+    if (cx >= W/2-80 && cx <= W/2+80 && cy >= H-48 && cy <= H-18) {
+      scene = 'select';
     }
   }
 });
 
+// ── 判定 ────────────────────────────────────────────────
 function judgeHit(lane) {
   let best = null, bestDist = 9999;
   for (const n of notes) {
@@ -233,22 +285,19 @@ function addEffect(lane, text, color) {
 
 // ── 更新 ────────────────────────────────────────────────
 function update(dt) {
-  if (scene !== 'play') return;
-
   gameTime += dt;
-  if (gameTime >= gameDuration) { scene = 'result'; return; }
+  if (gameTime >= currentStage.duration) { scene = 'result'; return; }
 
-  // ノーツ生成
-  const interval = BPM_SEC / NOTES_PER_BEAT;
+  const interval = currentStage.interval;
   if (gameTime - lastNoteTime >= interval) {
-    spawnNote();
+    if (patternIdx >= notePattern.length) patternIdx = 0;
+    const lane = notePattern[patternIdx++];
+    if (lane >= 0) { notes.push({ lane, y: -NOTE_R, hit: false }); totalNotes++; }
     lastNoteTime = gameTime;
   }
 
-  // ノーツ移動
-  for (const n of notes) { n.y += NOTE_SPEED; }
+  for (const n of notes) { n.y += currentStage.speed; }
 
-  // ミス判定（通り過ぎた）
   for (const n of notes) {
     if (!n.hit && n.y > HIT_Y + NOTE_R + 10) {
       n.hit = true; missCount++;
@@ -257,107 +306,152 @@ function update(dt) {
       combo = 0;
     }
   }
-
-  // 古いノーツ削除
   notes = notes.filter(n => !(n.hit && n.y > HIT_Y + 60));
 
-  // エフェクト更新
   effects.forEach(e => { e.life--; e.y -= 1; });
   effects = effects.filter(e => e.life > 0);
 
-  // まるちゃん
-  maru.bobT += 0.08;
   maru.jump += 0.7;
   maru.y += maru.jump;
   if (maru.y >= HIT_Y - 60) { maru.y = HIT_Y - 60; maru.jump = 0; }
 
-  // キーフラッシュ減衰
   keyFlash = keyFlash.map(v => Math.max(0, v - 1));
-
-  // BGM
   scheduleBGM();
-
-  // 背景色変化
-  bgColor = (bgColor + 0.3) % 360;
 }
 
-// ── 描画 ────────────────────────────────────────────────
-function drawTitle() {
-  // 背景
-  ctx.fillStyle = '#080818';
-  ctx.fillRect(0, 0, W, H);
-
-  // タイトルグロー
+// ── 描画ユーティリティ ─────────────────────────────────
+function drawMaru(x, y, r, wobble) {
   ctx.save();
-  ctx.shadowColor = '#a78bfa';
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 36px sans-serif';
+  ctx.translate(x + wobble, y);
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#f9a8d4'; ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = '#1e1b4b';
+  ctx.beginPath(); ctx.arc(-r*0.3, -r*0.1, r*0.15, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc( r*0.3, -r*0.1, r*0.15, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#1e1b4b'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(0, r*0.1, r*0.25, 0.1, Math.PI-0.1); ctx.stroke();
+  ctx.restore();
+}
+
+function hexToRgb(hex) {
+  return `${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)}`;
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+  ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+  ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+  ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+  ctx.closePath();
+}
+
+function btn(label, x, y, w, h, color, textColor = '#111') {
+  ctx.fillStyle = color;
+  roundRect(x, y, w, h, 10); ctx.fill();
+  ctx.fillStyle = textColor;
+  ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('まるちゃん', W/2, 180);
-  ctx.fillStyle = '#a78bfa';
-  ctx.font = 'bold 48px sans-serif';
-  ctx.fillText('リズムステージ', W/2, 235);
+  ctx.fillText(label, x + w/2, y + h/2 + 5);
+}
+
+// ── 描画：タイトル ─────────────────────────────────────
+function drawTitle() {
+  ctx.fillStyle = '#080818'; ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 30;
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('まるちゃん', W/2, 160);
+  ctx.fillStyle = '#a78bfa'; ctx.font = 'bold 48px sans-serif';
+  ctx.fillText('リズムステージ', W/2, 215);
   ctx.restore();
 
-  // まるちゃん
-  drawMaru(W/2, 310, 38, Math.sin(Date.now()/300)*5);
+  drawMaru(W/2, 290, 38, Math.sin(Date.now()/300)*5);
 
-  ctx.fillStyle = '#888';
-  ctx.font = '16px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('スペース / Enter / 矢印キー でスタート', W/2, 390);
-  ctx.fillText('← ↓ ↑ → キーでノーツをたたこう', W/2, 420);
-  ctx.fillStyle = '#555';
-  ctx.font = '13px sans-serif';
-  ctx.fillText('制作：まるちゃんワールド', W/2, 460);
+  btn('▶ スタート', W/2-80, 360, 160, 44, '#a78bfa');
 
-  // 戻るボタン
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  roundRect(ctx, W/2-60, H-60, 120, 36, 10);
-  ctx.fill();
-  ctx.fillStyle = '#888';
-  ctx.font = '14px sans-serif';
-  ctx.fillText('← もどる', W/2, H-36);
+  ctx.fillStyle = '#555'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('F G H J キーでノーツをたたこう', W/2, 430);
+  ctx.fillText('制作：まるちゃんワールド', W/2, 455);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  roundRect(W/2-55, H-58, 110, 34, 10); ctx.fill();
+  ctx.fillStyle = '#666'; ctx.font = '14px sans-serif';
+  ctx.fillText('← もどる', W/2, H-35);
 }
 
-function drawPlay() {
-  // 背景
-  ctx.fillStyle = '#080818';
-  ctx.fillRect(0, 0, W, H);
+// ── 描画：ステージ選択 ─────────────────────────────────
+function drawSelect() {
+  ctx.fillStyle = '#080818'; ctx.fillRect(0, 0, W, H);
 
-  // レーン背景
+  ctx.save();
+  ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#a78bfa'; ctx.font = 'bold 34px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('ステージ選択', W/2, 90);
+  ctx.restore();
+
+  drawMaru(W/2, 175, 34, Math.sin(Date.now()/400)*4);
+
+  ctx.fillStyle = '#888'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('あそびたいステージをえらんでね', W/2, 230);
+
+  STAGES.forEach((s, i) => {
+    const bx = W/2 - 130 + i * 90, by = 260, bw = 80, bh = 100;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    roundRect(bx, by, bw, bh, 12); ctx.fill();
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2;
+    roundRect(bx, by, bw, bh, 12); ctx.stroke();
+
+    ctx.fillStyle = s.color; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(s.label, bx + bw/2, by + 30);
+    ctx.fillStyle = '#888'; ctx.font = '12px sans-serif';
+    ctx.fillText(`${s.duration}秒`, bx + bw/2, by + 55);
+    ctx.fillStyle = '#555'; ctx.font = '11px sans-serif';
+    ctx.fillText(i === 0 ? 'ゆっくり' : i === 1 ? 'ふつう' : 'はやい', bx + bw/2, by + 75);
+
+    ctx.fillStyle = s.color;
+    roundRect(bx+10, by+bh-24, bw-20, 20, 6); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('▶ GO', bx + bw/2, by + bh - 10);
+  });
+
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  roundRect(W/2-50, H-55, 100, 30, 10); ctx.fill();
+  ctx.fillStyle = '#666'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('← もどる', W/2, H-33);
+}
+
+// ── 描画：プレイ ───────────────────────────────────────
+function drawPlay() {
+  ctx.fillStyle = '#080818'; ctx.fillRect(0, 0, W, H);
+
+  // レーン
   for (let i = 0; i < LANES; i++) {
     const x = OFFSET_X + i * LANE_W;
     ctx.fillStyle = keyFlash[i] > 0 ? `rgba(${hexToRgb(COLORS[i])},0.15)` : 'rgba(255,255,255,0.03)';
     ctx.fillRect(x, 0, LANE_W, H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
   }
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath(); ctx.moveTo(OFFSET_X + LANES * LANE_W, 0); ctx.lineTo(OFFSET_X + LANES * LANE_W, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(OFFSET_X + LANES*LANE_W, 0); ctx.lineTo(OFFSET_X + LANES*LANE_W, H); ctx.stroke();
 
   // ヒットライン
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(OFFSET_X, HIT_Y); ctx.lineTo(OFFSET_X + LANES * LANE_W, HIT_Y); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(OFFSET_X, HIT_Y); ctx.lineTo(OFFSET_X + LANES*LANE_W, HIT_Y); ctx.stroke();
 
   // ヒットサークル
   for (let i = 0; i < LANES; i++) {
     const x = laneX(i);
-    ctx.beginPath();
-    ctx.arc(x, HIT_Y, NOTE_R + 4, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(x, HIT_Y, NOTE_R+4, 0, Math.PI*2);
     ctx.strokeStyle = keyFlash[i] > 0 ? COLORS[i] : 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = keyFlash[i] > 0 ? 3 : 1.5;
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    ctx.fill();
-
-    // キーラベル
+    ctx.lineWidth = keyFlash[i] > 0 ? 3 : 1.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fill();
     ctx.fillStyle = keyFlash[i] > 0 ? COLORS[i] : '#555';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center';
+    ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(LABELS[i], x, HIT_Y + 5);
   }
 
@@ -366,19 +460,14 @@ function drawPlay() {
     if (n.hit) continue;
     const x = laneX(n.lane);
     ctx.save();
-    ctx.shadowColor = COLORS[n.lane];
-    ctx.shadowBlur = 15;
-    ctx.beginPath();
-    ctx.arc(x, n.y, NOTE_R, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS[n.lane];
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    ctx.shadowColor = COLORS[n.lane]; ctx.shadowBlur = 15;
+    ctx.beginPath(); ctx.arc(x, n.y, NOTE_R, 0, Math.PI*2);
+    ctx.fillStyle = COLORS[n.lane]; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     ctx.restore();
   }
 
-  // まるちゃん（レーン左側）
+  // まるちゃん
   drawMaru(OFFSET_X - 40, maru.y, 28, 0);
 
   // エフェクト
@@ -392,14 +481,11 @@ function drawPlay() {
   }
 
   // UI上部
-  const timeLeft = Math.max(0, gameDuration - gameTime);
+  const timeLeft = Math.max(0, currentStage.duration - gameTime);
   const barW = LANES * LANE_W;
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(OFFSET_X, 0, barW, 52);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(OFFSET_X, 0, barW, 52);
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'left';
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'left';
   ctx.fillText(`${score}`, OFFSET_X + 8, 30);
 
   ctx.textAlign = 'center';
@@ -413,27 +499,35 @@ function drawPlay() {
   ctx.fillText(`${Math.ceil(timeLeft)}秒`, OFFSET_X + barW - 8, 30);
 
   // タイムバー
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
-  ctx.fillRect(OFFSET_X, 44, barW, 5);
-  const pct = 1 - gameTime / gameDuration;
-  ctx.fillStyle = timeLeft <= 10 ? '#f87171' : '#a78bfa';
+  ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(OFFSET_X, 44, barW, 5);
+  const pct = 1 - gameTime / currentStage.duration;
+  ctx.fillStyle = timeLeft <= 10 ? '#f87171' : currentStage.color;
   ctx.fillRect(OFFSET_X, 44, barW * pct, 5);
+
+  // ステージ名（左上）
+  ctx.fillStyle = currentStage.color; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText(currentStage.label, OFFSET_X + 8, 48);
+
+  // 途中終了ボタン
+  ctx.fillStyle = 'rgba(255,255,255,0.1)';
+  roundRect(QUIT_BTN.x, QUIT_BTN.y, QUIT_BTN.w, QUIT_BTN.h, 8); ctx.fill();
+  ctx.fillStyle = '#888'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('やめる', QUIT_BTN.x + QUIT_BTN.w/2, QUIT_BTN.y + 18);
 }
 
+// ── 描画：リザルト ─────────────────────────────────────
 function drawResult() {
-  ctx.fillStyle = '#080818';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#080818'; ctx.fillRect(0, 0, W, H);
 
   ctx.save();
-  ctx.shadowColor = '#a78bfa';
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = '#a78bfa';
-  ctx.font = 'bold 42px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('RESULT', W/2, 90);
+  ctx.shadowColor = '#a78bfa'; ctx.shadowBlur = 20;
+  ctx.fillStyle = '#a78bfa'; ctx.font = 'bold 42px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('RESULT', W/2, 80);
   ctx.restore();
 
-  // ランク
+  ctx.fillStyle = currentStage.color; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`[ ${currentStage.label} ]`, W/2, 105);
+
   const pct = totalNotes > 0 ? perfectCount / totalNotes : 0;
   let rank = 'C', rColor = '#888';
   if (pct >= 0.95) { rank = 'S'; rColor = '#facc15'; }
@@ -441,100 +535,33 @@ function drawResult() {
   else if (pct >= 0.6) { rank = 'B'; rColor = '#60a5fa'; }
 
   ctx.save();
-  ctx.shadowColor = rColor;
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = rColor;
-  ctx.font = 'bold 80px sans-serif';
-  ctx.textAlign = 'center';
+  ctx.shadowColor = rColor; ctx.shadowBlur = 30;
+  ctx.fillStyle = rColor; ctx.font = 'bold 80px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText(rank, W/2, 200);
   ctx.restore();
 
-  // まるちゃん
-  drawMaru(W/2, 270, 34, rank === 'S' ? Math.sin(Date.now()/200)*8 : 0);
+  drawMaru(W/2, 265, 32, rank === 'S' ? Math.sin(Date.now()/200)*8 : 0);
 
-  // スコア詳細
   const rows = [
-    [`スコア`, `${score}`, '#fff'],
-    [`PERFECT`, `${perfectCount}`, '#facc15'],
-    [`GOOD`, `${goodCount}`, '#34d399'],
-    [`MISS`, `${missCount}`, '#f87171'],
-    [`MAX COMBO`, `${maxCombo}`, '#a78bfa'],
+    ['スコア', `${score}`, '#fff'],
+    ['PERFECT', `${perfectCount}`, '#facc15'],
+    ['GOOD', `${goodCount}`, '#34d399'],
+    ['MISS', `${missCount}`, '#f87171'],
+    ['MAX COMBO', `${maxCombo}`, '#a78bfa'],
   ];
-  let ry = 330;
+  let ry = 315;
   for (const [label, val, color] of rows) {
-    ctx.fillStyle = '#333';
-    ctx.fillRect(OFFSET_X + 10, ry - 20, LANES * LANE_W - 20, 28);
-    ctx.fillStyle = '#888';
-    ctx.font = '15px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(label, OFFSET_X + 22, ry);
-    ctx.fillStyle = color;
-    ctx.font = 'bold 16px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(val, OFFSET_X + LANES * LANE_W - 22, ry);
-    ry += 34;
+    ctx.fillStyle = '#222'; roundRect(OFFSET_X+10, ry-20, LANES*LANE_W-20, 28, 6); ctx.fill();
+    ctx.fillStyle = '#888'; ctx.font = '15px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(label, OFFSET_X+22, ry);
+    ctx.fillStyle = color; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(val, OFFSET_X+LANES*LANE_W-22, ry);
+    ry += 32;
   }
 
-  ctx.fillStyle = '#a78bfa';
-  ctx.font = '15px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('スペース / Enter でもう一度', W/2, H - 50);
-  ctx.fillStyle = '#444';
-  ctx.font = '13px sans-serif';
-  ctx.fillText('ESC でタイトルへ', W/2, H - 28);
+  btn('もう一度', W/2-80, H-92, 160, 36, currentStage.color);
+  btn('ステージ選択へ', W/2-80, H-50, 160, 30, 'rgba(255,255,255,0.1)', '#aaa');
 }
-
-function drawMaru(x, y, r, wobble) {
-  ctx.save();
-  ctx.translate(x + wobble, y);
-  // 体
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#f9a8d4';
-  ctx.fill();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  // 目
-  ctx.fillStyle = '#1e1b4b';
-  ctx.beginPath(); ctx.arc(-r*0.3, -r*0.1, r*0.15, 0, Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc( r*0.3, -r*0.1, r*0.15, 0, Math.PI*2); ctx.fill();
-  // 口
-  ctx.strokeStyle = '#1e1b4b'; ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(0, r*0.1, r*0.25, 0.1, Math.PI - 0.1);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1,3),16);
-  const g = parseInt(hex.slice(3,5),16);
-  const b = parseInt(hex.slice(5,7),16);
-  return `${r},${g},${b}`;
-}
-
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x+r, y);
-  ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
-  ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
-  ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
-  ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
-  ctx.closePath();
-}
-
-// タイトル画面の戻るボタン
-canvas.addEventListener('click', e => {
-  const rect = canvas.getBoundingClientRect();
-  const cx = (e.clientX - rect.left) * (W / rect.width);
-  const cy = (e.clientY - rect.top) * (H / rect.height);
-  if (scene === 'title') {
-    if (cx >= W/2-60 && cx <= W/2+60 && cy >= H-60 && cy <= H-24) {
-      window.location.href = '/';
-    }
-  }
-});
 
 // ── メインループ ─────────────────────────────────────────
 let last = 0;
@@ -543,9 +570,10 @@ function loop(ts) {
   last = ts;
 
   if (scene === 'play') update(dt);
-  else if (scene === 'title') scheduleBGM();
+  else scheduleBGM();
 
   if (scene === 'title') drawTitle();
+  else if (scene === 'select') drawSelect();
   else if (scene === 'play') drawPlay();
   else if (scene === 'result') drawResult();
 
