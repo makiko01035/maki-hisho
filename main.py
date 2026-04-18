@@ -7,7 +7,7 @@ import time
 import requests
 from flask import Flask, request, abort, send_from_directory
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageMessage, AudioMessage
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -1092,6 +1092,71 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
             event.reply_token,
             TextSendMessage(text=f"画像の読み取りに失敗しました😢\nエラー: {str(e)[:150]}")
         )
+
+
+@handler.add(MessageEvent, message=AudioMessage)
+def handle_audio(event):
+    message_id = event.message.id
+    try:
+        message_content = line_bot_api.get_message_content(message_id)
+        audio_data = b''.join(chunk for chunk in message_content.iter_content())
+    except Exception as e:
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"音声の取得に失敗しました😢\n{str(e)[:100]}"))
+        return
+
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text="🎤 音声を受け取りました！文字起こし中...少々お待ちください"))
+
+    def transcribe_and_summarize():
+        try:
+            groq_api_key = os.environ.get('GROQ_API_KEY', '')
+            files = {'file': ('audio.m4a', audio_data, 'audio/m4a')}
+            data = {'model': 'whisper-large-v3', 'language': 'ja', 'response_format': 'text'}
+            resp = requests.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                headers={'Authorization': f'Bearer {groq_api_key}'},
+                files=files,
+                data=data,
+                timeout=60
+            )
+            transcript = resp.text.strip()
+
+            summary = anthropic_client.messages.create(
+                model='claude-sonnet-4-6',
+                max_tokens=1500,
+                messages=[{
+                    'role': 'user',
+                    'content': f"""以下の音声文字起こしから議事録を作成してください。
+
+【文字起こし】
+{transcript}
+
+【議事録フォーマット】
+📋 議事録
+日時：{datetime.datetime.now(JST).strftime('%Y年%m月%d日 %H:%M')}
+
+■ 話題・内容
+（要点を箇条書きで）
+
+■ 決定事項
+（決まったことを箇条書き、なければ「なし」）
+
+■ ToDoリスト
+（誰が何をするか、なければ「なし」）
+
+---
+📝 文字起こし原文
+{transcript}"""
+                }]
+            )
+            result = summary.content[0].text
+
+            line_bot_api.push_message(event.source.user_id, TextSendMessage(text=result))
+        except Exception as e:
+            print(f"Transcription error: {e}")
+            import traceback; traceback.print_exc()
+            line_bot_api.push_message(event.source.user_id, TextSendMessage(text=f"文字起こしに失敗しました😢\n{str(e)[:150]}"))
+
+    threading.Thread(target=transcribe_and_summarize).start()
 
 
 @handler.add(MessageEvent, message=TextMessage)
