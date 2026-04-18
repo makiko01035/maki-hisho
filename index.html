@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>まるちゃんワールド</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #080818;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* 星 */
+  .stars {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle var(--d) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle {
+    from { opacity: 0.2; transform: scale(0.8); }
+    to   { opacity: 1;   transform: scale(1.2); }
+  }
+
+  .content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 32px;
+  }
+
+  /* タイトル */
+  .title-wrap { text-align: center; }
+  .title-chara {
+    font-size: 52px; line-height: 1;
+    animation: bounce 2s ease-in-out infinite;
+  }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+  }
+  h1 {
+    font-size: 32px; font-weight: bold;
+    color: #FF69B4;
+    text-shadow: 0 0 20px rgba(255,105,180,0.8), 0 0 40px rgba(255,105,180,0.4);
+    letter-spacing: 4px;
+    margin-top: 8px;
+  }
+  .subtitle {
+    color: #666; font-size: 13px; margin-top: 6px; letter-spacing: 2px;
+  }
+
+  /* ゲームカード */
+  .cards {
+    display: flex; gap: 28px;
+  }
+
+  .card {
+    width: 220px;
+    background: rgba(255,255,255,0.04);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 28px 20px 22px;
+    text-align: center;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    display: block;
+  }
+  .card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 40px var(--glow);
+    border-color: var(--color);
+  }
+
+  .card-icon { font-size: 40px; margin-bottom: 12px; }
+
+  .card-title {
+    font-size: 17px; font-weight: bold;
+    color: var(--color);
+    text-shadow: 0 0 10px var(--glow);
+    margin-bottom: 10px; line-height: 1.4;
+  }
+
+  .card-desc {
+    font-size: 12px; color: #888; line-height: 1.7;
+  }
+
+  .card-btn {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 8px 22px;
+    border-radius: 20px;
+    font-size: 13px; font-weight: bold;
+    background: var(--color);
+    color: #111;
+    transition: opacity 0.15s;
+  }
+  .card:hover .card-btn { opacity: 0.85; }
+
+  /* カード個別カラー */
+  .card-typing {
+    --color: #88DDFF;
+    --glow: rgba(136,221,255,0.3);
+  }
+  .card-action {
+    --color: #FF69B4;
+    --glow: rgba(255,105,180,0.3);
+  }
+
+  .footer {
+    color: #333; font-size: 11px; letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="content">
+
+  <div class="title-wrap">
+    <div class="title-chara">🌸</div>
+    <h1>まるちゃんワールド</h1>
+    <p class="subtitle">MARUCHAN WORLD</p>
+  </div>
+
+  <div class="cards">
+
+    <a class="card card-typing" href="maruchan_adventure.html">
+      <div class="card-icon">⌨️</div>
+      <div class="card-title">タイピング<br>大作戦</div>
+      <div class="card-desc">
+        単語を打ち込んで<br>
+        敵を倒そう！<br>
+        4つの難易度あり<br>
+        ライフ制・90秒
+      </div>
+      <span class="card-btn">▶ あそぶ</span>
+    </a>
+
+    <a class="card card-action" href="maruchan_action.html">
+      <div class="card-icon">⭐</div>
+      <div class="card-title">アクション</div>
+      <div class="card-desc">
+        吸い込んで<br>
+        能力コピー！<br>
+        フワフワ飛べる<br>
+        90秒スコアアタック
+      </div>
+      <span class="card-btn">▶ あそぶ</span>
+    </a>
+
+  </div>
+
+  <p class="footer">© まるちゃんワールド</p>
+
+</div>
+
+<script>
+  // 星を生成
+  const container = document.getElementById('stars');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.5 + 0.5;
+    s.style.cssText = `
+      width: ${size}px; height: ${size}px;
+      left: ${Math.random()*100}%; top: ${Math.random()*100}%;
+      --d: ${(Math.random()*3+1.5).toFixed(1)}s;
+      animation-delay: ${(Math.random()*3).toFixed(1)}s;
+    `;
+    container.appendChild(s);
+  }
+</script>
+</body>
+</html>
