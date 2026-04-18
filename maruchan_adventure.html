@@ -234,10 +234,11 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (mode === 'result') {
-    if (k === ' ' || k === 'Enter') { mode = 'title'; }
+    if (k === ' ' || k === 'Enter' || k === 'Escape') { mode = 'title'; }
     return;
   }
 
+  if (k === 'Escape') { mode = 'title'; return; }
   if (k.length !== 1) return;
   const ch = k.toLowerCase();
 
@@ -619,6 +620,33 @@ function drawResult() {
   ctx.textAlign='left';
 }
 
+// ── Menu button (click) ───────────────────────────────────
+const MENU_BTN = { x: W-90, y: H-38, w: 80, h: 26 };
+
+canvas.addEventListener('click', e => {
+  if (mode !== 'play') return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (W / rect.width);
+  const my = (e.clientY - rect.top)  * (H / rect.height);
+  if (mx >= MENU_BTN.x && mx <= MENU_BTN.x+MENU_BTN.w &&
+      my >= MENU_BTN.y && my <= MENU_BTN.y+MENU_BTN.h) {
+    mode = 'title';
+  }
+});
+
+function drawMenuButton() {
+  const b = MENU_BTN;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 6); ctx.fill(); ctx.stroke();
+  ctx.font = '13px Courier New';
+  ctx.fillStyle = '#aaa';
+  ctx.textAlign = 'center';
+  ctx.fillText('← メニュー', b.x + b.w/2, b.y + 17);
+  ctx.textAlign = 'left';
+}
+
 // ── Main loop ─────────────────────────────────────────────
 function loop() {
   update();
@@ -631,6 +659,7 @@ function loop() {
     drawPlayer();
     drawFloats();
     drawHUD();
+    drawMenuButton();
   }
   requestAnimationFrame(loop);
 }
