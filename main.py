@@ -276,90 +276,124 @@ def debug_x_keys():
     }
 
 
-@app.route('/overlay-image')
-def overlay_image():
-    """
-    アイキャッチ画像にタイトルを重ねてInstagram用画像を生成し、WPメディアにアップロードしてURLを返す
-    クエリパラメータ: img_url, title, wp_url (省略可)
-    """
+def _build_overlay_jpeg(img_url: str, title: str) -> bytes:
+    """アイキャッチ画像にタイトルを重ねてJPEGバイト列を返す"""
     from PIL import Image, ImageDraw, ImageFont
     from io import BytesIO
 
+    r = requests.get(img_url, timeout=15)
+    img = Image.open(BytesIO(r.content)).convert('RGBA')
+    img = img.resize((1080, 1080), Image.LANCZOS)
+
+    overlay = Image.new('RGBA', (1080, 1080), (0, 0, 0, 0))
+    draw_ov = ImageDraw.Draw(overlay)
+    for y in range(1080):
+        alpha = int(180 * (y / 1080))
+        draw_ov.line([(0, y), (1080, y)], fill=(0, 0, 0, alpha))
+    img = Image.alpha_composite(img, overlay)
+
+    draw = ImageDraw.Draw(img)
+    font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
+    font = ImageFont.truetype(font_path, 60)
+
+    max_chars = 14
+    lines = []
+    t = title
+    while len(t) > max_chars:
+        lines.append(t[:max_chars])
+        t = t[max_chars:]
+    lines.append(t)
+
+    line_height = 72
+    y_start = 1080 - line_height * len(lines) - 80
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        x = (1080 - (bbox[2] - bbox[0])) // 2
+        draw.text((x + 2, y_start + 2), line, font=font, fill=(0, 0, 0, 200))
+        draw.text((x, y_start), line, font=font, fill=(255, 255, 255, 255))
+        y_start += line_height
+
+    buf = __import__('io').BytesIO()
+    img.convert('RGB').save(buf, format='JPEG', quality=90)
+    return buf.getvalue()
+
+
+def _upload_to_wp(img_data: bytes, filename: str, wp_url: str, wp_user: str, wp_pass: str):
+    """WPメディアライブラリにJPEGをアップロードしてsource_urlを返す"""
+    res = requests.post(
+        f"{wp_url}/wp-json/wp/v2/media",
+        auth=(wp_user, wp_pass),
+        headers={'Content-Disposition': f'attachment; filename="{filename}"', 'Content-Type': 'image/jpeg'},
+        data=img_data,
+    )
+    if res.status_code == 201:
+        return res.json()['id'], res.json()['source_url']
+    return None, None
+
+
+@app.route('/overlay-image')
+def overlay_image():
+    """アイキャッチ画像にタイトルを重ねてWPメディアにアップロードしURLを返す"""
     img_url = request.args.get('img_url', '')
     title = request.args.get('title', '')
     wp_url = request.args.get('wp_url', os.environ.get('SEKISUI_WP_URL', ''))
     wp_user = os.environ.get('SEKISUI_WP_USER', '')
     wp_pass = os.environ.get('SEKISUI_WP_APP_PASSWORD', '')
-
     if not img_url or not title:
         return 'img_url and title are required', 400
+    try:
+        img_data = _build_overlay_jpeg(img_url, title)
+        filename = 'og_' + img_url.split('/')[-1].split('.')[0] + '.jpg'
+        _, media_url = _upload_to_wp(img_data, filename, wp_url, wp_user, wp_pass)
+        if media_url:
+            return {'url': media_url}, 200
+        return {'error': 'WP upload failed'}, 500
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
+@app.route('/wp-post-published', methods=['POST'])
+def wp_post_published():
+    """WP Webhooksから記事公開通知を受け取り、オーバーレイ画像を作成してfeatured_mediaを更新する"""
+    data = request.json or {}
+
+    post_status = data.get('post_status', '')
+    post_type = data.get('post_type', 'post')
+    if post_status != 'publish' or post_type != 'post':
+        return {'status': 'skipped'}, 200
+
+    post_id = data.get('ID') or data.get('post_id')
+    wp_url = os.environ.get('SEKISUI_WP_URL', '')
+    wp_user = os.environ.get('SEKISUI_WP_USER', '')
+    wp_pass = os.environ.get('SEKISUI_WP_APP_PASSWORD', '')
 
     try:
-        # 元画像をダウンロード
-        r = requests.get(img_url, timeout=15)
-        img = Image.open(BytesIO(r.content)).convert('RGBA')
+        post_res = requests.get(f"{wp_url}/wp-json/wp/v2/posts/{post_id}", auth=(wp_user, wp_pass))
+        if post_res.status_code != 200:
+            return {'error': 'post not found'}, 404
+        post = post_res.json()
+        title = post['title']['rendered']
+        featured_media_id = post.get('featured_media', 0)
+        if not featured_media_id:
+            return {'status': 'skipped', 'reason': 'no featured image'}, 200
 
-        # 正方形1080×1080にリサイズ（Instagram最適）
-        img = img.resize((1080, 1080), Image.LANCZOS)
+        media_res = requests.get(f"{wp_url}/wp-json/wp/v2/media/{featured_media_id}", auth=(wp_user, wp_pass))
+        if media_res.status_code != 200:
+            return {'error': 'media not found'}, 404
+        img_url = media_res.json()['source_url']
 
-        # 半透明グラデーションオーバーレイ（下半分を暗く）
-        overlay = Image.new('RGBA', (1080, 1080), (0, 0, 0, 0))
-        draw_ov = ImageDraw.Draw(overlay)
-        for y in range(1080):
-            alpha = int(180 * (y / 1080))
-            draw_ov.line([(0, y), (1080, y)], fill=(0, 0, 0, alpha))
-        img = Image.alpha_composite(img, overlay)
+        img_data = _build_overlay_jpeg(img_url, title)
+        filename = f'ig_{post_id}.jpg'
+        new_media_id, media_url = _upload_to_wp(img_data, filename, wp_url, wp_user, wp_pass)
+        if not new_media_id:
+            return {'error': 'upload failed'}, 500
 
-        # テキスト描画
-        draw = ImageDraw.Draw(img)
-        font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
-        font_size = 60
-        font = ImageFont.truetype(font_path, font_size)
-
-        # テキスト折り返し（1行14文字）
-        max_chars = 14
-        lines = []
-        while len(title) > max_chars:
-            lines.append(title[:max_chars])
-            title = title[max_chars:]
-        lines.append(title)
-
-        line_height = font_size + 12
-        total_height = line_height * len(lines)
-        y_start = 1080 - total_height - 80
-
-        for line in lines:
-            bbox = draw.textbbox((0, 0), line, font=font)
-            text_width = bbox[2] - bbox[0]
-            x = (1080 - text_width) // 2
-            draw.text((x + 2, y_start + 2), line, font=font, fill=(0, 0, 0, 200))
-            draw.text((x, y_start), line, font=font, fill=(255, 255, 255, 255))
-            y_start += line_height
-
-        # RGBに変換してJPEG化
-        img_rgb = img.convert('RGB')
-        buf = BytesIO()
-        img_rgb.save(buf, format='JPEG', quality=90)
-        buf.seek(0)
-        img_data = buf.read()
-
-        # WordPressメディアにアップロード
-        filename = 'og_' + img_url.split('/')[-1].split('.')[0] + '.jpg'
-        upload_res = requests.post(
-            f"{wp_url}/wp-json/wp/v2/media",
+        requests.post(
+            f"{wp_url}/wp-json/wp/v2/posts/{post_id}",
             auth=(wp_user, wp_pass),
-            headers={
-                'Content-Disposition': f'attachment; filename="{filename}"',
-                'Content-Type': 'image/jpeg',
-            },
-            data=img_data,
+            json={'featured_media': new_media_id},
         )
-        if upload_res.status_code == 201:
-            media_url = upload_res.json()['source_url']
-            return {'url': media_url}, 200
-        else:
-            return {'error': f'WP upload failed: {upload_res.status_code}'}, 500
-
+        return {'status': 'ok', 'new_image': media_url}, 200
     except Exception as e:
         return {'error': str(e)}, 500
 
