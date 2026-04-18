@@ -794,6 +794,10 @@ def game_files(filename):
 def company_office():
     return send_from_directory('.', 'company_office.html')
 
+@app.route('/game/rhythm')
+def game_rhythm():
+    return send_from_directory('.', 'maruchan_rhythm.html')
+
 
 @app.route('/auth/pinterest')
 def auth_pinterest():
