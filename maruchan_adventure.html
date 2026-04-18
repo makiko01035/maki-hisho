@@ -23,6 +23,11 @@ const W = 760, H = 440, FLOOR = 370;
 
 // ── 難易度設定 ────────────────────────────────────────────
 const DIFFICULTY = {
+  moji: {
+    label: 'もじ（1文字）', color: '#cc99ff',
+    words: 'abcdefghijklmnopqrstuvwxyz'.split(''),
+    spawnInterval: 260, enemySpeed: 0.45, maxEnemies: 2,
+  },
   easy: {
     label: 'かんたん', color: '#66ffaa',
     words: ['cat','dog','sun','red','run','hot','ice','fly','big','top',
@@ -221,6 +226,7 @@ document.addEventListener('keydown', e => {
 
   if (mode === 'title') {
     initAudio();
+    if (k === '0') startGame('moji');
     if (k === '1') startGame('easy');
     if (k === '2') startGame('normal');
     if (k === '3') startGame('hard');
@@ -541,12 +547,13 @@ function drawTitle() {
   ctx.fillText('単語を打ち込んで敵を倒そう！  ライフ制・BGMあり', W/2, 138);
 
   const diffs=[
-    {key:'1',id:'easy',  label:'１  かんたん',   sub:'短い英単語  ゆっくり  ライフ3',color:'#66ffaa'},
-    {key:'2',id:'normal',label:'２  ふつう',      sub:'日英ミックス  普通スピード  ライフ3',color:'#FFD700'},
-    {key:'3',id:'hard',  label:'３  むずかしい',  sub:'長い単語  速い！  ライフ3',   color:'#ff6677'},
+    {key:'0',id:'moji',  label:'０  もじ（1文字）',sub:'アルファベット1文字  超ゆっくり',color:'#cc99ff'},
+    {key:'1',id:'easy',  label:'１  かんたん',     sub:'短い英単語  ゆっくり',           color:'#66ffaa'},
+    {key:'2',id:'normal',label:'２  ふつう',        sub:'日英ミックス  普通スピード',     color:'#FFD700'},
+    {key:'3',id:'hard',  label:'３  むずかしい',    sub:'長い単語  速い！',               color:'#ff6677'},
   ];
   diffs.forEach((d,i)=>{
-    const bx=W/2-150, by=183+i*70, bw=300, bh=52;
+    const bx=W/2-160, by=155+i*60, bw=320, bh=50;
     const hover=Math.sin(frame*0.05+i)*2;
     ctx.fillStyle='rgba(255,255,255,0.06)';
     ctx.strokeStyle=d.color+'88'; ctx.lineWidth=2;
