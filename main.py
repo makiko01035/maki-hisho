@@ -5,7 +5,7 @@ import datetime
 import threading
 import time
 import requests
-from flask import Flask, request, abort
+from flask import Flask, request, abort, send_from_directory
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageMessage
 from google.oauth2.credentials import Credentials
@@ -584,6 +584,38 @@ def company_dashboard():
     50% {{ opacity: 0.4; }}
   }}
 
+  /* クイックアクセス */
+  .quick-section {{ margin-bottom: 56px; }}
+  .quick-grid {{
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }}
+  .quick-btn {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 20px 28px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    transition: border-color 0.3s, color 0.3s;
+    letter-spacing: 1px;
+  }}
+  .quick-btn:hover {{
+    border-color: var(--gold);
+    color: var(--gold-light);
+  }}
+  .quick-btn-icon {{
+    font-size: 20px;
+    line-height: 1;
+  }}
+
   @media (max-width: 768px) {{
     header {{ padding: 24px; flex-direction: column; align-items: flex-start; gap: 16px; }}
     main {{ padding: 24px; }}
@@ -591,6 +623,7 @@ def company_dashboard():
     .goal-card {{ flex-direction: column; gap: 24px; align-items: flex-start; }}
     .goal-divider {{ width: 40px; height: 1px; }}
     .line-grid {{ grid-template-columns: 1fr; }}
+    .quick-grid {{ flex-direction: column; }}
     footer {{ flex-direction: column; gap: 8px; padding: 24px; }}
   }}
 </style>
@@ -609,6 +642,21 @@ def company_dashboard():
 </header>
 
 <main>
+
+  <!-- クイックアクセス -->
+  <div class="quick-section">
+    <p class="section-title">Quick Access</p>
+    <div class="quick-grid">
+      <a class="quick-btn" href="/game" target="_blank">
+        <span class="quick-btn-icon">🎮</span>
+        <span>まるちゃんワールド</span>
+      </a>
+      <a class="quick-btn" href="/office" target="_blank">
+        <span class="quick-btn-icon">🏢</span>
+        <span>会社組織図</span>
+      </a>
+    </div>
+  </div>
 
   <!-- ミッション -->
   <div class="mission">
@@ -732,6 +780,19 @@ def company_dashboard():
 
 </body>
 </html>'''
+
+
+@app.route('/game')
+def game_index():
+    return send_from_directory('.', 'index.html')
+
+@app.route('/game/<path:filename>')
+def game_files(filename):
+    return send_from_directory('.', filename)
+
+@app.route('/office')
+def company_office():
+    return send_from_directory('.', 'company_office.html')
 
 
 @app.route('/auth/pinterest')
@@ -1601,6 +1662,11 @@ TWEET_STOCK = [
     "セキスイブログとPexels APIを連携。記事のアイキャッチ画像も自動で取得するようにした🖼️ #AI副業 #ブログ自動化 #Claude",
     "Renderの環境変数を10個以上管理してる。最初は何が何かわからなかったのに今は全部把握できてる #AI副業 #個人開発 #Render",
     "週次ルーティン通知を設定：月曜A8確認、火曜薬膳ブログ、木曜セキスイブログ、土曜eBayチェック。週の動きが自然に決まってきた #AI副業 #副業 #習慣化",
+    # ── まるちゃんワールド（ゲーム系） ──
+    "Claude Codeでブラウザゲームを作った🎮 プログラミングゼロなのにタイピングゲームが完成。息子と一緒に遊んでる笑 #AI副業 #ClaudeCode #ゲーム開発",
+    "「まるちゃんワールド」というゲームシリーズを作り始めた。タイピング練習ゲームとアクションゲームをHTMLファイル1枚で。コードは全部Claudeが書いてくれた #AI副業 #ClaudeCode",
+    "AIで作ったゲームをGitHub Pagesで無料公開した📡 URLを共有するだけでどこからでも遊べる。サーバー代0円。 #AI副業 #個人開発 #ClaudeCode",
+    "子どものタイピング練習用にゲームを作ったら自分もハマった😂 かんたん・ふつう・むずかしい・1文字モードの4段階。BGMも効果音も全部AIが生成 #AI副業 #子育て中ママ",
 ]
 
 
