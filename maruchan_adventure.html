@@ -226,6 +226,7 @@ document.addEventListener('keydown', e => {
 
   if (mode === 'title') {
     initAudio();
+    if (k === 'm' || k === 'M') { bgmOn = !bgmOn; return; }
     if (k === '0') startGame('moji');
     if (k === '1') startGame('easy');
     if (k === '2') startGame('normal');
@@ -237,8 +238,6 @@ document.addEventListener('keydown', e => {
     return;
   }
 
-  // M キーでBGMミュート切替
-  if (k === 'm' || k === 'M') { bgmOn = !bgmOn; return; }
   if (k.length !== 1) return;
   const ch = k.toLowerCase();
 
@@ -567,7 +566,7 @@ function drawTitle() {
   });
 
   ctx.font='12px Courier New'; ctx.fillStyle='#555';
-  ctx.fillText('M キーでBGMのON/OFF', W/2, 406);
+  ctx.fillText('タイトル画面で M キーBGM ON/OFF', W/2, 406);
 
   // ミニキャラ
   const px=W/2, py=425;
