@@ -114,11 +114,48 @@ def post_to_sekisui_wp(title, content_md):
 
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
     html = html.replace('<!-- sekisui-affiliate-cta -->', SEKISUI_CTA_BOX)
-    data = {'title': title, 'content': html, 'status': 'publish'}
+    # 英語スラッグを生成（URL文字化け防止）
+    import re, datetime
+    date_str = datetime.date.today().strftime('%Y%m%d')
+    ascii_part = re.sub(r'[^a-z0-9-]', '', re.sub(r'[^\x00-\x7F]', '', title).lower().replace(' ', '-')).strip('-')[:20]
+    slug = f"sekisui-{ascii_part}-{date_str}" if ascii_part else f"sekisui-{date_str}"
+    data = {'title': title, 'content': html, 'status': 'publish', 'slug': slug}
 
     img_result = fetch_pexels_image_for_wp(title)
     if img_result:
         img_data, filename = img_result
+        # タイトルオーバーレイを合成してからアップロード
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            from io import BytesIO
+            import os as _os
+            img = Image.open(BytesIO(img_data)).convert('RGBA')
+            img = img.resize((1080, 1080), Image.LANCZOS)
+            ov = Image.new('RGBA', (1080, 1080), (0, 0, 0, 0))
+            d = ImageDraw.Draw(ov)
+            for y in range(1080):
+                d.line([(0, y), (1080, y)], fill=(0, 0, 0, int(180 * y / 1080)))
+            img = Image.alpha_composite(img, ov)
+            draw = ImageDraw.Draw(img)
+            font_path = _os.path.join(_os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
+            font = ImageFont.truetype(font_path, 60)
+            lines_t, t = [], title
+            while len(t) > 14:
+                lines_t.append(t[:14]); t = t[14:]
+            lines_t.append(t)
+            y_s = 1080 - 72 * len(lines_t) - 80
+            for ln in lines_t:
+                bx = draw.textbbox((0, 0), ln, font=font)
+                x = (1080 - (bx[2] - bx[0])) // 2
+                draw.text((x+2, y_s+2), ln, font=font, fill=(0, 0, 0, 200))
+                draw.text((x, y_s), ln, font=font, fill=(255, 255, 255, 255))
+                y_s += 72
+            buf = BytesIO()
+            img.convert('RGB').save(buf, format='JPEG', quality=90)
+            img_data = buf.getvalue()
+            filename = 'ig_' + filename
+        except Exception as oe:
+            print(f"Overlay error (使用元画像): {oe}")
         media_id = upload_image_to_wp(wp_url, wp_user, wp_pass, img_data, filename)
         if media_id:
             data['featured_media'] = media_id
