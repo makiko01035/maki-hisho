@@ -1690,6 +1690,23 @@ def send_preparation_reminder():
         print(f"Preparation reminder error: {e}")
 
 
+def send_ebay_reset_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        message = (
+            "🎉 eBay月次リセットday！\n\n"
+            "今日から出品枠がリフレッシュされました！\n"
+            "✅ 無料出品250品 → リセット\n"
+            "✅ 出品総額$7,000 → リセット\n\n"
+            "たくさん出品するチャンスです！\n"
+            "Claude Codeに「出品サポートして」と声かけてね📦\n\n"
+            "また5月26日頃にはリミットアップ申請も可能になります！"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=message))
+    except Exception as e:
+        print(f"send_ebay_reset_reminder error: {e}")
+
+
 def send_hsbc_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -1966,6 +1983,8 @@ scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
 scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
 # 毎月末日朝9時：noteリマインド
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
+# 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
+scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 scheduler.start()
 
 if __name__ == '__main__':
