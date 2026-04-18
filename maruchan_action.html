@@ -94,8 +94,15 @@ function sfx(type) {
 }
 
 // ── State ────────────────────────────────────────────────
-let mode = 'title'; // title | play | result
+let mode = 'title'; // title | play | ending | result
+let gameMode = 'score'; // 'score' | 'survival'
 let score = 0, defeated = 0, spawnTimer = 0, frame = 0, missFlash = 0;
+// サバイバル用
+let lives = 5;
+const MAX_LIVES = 5;
+let heartAnim = [0,0,0,0,0];
+let wave = 1, waveAnnounce = 0; // wave表示カウント
+let survivalSec = 0; // 生存秒数
 
 // ── Player ───────────────────────────────────────────────
 function resetPlayer() {
@@ -156,7 +163,9 @@ document.addEventListener('keydown', e => {
 
   if (mode==='title') {
     initAudio();
-    if (e.key===' '||e.key==='Enter') startGame();
+    if (e.key==='1') startGame('score');
+    if (e.key==='2') startGame('survival');
+    if (e.key===' '||e.key==='Enter') startGame('score');
     if (e.key==='m'||e.key==='M') bgmOn=!bgmOn;
     e.preventDefault(); return;
   }
@@ -186,10 +195,13 @@ document.addEventListener('keyup', e => {
 });
 
 // ── Game control ─────────────────────────────────────────
-function startGame() {
+function startGame(gm='score') {
+  gameMode = gm;
   resetPlayer();
   enemies=[]; projectiles=[]; particles=[]; floats=[];
   score=0; defeated=0; spawnTimer=0; frame=0; missFlash=0;
+  lives=MAX_LIVES; heartAnim=[0,0,0,0,0];
+  wave=1; waveAnnounce=0; survivalSec=0;
   bgmIdx=0; bassIdx=0;
   if (audioCtx) { bgmNext=audioCtx.currentTime+0.1; bassNext=audioCtx.currentTime+0.1; }
   spawnEnemy(); spawnEnemy();
@@ -232,9 +244,10 @@ function spawnEnemy() {
   const type=types[Math.floor(Math.random()*types.length)];
   const d=ETYPES[type];
   const fromLeft=Math.random()<0.5;
+  const spdMult = gameMode==='survival' ? 1+0.3*(wave-1) : 1;
   enemies.push({
     x:fromLeft?-50:W+50, y:FLOOR-d.h,
-    w:d.w, h:d.h, vx:(fromLeft?1:-1)*d.spd,
+    w:d.w, h:d.h, vx:(fromLeft?1:-1)*d.spd*spdMult,
     type, ability:d.ability, color:d.color,
     alive:true, inhaled:false, inhaledProg:0, walk:0,
   });
@@ -262,16 +275,22 @@ function update() {
   scheduleBGM();
   if (mode!=='play') return;
 
-  // タイマー終了
-  const timeLeft = GAME_TIME - Math.floor(frame/60);
-  if (timeLeft <= 0) {
-    sfx('end');
-    setTimeout(()=>{ mode='result'; }, 300);
-    mode='ending'; return;
+  // ── モード別タイマー/ウェーブ処理 ──
+  if (gameMode==='score') {
+    const timeLeft = GAME_TIME - Math.floor(frame/60);
+    if (timeLeft<=0) { sfx('end'); mode='ending'; setTimeout(()=>{ mode='result'; },300); return; }
+    if (timeLeft<=10 && frame%30===0) missFlash=4;
+  } else {
+    // サバイバル：ウェーブアップ（20秒ごと）
+    survivalSec = Math.floor(frame/60);
+    const newWave = 1 + Math.floor(survivalSec/20);
+    if (newWave > wave) {
+      wave = newWave;
+      waveAnnounce = 150;
+      sfx('copy'); // ウェーブアップ音
+    }
+    if (waveAnnounce>0) waveAnnounce--;
   }
-
-  // 残り10秒でBGM加速感（テンポ変化は省略、フラッシュで演出）
-  if (timeLeft<=10 && frame%30===0) missFlash=4;
 
   // 移動
   if (keys['ArrowLeft']||keys['KeyA']) { player.vx=-3.8; player.facing=-1; }
@@ -337,6 +356,15 @@ function update() {
       addParticles(player.x+player.w/2, player.y+player.h/2, '#ff6699', 8, 0, -2);
       addFloat(player.x, player.y-30, 'ダメージ！', '#ff4466');
       sfx('hit');
+      if (gameMode==='survival') {
+        lives--;
+        heartAnim[lives] = 20;
+        if (lives<=0) {
+          sfx('end');
+          setTimeout(()=>{ mode='result'; }, 500);
+          mode='ending';
+        }
+      }
     }
   }
 
@@ -364,9 +392,12 @@ function update() {
   particles   = particles.filter(p=>p.life>0);
   floats      = floats.filter(f=>f.life>0);
   if (missFlash>0) missFlash--;
+  heartAnim = heartAnim.map(v=>Math.max(0,v-1));
 
   spawnTimer++;
-  if (spawnTimer>180&&enemies.length<6) { spawnEnemy(); spawnTimer=0; }
+  const spawnInterval = gameMode==='survival' ? Math.max(60, 180-wave*20) : 180;
+  const maxEnemies    = gameMode==='survival' ? Math.min(3+wave, 10)       : 6;
+  if (spawnTimer>spawnInterval&&enemies.length<maxEnemies) { spawnEnemy(); spawnTimer=0; }
 }
 
 // ── Draw ──────────────────────────────────────────────────
@@ -557,16 +588,49 @@ function drawHUD() {
     ctx.shadowBlur=0;
   }
 
-  // タイマー
-  const timeLeft=Math.max(0, GAME_TIME-Math.floor(frame/60));
-  const tc=timeLeft<=10?'#ff6677':timeLeft<=30?'#FFD700':'#ffffff';
-  ctx.font=`bold 22px sans-serif`; ctx.fillStyle=tc;
-  ctx.textAlign='center';
-  ctx.shadowColor=tc; ctx.shadowBlur=timeLeft<=10?12:0;
-  ctx.fillText(`⏱ ${timeLeft}`, W/2, 30);
-  ctx.shadowBlur=0; ctx.textAlign='left';
+  if (gameMode==='score') {
+    // タイマー
+    const timeLeft=Math.max(0, GAME_TIME-Math.floor(frame/60));
+    const tc=timeLeft<=10?'#ff6677':timeLeft<=30?'#FFD700':'#ffffff';
+    ctx.font='bold 22px sans-serif'; ctx.fillStyle=tc;
+    ctx.textAlign='center';
+    ctx.shadowColor=tc; ctx.shadowBlur=timeLeft<=10?12:0;
+    ctx.fillText(`⏱ ${timeLeft}`, W/2, 30);
+    ctx.shadowBlur=0; ctx.textAlign='left';
+  } else {
+    // サバイバル：ライフ表示
+    for (let i=0;i<MAX_LIVES;i++) {
+      const shake=heartAnim[i]>0?Math.sin(heartAnim[i]*1.5)*3:0;
+      ctx.font='22px sans-serif';
+      ctx.globalAlpha=i<lives?1:0.2;
+      ctx.fillText('♥', W/2-MAX_LIVES*14+i*28+shake, 30);
+    }
+    ctx.globalAlpha=1;
+    // ウェーブ表示
+    ctx.font='bold 14px sans-serif'; ctx.fillStyle='#FFD700';
+    ctx.textAlign='center';
+    ctx.fillText(`WAVE ${wave}`, W/2, 50);
+    ctx.textAlign='left';
+    // 生存時間
+    const m=Math.floor(survivalSec/60), s=survivalSec%60;
+    ctx.font='13px sans-serif'; ctx.fillStyle='#888';
+    ctx.textAlign='right';
+    ctx.fillText(`${m}:${String(s).padStart(2,'0')}`, W-16, 50);
+    ctx.textAlign='left';
 
-  // 倒した数
+    // ウェーブアップ演出
+    if (waveAnnounce>0) {
+      const a=Math.min(waveAnnounce,30)/30;
+      ctx.globalAlpha=a;
+      ctx.font='bold 36px sans-serif'; ctx.fillStyle='#FFD700';
+      ctx.shadowColor='#FFD700'; ctx.shadowBlur=20;
+      ctx.textAlign='center';
+      ctx.fillText(`WAVE ${wave} !!`, W/2, H/2-20);
+      ctx.shadowBlur=0; ctx.globalAlpha=1; ctx.textAlign='left';
+    }
+  }
+
+  // 倒した数（共通）
   ctx.font='14px sans-serif'; ctx.fillStyle='#aaa';
   ctx.textAlign='right';
   ctx.fillText(`${defeated} 体倒した`, W-16, 30);
@@ -599,38 +663,42 @@ function drawTitle() {
   ctx.textAlign='center';
   ctx.font='bold 40px sans-serif';
   ctx.fillStyle='#FF69B4'; ctx.shadowColor='#ff69b4'; ctx.shadowBlur=20;
-  ctx.fillText('まるちゃんアクション', W/2, 120);
-  ctx.shadowBlur=0;
-  ctx.font='16px sans-serif'; ctx.fillStyle='#aaa';
-  ctx.fillText('吸い込んで能力コピー！90秒スコアアタック', W/2, 160);
-
-  const bx=W/2-120, by=210, bw=240, bh=55;
-  const hov=Math.sin(frame*0.06)*2;
-  ctx.fillStyle='rgba(255,105,180,0.15)';
-  ctx.strokeStyle='#ff69b488'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.roundRect(bx,by+hov,bw,bh,12); ctx.fill(); ctx.stroke();
-  ctx.font='bold 22px sans-serif'; ctx.fillStyle='#FF69B4';
-  ctx.shadowColor='#ff69b4'; ctx.shadowBlur=10;
-  ctx.fillText('▶ スタート', W/2, by+hov+35);
+  ctx.fillText('まるちゃんアクション', W/2, 105);
   ctx.shadowBlur=0;
   ctx.font='14px sans-serif'; ctx.fillStyle='#666';
-  ctx.fillText('Space または Enter', W/2, by+hov+52);
+  ctx.fillText('吸い込んで能力コピー！モードを選んでね', W/2, 138);
 
-  ctx.font='13px sans-serif'; ctx.fillStyle='#444';
-  ctx.fillText('← → 移動  ↑/W ジャンプ  Z/Space フワフワ  X 吸い込む・発射', W/2, 300);
-  ctx.fillText('タイトル画面で M キー → BGM ON/OFF', W/2, 324);
+  const modes=[
+    { key:'１', label:'スコアアタック', sub:'90秒で高スコアを狙え！', color:'#FF69B4', glow:'rgba(255,105,180,0.3)', gm:'score'  },
+    { key:'２', label:'サバイバル',     sub:'ライフ5個・波が来るたびに敵が増えて速くなる！', color:'#FFD700', glow:'rgba(255,215,0,0.3)',    gm:'survival'},
+  ];
+  modes.forEach((m,i)=>{
+    const bx=W/2-170, by=168+i*98, bw=340, bh=78;
+    const hov=Math.sin(frame*0.06+i)*2;
+    ctx.fillStyle=`rgba(255,255,255,0.05)`;
+    ctx.strokeStyle=m.color+'88'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.roundRect(bx,by+hov,bw,bh,12); ctx.fill(); ctx.stroke();
+    ctx.font='bold 11px sans-serif'; ctx.fillStyle=m.color;
+    ctx.fillText(`キー ${m.key}`, bx+28, by+hov+22);
+    ctx.font='bold 20px sans-serif'; ctx.fillStyle=m.color;
+    ctx.shadowColor=m.color; ctx.shadowBlur=10;
+    ctx.fillText(m.label, W/2+10, by+hov+32);
+    ctx.shadowBlur=0;
+    ctx.font='13px sans-serif'; ctx.fillStyle='#888';
+    ctx.fillText(m.sub, W/2, by+hov+56);
+  });
+
+  ctx.font='12px sans-serif'; ctx.fillStyle='#444';
+  ctx.fillText('← → 移動  ↑/W ジャンプ  Z/Space フワフワ  X 吸い込む・発射  M BGM切替', W/2, 386);
 
   // ミニキャラ
-  const px=W/2, py=390;
-  ctx.fillStyle='#FF69B4'; ctx.beginPath(); ctx.arc(px,py,18,0,Math.PI*2); ctx.fill();
+  const px=W/2-140, py=220;
+  ctx.fillStyle='#FF69B4'; ctx.beginPath(); ctx.arc(px,py,14,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='rgba(255,255,255,0.2)';
-  ctx.beginPath(); ctx.ellipse(px-5,py-6,8,5,-0.3,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(px-4,py-5,6,4,-0.3,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#111';
-  ctx.beginPath(); ctx.arc(px-6,py,2.5,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(px+6,py,2.5,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='white';
-  ctx.beginPath(); ctx.arc(px-5,py-1,1,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(px+7,py-1,1,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(px-5,py,2,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(px+5,py,2,0,Math.PI*2); ctx.fill();
   ctx.textAlign='left';
 }
 
@@ -638,36 +706,63 @@ function drawResult() {
   drawBg();
   ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
   ctx.textAlign='center';
-  ctx.font='bold 36px sans-serif'; ctx.fillStyle='#FFD700';
-  ctx.shadowColor='#FFD700'; ctx.shadowBlur=15;
-  ctx.fillText('タイム終了！', W/2, 100);
-  ctx.shadowBlur=0;
 
-  const rows=[
-    ['スコア',   `${score} 点`,    '#ff99cc'],
-    ['倒した数', `${defeated} 体`, '#88ccff'],
-  ];
-  rows.forEach(([label,val,color],i)=>{
-    ctx.font='17px sans-serif'; ctx.fillStyle='#888';
-    ctx.fillText(label, W/2-50, 170+i*55);
-    ctx.font=`bold ${i===0?32:26}px sans-serif`; ctx.fillStyle=color;
-    ctx.shadowColor=color; ctx.shadowBlur=10;
-    ctx.fillText(val, W/2+50, 170+i*55);
+  if (gameMode==='score') {
+    ctx.font='bold 36px sans-serif'; ctx.fillStyle='#FFD700';
+    ctx.shadowColor='#FFD700'; ctx.shadowBlur=15;
+    ctx.fillText('タイム終了！', W/2, 95);
     ctx.shadowBlur=0;
-  });
-
-  // ランク
-  const rank = score>=3000?'S':score>=2000?'A':score>=1000?'B':score>=500?'C':'D';
-  const rc   = rank==='S'?'#FFD700':rank==='A'?'#ff99cc':rank==='B'?'#88ccff':rank==='C'?'#66ffaa':'#aaa';
-  ctx.font='bold 64px sans-serif'; ctx.fillStyle=rc;
-  ctx.shadowColor=rc; ctx.shadowBlur=20;
-  ctx.fillText(rank, W/2, 310);
-  ctx.shadowBlur=0;
+    const rows=[['スコア',`${score} 点`,'#ff99cc'],['倒した数',`${defeated} 体`,'#88ccff']];
+    rows.forEach(([label,val,color],i)=>{
+      ctx.font='17px sans-serif'; ctx.fillStyle='#888';
+      ctx.fillText(label, W/2-50, 168+i*55);
+      ctx.font=`bold ${i===0?32:26}px sans-serif`; ctx.fillStyle=color;
+      ctx.shadowColor=color; ctx.shadowBlur=10;
+      ctx.fillText(val, W/2+50, 168+i*55);
+      ctx.shadowBlur=0;
+    });
+    const rank=score>=3000?'S':score>=2000?'A':score>=1000?'B':score>=500?'C':'D';
+    const rc=rank==='S'?'#FFD700':rank==='A'?'#ff99cc':rank==='B'?'#88ccff':rank==='C'?'#66ffaa':'#aaa';
+    ctx.font='bold 64px sans-serif'; ctx.fillStyle=rc;
+    ctx.shadowColor=rc; ctx.shadowBlur=20;
+    ctx.fillText(rank, W/2, 305);
+    ctx.shadowBlur=0;
+  } else {
+    // サバイバル
+    const survived = lives>0;
+    ctx.font='bold 36px sans-serif';
+    ctx.fillStyle=survived?'#FFD700':'#ff6677';
+    ctx.shadowColor=ctx.fillStyle; ctx.shadowBlur=15;
+    ctx.fillText(survived?'タイム終了！':'ゲームオーバー…', W/2, 95);
+    ctx.shadowBlur=0;
+    const m=Math.floor(survivalSec/60), s=survivalSec%60;
+    const rows=[
+      ['スコア',     `${score} 点`,                      '#ff99cc'],
+      ['生存時間',   `${m}:${String(s).padStart(2,'0')}`, '#66ffaa'],
+      ['到達WAVE',   `WAVE ${wave}`,                      '#FFD700'],
+      ['倒した数',   `${defeated} 体`,                    '#88ccff'],
+    ];
+    rows.forEach(([label,val,color],i)=>{
+      ctx.font='15px sans-serif'; ctx.fillStyle='#888';
+      ctx.fillText(label, W/2-55, 155+i*48);
+      ctx.font='bold 24px sans-serif'; ctx.fillStyle=color;
+      ctx.shadowColor=color; ctx.shadowBlur=8;
+      ctx.fillText(val, W/2+55, 155+i*48);
+      ctx.shadowBlur=0;
+    });
+    // 残りライフ
+    ctx.font='22px sans-serif';
+    for (let i=0;i<MAX_LIVES;i++) {
+      ctx.globalAlpha=i<lives?1:0.2;
+      ctx.fillText('♥', W/2-MAX_LIVES*14+i*28, 360);
+    }
+    ctx.globalAlpha=1;
+  }
 
   if (Math.sin(frame*0.08)>0) {
     ctx.font='bold 16px sans-serif'; ctx.fillStyle='#FFD700';
     ctx.shadowColor='#FFD700'; ctx.shadowBlur=10;
-    ctx.fillText('[ Space / Enter でタイトルへ ]', W/2, 400);
+    ctx.fillText('[ Space / Enter でタイトルへ ]', W/2, 415);
     ctx.shadowBlur=0;
   }
   ctx.textAlign='left';
