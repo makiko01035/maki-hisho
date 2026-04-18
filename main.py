@@ -276,6 +276,94 @@ def debug_x_keys():
     }
 
 
+@app.route('/overlay-image')
+def overlay_image():
+    """
+    アイキャッチ画像にタイトルを重ねてInstagram用画像を生成し、WPメディアにアップロードしてURLを返す
+    クエリパラメータ: img_url, title, wp_url (省略可)
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    from io import BytesIO
+
+    img_url = request.args.get('img_url', '')
+    title = request.args.get('title', '')
+    wp_url = request.args.get('wp_url', os.environ.get('SEKISUI_WP_URL', ''))
+    wp_user = os.environ.get('SEKISUI_WP_USER', '')
+    wp_pass = os.environ.get('SEKISUI_WP_APP_PASSWORD', '')
+
+    if not img_url or not title:
+        return 'img_url and title are required', 400
+
+    try:
+        # 元画像をダウンロード
+        r = requests.get(img_url, timeout=15)
+        img = Image.open(BytesIO(r.content)).convert('RGBA')
+
+        # 正方形1080×1080にリサイズ（Instagram最適）
+        img = img.resize((1080, 1080), Image.LANCZOS)
+
+        # 半透明グラデーションオーバーレイ（下半分を暗く）
+        overlay = Image.new('RGBA', (1080, 1080), (0, 0, 0, 0))
+        draw_ov = ImageDraw.Draw(overlay)
+        for y in range(1080):
+            alpha = int(180 * (y / 1080))
+            draw_ov.line([(0, y), (1080, y)], fill=(0, 0, 0, alpha))
+        img = Image.alpha_composite(img, overlay)
+
+        # テキスト描画
+        draw = ImageDraw.Draw(img)
+        font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
+        font_size = 60
+        font = ImageFont.truetype(font_path, font_size)
+
+        # テキスト折り返し（1行14文字）
+        max_chars = 14
+        lines = []
+        while len(title) > max_chars:
+            lines.append(title[:max_chars])
+            title = title[max_chars:]
+        lines.append(title)
+
+        line_height = font_size + 12
+        total_height = line_height * len(lines)
+        y_start = 1080 - total_height - 80
+
+        for line in lines:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_width = bbox[2] - bbox[0]
+            x = (1080 - text_width) // 2
+            draw.text((x + 2, y_start + 2), line, font=font, fill=(0, 0, 0, 200))
+            draw.text((x, y_start), line, font=font, fill=(255, 255, 255, 255))
+            y_start += line_height
+
+        # RGBに変換してJPEG化
+        img_rgb = img.convert('RGB')
+        buf = BytesIO()
+        img_rgb.save(buf, format='JPEG', quality=90)
+        buf.seek(0)
+        img_data = buf.read()
+
+        # WordPressメディアにアップロード
+        filename = 'og_' + img_url.split('/')[-1].split('.')[0] + '.jpg'
+        upload_res = requests.post(
+            f"{wp_url}/wp-json/wp/v2/media",
+            auth=(wp_user, wp_pass),
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'image/jpeg',
+            },
+            data=img_data,
+        )
+        if upload_res.status_code == 201:
+            media_url = upload_res.json()['source_url']
+            return {'url': media_url}, 200
+        else:
+            return {'error': f'WP upload failed: {upload_res.status_code}'}, 500
+
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
