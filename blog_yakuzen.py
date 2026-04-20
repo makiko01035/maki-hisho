@@ -453,7 +453,7 @@ def build_slide_image(header, items, accent_color=(139, 105, 20)):
     bg_color = (245, 240, 232)
     img = Image.new('RGB', (W, H), bg_color)
     draw = ImageDraw.Draw(img)
-    font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
+    font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
 
     # アクセントライン上部
     draw.rectangle([(0, 0), (W, 12)], fill=accent_color)
