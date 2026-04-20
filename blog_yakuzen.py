@@ -208,10 +208,50 @@ def generate_yakuzen_rewrite(title, original_html, instruction=''):
     return response.content[0].text.strip()
 
 
+AFFILIATE_BOOKS = {
+    'kids': {
+        'url': 'https://amzn.asia/d/07txS5CF',
+        'title': '薬に頼らずのびのび育てる！こども薬膳',
+        'desc': 'お子さんの体質改善・風邪予防・食欲不振など、日常のごはんで対応できる薬膳レシピを紹介。',
+    },
+    'soup': {
+        'url': 'https://amzn.asia/d/09tQHZKL',
+        'title': '薬膳スープジャー弁当 朝10分で作れる',
+        'desc': '忙しい朝でも10分で完成。体を温めて整えるスープジャーレシピが満載。',
+    },
+    'default': {
+        'url': 'https://amzn.asia/d/0bkhnDrf',
+        'title': '「まいにちのごはん」で健康になっちゃう！ずぼら薬膳',
+        'desc': '特別な食材は不要。いつものごはんに薬膳の考え方をプラスするだけで体が変わる一冊。',
+    },
+}
+
+
+def _select_affiliate_book(title, content_md):
+    kids_keywords = ['子ども', 'こども', '子育て', '育児', '小児', 'キッズ']
+    soup_keywords = ['スープ', '鍋', '温活', '温め', 'シチュー', 'お粥', '粥']
+    text = title + content_md[:500]
+    if any(k in text for k in kids_keywords):
+        return AFFILIATE_BOOKS['kids']
+    if any(k in text for k in soup_keywords):
+        return AFFILIATE_BOOKS['soup']
+    return AFFILIATE_BOOKS['default']
+
+
+def _build_affiliate_cta(title, content_md):
+    book = _select_affiliate_book(title, content_md)
+    return f'''<div style="background:#f9f6f0;border-left:4px solid #8b6914;padding:20px;margin:30px 0;border-radius:4px;">
+<p style="font-weight:bold;margin:0 0 8px;">📚 もっと薬膳を日常に取り入れたい方へ</p>
+<p style="margin:0 0 4px;font-weight:bold;">{book["title"]}</p>
+<p style="margin:0 0 15px;font-size:0.95em;">{book["desc"]}</p>
+<a href="{book["url"]}" target="_blank" rel="nofollow" style="display:inline-block;background:#ff9900;color:white;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;">Amazonで見る →</a>
+</div>'''
+
+
 def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured_media_id=None):
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
-    html = html.replace('<!-- yakuzen-affiliate-cta -->', '')
+    html = html.replace('<!-- yakuzen-affiliate-cta -->', _build_affiliate_cta(title, content_md))
     data = {'title': title, 'content': html, 'status': status}
     if featured_media_id:
         data['featured_media'] = featured_media_id
