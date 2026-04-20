@@ -369,6 +369,26 @@ def process_yakuzen_new_article(user_id, topic=None):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 記事作成中にエラーが発生しました。\n{str(e)[:150]}"))
 
 
+def rewrite_yakuzen_by_slug(user_id, slug):
+    """URLのslugで記事を特定してリライト"""
+    try:
+        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+        res = requests.get(
+            f'{wp_url}/wp-json/wp/v2/posts',
+            auth=(wp_user, wp_pass),
+            params={'slug': slug, '_fields': 'id,title,content'},
+            timeout=15
+        )
+        if res.status_code != 200 or not res.json():
+            line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 記事が見つかりませんでした。\nslug: {slug}"))
+            return
+        post = res.json()[0]
+        process_yakuzen_rewrite(user_id, post['id'], post['title']['rendered'], post['content']['rendered'])
+    except Exception as e:
+        print(f"rewrite_by_slug error: {e}")
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
+
+
 def process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruction=''):
     try:
         article_md = generate_yakuzen_rewrite(post_title, post_content, instruction)

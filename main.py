@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research
-from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, get_pinterest_access_token
+from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, get_pinterest_access_token
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
 app = Flask(__name__)
@@ -1608,12 +1608,11 @@ def handle_message(event):
                 ))
                 threading.Thread(target=process_yakuzen_new_article, args=(user_id,)).start()
             elif any(kw in normalized for kw in ['リライト', '更新', '既存', '2', '②']):
-                del yakuzen_sessions[user_id]
+                yakuzen_sessions[user_id] = {'state': 'waiting_for_rewrite_target'}
                 save_yakuzen_sessions(yakuzen_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="🌿 今の季節に合った記事を自動選択してリライトします！\n数分かかります、そのままお待ちください..."
+                    text="🌿 リライトします！\n\n記事のURLを貼り付けるか、「自動」と送ってください。\n例：https://foodmakehealth.com/xxx/"
                 ))
-                threading.Thread(target=auto_rewrite_yakuzen, args=(user_id,)).start()
             elif any(kw in normalized for kw in ['テーマ', '指定', '自分', '3', '③']):
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
                 save_yakuzen_sessions(yakuzen_sessions)
@@ -1624,6 +1623,24 @@ def handle_message(event):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
                     text="「1」か「新規作成」、または「2」か「リライト」と送ってください！\n（テーマを自分で決めたい場合は「3」）"
                 ))
+            return
+
+        elif state == 'waiting_for_rewrite_target':
+            del yakuzen_sessions[user_id]
+            save_yakuzen_sessions(yakuzen_sessions)
+            import unicodedata
+            normalized = unicodedata.normalize('NFKC', user_message)
+            if '自動' in normalized or normalized.strip() in ['auto', '']:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="🌿 季節に合った記事を自動選択してリライトします！\n数分かかります..."
+                ))
+                threading.Thread(target=auto_rewrite_yakuzen, args=(user_id,)).start()
+            else:
+                slug = user_message.strip().rstrip('/').split('/')[-1]
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"✍️ 「{slug}」の記事をリライト中です...少しお待ちください！"
+                ))
+                threading.Thread(target=rewrite_yakuzen_by_slug, args=(user_id, slug)).start()
             return
 
         elif state == 'waiting_for_new_topic':
