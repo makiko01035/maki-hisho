@@ -916,6 +916,10 @@ def game_files(filename):
 def company_office():
     return send_from_directory('.', 'company_office.html')
 
+@app.route('/instagram-roadmap')
+def instagram_roadmap():
+    return send_from_directory('.', 'instagram_roadmap.html')
+
 @app.route('/game/rhythm')
 def game_rhythm():
     return send_from_directory('.', 'maruchan_rhythm.html')
