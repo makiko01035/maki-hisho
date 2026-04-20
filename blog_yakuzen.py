@@ -488,6 +488,30 @@ def extract_slide_content(title, content_md):
     return {'ingredients': [], 'effects': []}
 
 
+def _resolve_font_path():
+    """フォントパスを返す。ローカルになければGitHubからダウンロード"""
+    local = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
+    if os.path.exists(local):
+        print(f"[Font] local found: {local}")
+        return local
+    tmp = '/tmp/NotoSansJP-Bold.ttf'
+    if os.path.exists(tmp):
+        print(f"[Font] tmp cache: {tmp}")
+        return tmp
+    try:
+        import requests as _req
+        url = "https://github.com/makiko01035/maki-hisho/raw/main/fonts/NotoSansJP-Bold.ttf"
+        r = _req.get(url, timeout=30)
+        r.raise_for_status()
+        with open(tmp, 'wb') as f:
+            f.write(r.content)
+        print(f"[Font] downloaded to {tmp}")
+        return tmp
+    except Exception as e:
+        print(f"[Font] download failed: {e}")
+        return None
+
+
 def build_slide_image(header, items, accent_color=(139, 105, 20)):
     """テキストリスト画像を生成してJPEGバイト列を返す"""
     from PIL import Image, ImageDraw, ImageFont
@@ -497,8 +521,9 @@ def build_slide_image(header, items, accent_color=(139, 105, 20)):
     bg_color = (245, 240, 232)
     img = Image.new('RGB', (W, H), bg_color)
     draw = ImageDraw.Draw(img)
-    font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
-    print(f"[Font] path={font_path}, exists={os.path.exists(font_path)}")
+    font_path = _resolve_font_path()
+    if not font_path:
+        raise RuntimeError("Font not available")
 
     # アクセントライン上部
     draw.rectangle([(0, 0), (W, 12)], fill=accent_color)
