@@ -140,11 +140,9 @@ def auto_rewrite_yakuzen(user_id):
         image_url = fetch_pexels_image_url(keyword)
         media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
         _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish', featured_media_id=media_id)
-        pin_msg = try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
-
-        msg = f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}"
-        if pin_msg:
-            msg += f"\n\n{pin_msg}"
+        try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
+        sns_msg = build_sns_message(new_title, link, image_url, new_content)
+        msg = f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
 
     except Exception as e:
@@ -362,10 +360,9 @@ def process_yakuzen_new_article(user_id, topic=None):
         image_url = fetch_pexels_image_url(keyword)
         media_id = upload_image_to_yakuzen_wp(image_url, title) if image_url else None
         post_id, link = post_to_yakuzen_wp(title, content, status='publish', featured_media_id=media_id)
-        pin_msg = try_post_to_pinterest(title, link, content, image_url=image_url)
-        msg = f"✅ 薬膳記事を公開しました！\n\n📝 {title}\n🔗 {link}"
-        if pin_msg:
-            msg += f"\n\n{pin_msg}"
+        try_post_to_pinterest(title, link, content, image_url=image_url)
+        sns_msg = build_sns_message(title, link, image_url, content)
+        msg = f"✅ 薬膳記事を公開しました！\n\n📝 {title}\n🔗 {link}\n\n{sns_msg}"
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
     except Exception as e:
         print(f"Yakuzen new article error: {e}")
@@ -382,14 +379,58 @@ def process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruct
         image_url = fetch_pexels_image_url(keyword)
         media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
         _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish', featured_media_id=media_id)
-        pin_msg = try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
-        msg = f"✅ 薬膳記事をリライト・更新しました！\n\n📝 {new_title}\n🔗 {link}"
-        if pin_msg:
-            msg += f"\n\n{pin_msg}"
+        try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
+        sns_msg = build_sns_message(new_title, link, image_url, new_content)
+        msg = f"✅ 薬膳記事をリライト・更新しました！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
     except Exception as e:
         print(f"Yakuzen rewrite error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 リライト中にエラーが発生しました。\n{str(e)[:150]}"))
+
+
+# ========== SNS投稿セット生成 ==========
+
+def generate_instagram_caption(title, content_md, article_url):
+    """Instagram @foodmakehealth 用キャプションを生成"""
+    response = anthropic_client.messages.create(
+        model='claude-haiku-4-5-20251001',
+        max_tokens=300,
+        messages=[{
+            'role': 'user',
+            'content': f"""薬膳料理研究家のInstagram（@foodmakehealth）用キャプションを作成してください。
+
+記事タイトル：{title}
+記事冒頭：{content_md[:300]}
+
+条件：
+- 1行目：共感を呼ぶ一言（絵文字1個＋症状への共感）
+- 2〜4行目：レシピのポイントを箇条書き（絵文字付き）
+- 最後：「詳しいレシピはプロフのリンクから🔗」
+- ハッシュタグ5〜8個（#薬膳 #スーパーで買える #女性の健康 など）
+- 全体150文字以内
+- キャプションのみ出力"""
+        }]
+    )
+    return response.content[0].text.strip()
+
+
+def build_sns_message(title, link, image_url, content_md):
+    """Instagram・Pinterest用の投稿セットをまとめてLINEメッセージ化"""
+    ig_caption = generate_instagram_caption(title, content_md, link)
+    pin = generate_yakuzen_pin_text(title, link, content_md)
+    img_line = f"\n📸 画像（タップして保存）：\n{image_url}" if image_url else ""
+    return (
+        f"━━━━━━━━━━━━━━\n"
+        f"【Instagram @foodmakehealth】\n\n"
+        f"{ig_caption}\n"
+        f"{img_line}\n\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"【Pinterest】\n"
+        f"ボード：{pin['board']}\n"
+        f"タイトル：{pin['pin_title']}\n"
+        f"説明：{pin['description']}\n"
+        f"画像：{image_url or 'なし'}"
+    )
 
 
 # ========== Pinterest連携 ==========
