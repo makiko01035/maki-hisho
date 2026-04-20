@@ -668,43 +668,53 @@ def upload_bytes_to_yakuzen_wp(img_bytes, filename):
 
 
 def build_carousel_images(title, content_md, slide1_url):
-    """2枚目・3枚目のスライド画像を生成してURLリストを返す"""
+    """2枚目・3枚目のスライド画像を生成してURLリストを返す。エラー文字列も返す"""
+    import traceback
+    errors = []
+    urls = [slide1_url] if slide1_url else []
     try:
         data = extract_slide_content(title, content_md)
         slug = re.sub(r'[^a-z0-9-]', '-', title[:20].encode('ascii', 'ignore').decode())[:20] or 'yakuzen'
-
-        img2 = build_slide_image("使う食材", data.get('ingredients', []))
-        url2 = upload_bytes_to_yakuzen_wp(img2, f"slide2-{slug}.jpg")
-        print(f"[Carousel] slide2 url: {url2}")
-
-        img3 = build_slide_image("体への効能", data.get('effects', []))
-        url3 = upload_bytes_to_yakuzen_wp(img3, f"slide3-{slug}.jpg")
-        print(f"[Carousel] slide3 url: {url3}")
-
-        urls = [u for u in [slide1_url, url2, url3] if u]
-        return urls
     except Exception as e:
-        import traceback
-        print(f"Carousel build error: {e}")
-        traceback.print_exc()
-        return [slide1_url] if slide1_url else []
+        errors.append(f"extract: {e}")
+        return urls, errors
+
+    for label, filename_prefix in [("使う食材", "slide2"), ("体への効能", "slide3")]:
+        try:
+            img = build_slide_image(label, data.get('ingredients' if label == "使う食材" else 'effects', []))
+            url = upload_bytes_to_yakuzen_wp(img, f"{filename_prefix}-{slug}.jpg")
+            if url:
+                urls.append(url)
+                print(f"[Carousel] {filename_prefix} url: {url}")
+            else:
+                errors.append(f"{filename_prefix}: WPアップロード失敗")
+        except Exception as e:
+            tb = traceback.format_exc()
+            errors.append(f"{filename_prefix}: {e}\n{tb[-300:]}")
+            print(f"[Carousel] {filename_prefix} error: {e}\n{tb}")
+
+    return urls, errors
 
 
 def build_sns_message(title, link, image_url, content_md):
     """Instagram・Pinterest用の投稿セットをまとめてLINEメッセージ化"""
     ig_caption = generate_instagram_caption(title, content_md, link)
     pin = generate_yakuzen_pin_text(title, link, content_md)
-    carousel_urls = build_carousel_images(title, content_md, image_url)
+    carousel_urls, carousel_errors = build_carousel_images(title, content_md, image_url)
 
     img_lines = ""
     for i, url in enumerate(carousel_urls, 1):
         img_lines += f"📸 {i}枚目：{url}\n"
 
+    error_note = ""
+    if carousel_errors:
+        error_note = f"\n⚠️ スライドエラー：\n" + "\n".join(carousel_errors[:2]) + "\n"
+
     return (
         f"━━━━━━━━━━━━━━\n"
         f"【Instagram @foodmakehealth】\n"
         f"↓3枚保存してカルーセル投稿\n\n"
-        f"{img_lines}\n"
+        f"{img_lines}{error_note}\n"
         f"【キャプション】\n"
         f"{ig_caption}\n\n"
         f"━━━━━━━━━━━━━━\n"
