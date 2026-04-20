@@ -292,6 +292,9 @@ AFFILIATE_BOOKS = {
         'title': '薬膳スープジャー弁当 朝10分で作れる',
         'desc': '忙しい朝でも10分で完成。体を温めて整えるスープジャーレシピが満載。',
     },
+    'ayurveda': {
+        'raw_html': '<a href="//af.moshimo.com/af/c/click?a_id=5429137&p_id=4140&pc_id=10486&pl_id=56829" rel="nofollow" referrerpolicy="no-referrer-when-downgrade" attributionsrc><img src="//image.moshimo.com/af-img/3597/000000056829.jpg" width="240" height="120" style="border:none;"></a><img src="//i.moshimo.com/af/i/impression?a_id=5429137&p_id=4140&pc_id=10486&pl_id=56829" width="1" height="1" style="border:none;" loading="lazy">',
+    },
     'default': {
         'url': 'https://amzn.asia/d/0bkhnDrf',
         'title': '「まいにちのごはん」で健康になっちゃう！ずぼら薬膳',
@@ -301,9 +304,12 @@ AFFILIATE_BOOKS = {
 
 
 def _select_affiliate_book(title, content_md):
+    ayurveda_keywords = ['アーユルヴェーダ', 'スパイス検定', 'アーユル']
     kids_keywords = ['子ども', 'こども', '子育て', '育児', '小児', 'キッズ']
     soup_keywords = ['スープ', '鍋', '温活', '温め', 'シチュー', 'お粥', '粥']
     text = title + content_md[:500]
+    if any(k in text for k in ayurveda_keywords):
+        return AFFILIATE_BOOKS['ayurveda']
     if any(k in text for k in kids_keywords):
         return AFFILIATE_BOOKS['kids']
     if any(k in text for k in soup_keywords):
@@ -313,6 +319,8 @@ def _select_affiliate_book(title, content_md):
 
 def _build_affiliate_cta(title, content_md):
     book = _select_affiliate_book(title, content_md)
+    if 'raw_html' in book:
+        return f'<div style="margin:30px 0;">{book["raw_html"]}</div>'
     return f'''<div style="background:#f9f6f0;border-left:4px solid #8b6914;padding:20px;margin:30px 0;border-radius:4px;">
 <p style="font-weight:bold;margin:0 0 8px;">📚 もっと薬膳を日常に取り入れたい方へ</p>
 <p style="margin:0 0 4px;font-weight:bold;">{book["title"]}</p>
