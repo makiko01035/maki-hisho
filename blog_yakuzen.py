@@ -136,8 +136,11 @@ def auto_rewrite_yakuzen(user_id):
         new_title = lines[0].lstrip('# ').strip()
         new_content = '\n'.join(lines[1:]).lstrip('\n')
 
-        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish')
-        pin_msg = try_post_to_pinterest(new_title, link, new_content)
+        keyword = generate_pexels_keyword(new_title)
+        image_url = fetch_pexels_image_url(keyword)
+        media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
+        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish', featured_media_id=media_id)
+        pin_msg = try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
 
         msg = f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}"
         if pin_msg:
@@ -205,11 +208,13 @@ def generate_yakuzen_rewrite(title, original_html, instruction=''):
     return response.content[0].text.strip()
 
 
-def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft'):
+def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured_media_id=None):
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
     html = html.replace('<!-- yakuzen-affiliate-cta -->', '')
     data = {'title': title, 'content': html, 'status': status}
+    if featured_media_id:
+        data['featured_media'] = featured_media_id
     if post_id:
         res = requests.post(
             f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
@@ -236,8 +241,11 @@ def process_yakuzen_new_article(user_id, topic):
         lines = article_md.split('\n')
         title = lines[0].lstrip('# ').strip()
         content = '\n'.join(lines[1:]).lstrip('\n')
-        post_id, link = post_to_yakuzen_wp(title, content, status='publish')
-        pin_msg = try_post_to_pinterest(title, link, content)
+        keyword = generate_pexels_keyword(title)
+        image_url = fetch_pexels_image_url(keyword)
+        media_id = upload_image_to_yakuzen_wp(image_url, title) if image_url else None
+        post_id, link = post_to_yakuzen_wp(title, content, status='publish', featured_media_id=media_id)
+        pin_msg = try_post_to_pinterest(title, link, content, image_url=image_url)
         msg = f"✅ 薬膳記事を公開しました！\n\n📝 {title}\n🔗 {link}"
         if pin_msg:
             msg += f"\n\n{pin_msg}"
@@ -253,8 +261,11 @@ def process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruct
         lines = article_md.split('\n')
         new_title = lines[0].lstrip('# ').strip()
         new_content = '\n'.join(lines[1:]).lstrip('\n')
-        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish')
-        pin_msg = try_post_to_pinterest(new_title, link, new_content)
+        keyword = generate_pexels_keyword(new_title)
+        image_url = fetch_pexels_image_url(keyword)
+        media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
+        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish', featured_media_id=media_id)
+        pin_msg = try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
         msg = f"✅ 薬膳記事をリライト・更新しました！\n\n📝 {new_title}\n🔗 {link}"
         if pin_msg:
             msg += f"\n\n{pin_msg}"
@@ -265,6 +276,50 @@ def process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruct
 
 
 # ========== Pinterest連携 ==========
+
+def generate_pexels_keyword(title):
+    """日本語タイトルから完成料理写真が出る英語キーワードを生成"""
+    response = anthropic_client.messages.create(
+        model='claude-haiku-4-5-20251001',
+        max_tokens=30,
+        messages=[{
+            'role': 'user',
+            'content': f"""薬膳ブログ記事タイトルから、Pexelsで料理の完成品写真を検索する英語キーワードを1〜3語で出力してください。
+必ず料理・食事の完成品写真が出るキーワードにすること。キーワードのみ出力。
+
+例：
+「生姜スープで冷えを改善」→ japanese ginger soup bowl
+「黒豆の薬膳レシピ」→ healthy black bean dish
+「むくみに効く薬膳粥」→ japanese congee porridge
+
+タイトル：{title}"""
+        }]
+    )
+    return response.content[0].text.strip()
+
+
+def upload_image_to_yakuzen_wp(image_url, title):
+    """PexelsのURLをWPメディアにアップロードしてmedia_idを返す"""
+    wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+    try:
+        img_data = requests.get(image_url, timeout=15).content
+        filename = f"yakuzen-{re.sub(r'[^a-z0-9]', '-', title[:30])}.jpg"
+        res = requests.post(
+            f"{wp_url}/wp-json/wp/v2/media",
+            auth=(wp_user, wp_pass),
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'image/jpeg'
+            },
+            data=img_data,
+            timeout=30
+        )
+        if res.status_code == 201:
+            return res.json()['id']
+    except Exception as e:
+        print(f"WP media upload error: {e}")
+    return None
+
 
 def fetch_pexels_image_url(keyword):
     """PexelsからキーワードにマッチするサムネイルのURLを返す"""
@@ -392,12 +447,13 @@ def post_pin_to_pinterest(pin_title, description, board_id, link, image_url):
     return False, f"{res.status_code}: {res.text[:100]}"
 
 
-def try_post_to_pinterest(title, article_url, content_md):
+def try_post_to_pinterest(title, article_url, content_md, image_url=None):
     """Pinterest投稿を試みる。成功時は投稿完了メッセージ、未設定時はピンテキストを返す"""
     try:
         pin = generate_yakuzen_pin_text(title, article_url, content_md)
         board_id = get_pinterest_board_id(pin['board'])
-        image_url = fetch_pexels_image_url(title)
+        if not image_url:
+            image_url = fetch_pexels_image_url(generate_pexels_keyword(title))
 
         if image_url and board_id and os.environ.get('PINTEREST_ACCESS_TOKEN'):
             success, result = post_pin_to_pinterest(
