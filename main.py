@@ -1580,8 +1580,15 @@ def handle_message(event):
 
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
-    if any(kw in user_message for kw in ebay_research_keywords):
-        # 「eBayリサーチ：〇〇」形式で条件指定があれば抽出
+    msg_lower = user_message.lower()
+    is_ebay_research = any(kw in user_message for kw in ebay_research_keywords)
+    # 「ebay:〇〇」「eBay：〇〇」「ebay 〇〇」形式も検出
+    if not is_ebay_research and msg_lower.startswith('ebay'):
+        rest = user_message[4:].lstrip('： :　 ')
+        if rest:
+            is_ebay_research = True
+    if is_ebay_research:
+        # 「eBayリサーチ：〇〇」「ebay:〇〇」「ebay 〇〇」形式で条件指定があれば抽出
         user_query = None
         for sep in ['：', ':']:
             if sep in user_message:
@@ -1589,6 +1596,11 @@ def handle_message(event):
                 if len(parts) == 2 and parts[1].strip():
                     user_query = parts[1].strip()
                     break
+        # 「ebay 〇〇」形式（コロンなし・スペース区切り）
+        if not user_query and msg_lower.startswith('ebay'):
+            rest = user_message[4:].lstrip('　 ')
+            if rest and not any(kw in rest for kw in ['リサーチ', 'research']):
+                user_query = rest.strip()
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📦 eBayリサーチを開始します！\n結果が届くまで2〜3分お待ちください🔍"))
         threading.Thread(target=run_ebay_research, args=(user_id, user_query)).start()
         return
