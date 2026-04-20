@@ -510,18 +510,22 @@ def build_carousel_images(title, content_md, slide1_url):
     """2枚目・3枚目のスライド画像を生成してURLリストを返す"""
     try:
         data = extract_slide_content(title, content_md)
-        slug = re.sub(r'[^a-z0-9]', '-', title[:20].lower())
+        slug = re.sub(r'[^a-z0-9-]', '-', title[:20].encode('ascii', 'ignore').decode())[:20] or 'yakuzen'
 
-        img2 = build_slide_image("✦ 使う食材 ✦", data.get('ingredients', []))
+        img2 = build_slide_image("使う食材", data.get('ingredients', []))
         url2 = upload_bytes_to_yakuzen_wp(img2, f"slide2-{slug}.jpg")
+        print(f"[Carousel] slide2 url: {url2}")
 
-        img3 = build_slide_image("✦ 体への効能 ✦", data.get('effects', []))
+        img3 = build_slide_image("体への効能", data.get('effects', []))
         url3 = upload_bytes_to_yakuzen_wp(img3, f"slide3-{slug}.jpg")
+        print(f"[Carousel] slide3 url: {url3}")
 
         urls = [u for u in [slide1_url, url2, url3] if u]
         return urls
     except Exception as e:
+        import traceback
         print(f"Carousel build error: {e}")
+        traceback.print_exc()
         return [slide1_url] if slide1_url else []
 
 
