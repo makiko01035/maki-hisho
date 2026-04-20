@@ -151,8 +151,27 @@ def auto_rewrite_yakuzen(user_id):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
 
 
+def _get_recent_yakuzen_titles(n=5):
+    """直近n件のWP投稿タイトルを返す"""
+    try:
+        wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+        wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+        wp_pass = os.environ.get('YAKUZEN_WP_APP_PASSWORD', '')
+        res = requests.get(
+            f"{wp_url}/wp-json/wp/v2/posts",
+            params={'per_page': n, 'orderby': 'date', 'order': 'desc', 'status': 'publish'},
+            auth=(wp_user, wp_pass),
+            timeout=10
+        )
+        if res.status_code == 200:
+            return [p['title']['rendered'] for p in res.json()]
+    except Exception as e:
+        print(f"[Topic] recent titles fetch error: {e}")
+    return []
+
+
 def select_yakuzen_topic():
-    """今月・季節・人気検索ワードを考慮して記事テーマを1つ自動選定"""
+    """今月・季節・人気検索ワードを考慮して記事テーマを1つ自動選定（直近記事と重複回避）"""
     today = datetime.date.today()
     month = today.month
     seasonal = {
@@ -170,6 +189,12 @@ def select_yakuzen_topic():
         12: "冷え・年末疲れ・冬の免疫・むくみ",
     }.get(month, "冷え・疲れ・免疫")
 
+    recent_titles = _get_recent_yakuzen_titles(5)
+    avoid_note = ""
+    if recent_titles:
+        titles_str = "\n".join(f"- {t}" for t in recent_titles)
+        avoid_note = f"\n\n直近5記事（これらと主テーマ・症状が被らないようにすること）：\n{titles_str}"
+
     response = anthropic_client.messages.create(
         model='claude-haiku-4-5-20251001',
         max_tokens=100,
@@ -181,7 +206,7 @@ def select_yakuzen_topic():
 - 今月の季節ワード：{seasonal}
 - 20〜40代女性の検索頻度が高い症状（冷え・むくみ・生理痛・PMS・疲労・肌荒れ・便秘・不眠）
 - 旬の食材と組み合わせる
-- 子ども・家族向けテーマを月1〜2回程度混ぜる
+- 子ども・家族向けテーマを月1〜2回程度混ぜる{avoid_note}
 
 テーマのみ出力（説明不要）。例：「花粉症の季節に試したい！鼻炎を和らげる旬の薬膳レシピ」"""
         }]
