@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research
-from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, get_pinterest_access_token
+from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, get_pinterest_access_token, generate_yakuzen_topics
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
 app = Flask(__name__)
@@ -1601,12 +1601,20 @@ def handle_message(event):
             import unicodedata
             normalized = unicodedata.normalize('NFKC', user_message)
             if any(kw in normalized for kw in ['新規', '作成', '新しい', '1', '①']):
-                del yakuzen_sessions[user_id]
-                yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
-                save_yakuzen_sessions(yakuzen_sessions)
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="✍️ 薬膳記事を新規作成します！\n\nテーマや書きたいことを教えてください。\n例：「春の花粉症に効く食材」「更年期のほてりに薬膳」"
-                ))
+                topics = generate_yakuzen_topics()
+                if topics:
+                    yakuzen_sessions[user_id] = {'state': 'waiting_for_topic_select', 'topics': topics}
+                    save_yakuzen_sessions(yakuzen_sessions)
+                    lines = [f"{i+1}️⃣ {t}" for i, t in enumerate(topics)]
+                    lines.append("6️⃣ 自分でテーマを入力する")
+                    msg = "🌿 今月のおすすめテーマです！\n番号を選んでください👇\n\n" + "\n".join(lines)
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+                else:
+                    yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
+                    save_yakuzen_sessions(yakuzen_sessions)
+                    line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                        text="✍️ 薬膳記事を新規作成します！\n\nテーマや書きたいことを教えてください。"
+                    ))
             elif any(kw in normalized for kw in ['リライト', '更新', '既存', '2', '②']):
                 del yakuzen_sessions[user_id]
                 save_yakuzen_sessions(yakuzen_sessions)
@@ -1615,10 +1623,38 @@ def handle_message(event):
                 ))
                 threading.Thread(target=auto_rewrite_yakuzen, args=(user_id,)).start()
             else:
-                # セッションはそのまま残して再入力を促す
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
                     text="「1」か「新規作成」、または「2」か「リライト」と送ってください！"
                 ))
+            return
+
+        elif state == 'waiting_for_topic_select':
+            import unicodedata
+            normalized = unicodedata.normalize('NFKC', user_message)
+            topics = session.get('topics', [])
+            del yakuzen_sessions[user_id]
+            save_yakuzen_sessions(yakuzen_sessions)
+            selected_topic = None
+            for i, label in enumerate(['1','2','3','4','5'], 1):
+                if normalized.strip() in [str(i), f'{i}️⃣']:
+                    selected_topic = topics[i-1] if i-1 < len(topics) else None
+                    break
+            if not selected_topic:
+                for i, t in enumerate(topics):
+                    if str(i+1) in normalized:
+                        selected_topic = t
+                        break
+            if not selected_topic or '6' in normalized or '自分' in normalized:
+                yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="✍️ テーマを自由に入力してください！"
+                ))
+                return
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"✍️ 「{selected_topic}」で記事を作成中です...少しお待ちください！（1〜2分かかります）"
+            ))
+            threading.Thread(target=process_yakuzen_new_article, args=(user_id, selected_topic)).start()
             return
 
         elif state == 'waiting_for_new_topic':

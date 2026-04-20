@@ -153,6 +153,51 @@ def auto_rewrite_yakuzen(user_id):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
 
 
+def generate_yakuzen_topics():
+    """今月おすすめの症状×食材テーマを5個生成"""
+    today = datetime.date.today()
+    month = today.month
+    season_hints = {
+        1: "冬・乾燥・冷え・免疫低下",
+        2: "冬から春・花粉準備・むくみ",
+        3: "春・花粉症・気の巡り・肝",
+        4: "春・花粉症・PMS・肝・デトックス",
+        5: "晩春・疲労感・胃腸疲れ・気の補充",
+        6: "梅雨・むくみ・だるさ・湿気・脾",
+        7: "夏・夏バテ・冷え・心・熱中症",
+        8: "真夏・夏バテ・不眠・冷え対策",
+        9: "初秋・肺・乾燥・肌荒れ・免疫",
+        10: "秋・乾燥・便秘・肺・肌荒れ",
+        11: "晩秋・冷え・貧血・腎・疲労回復",
+        12: "冬・冷え・むくみ・腎・年末疲れ",
+    }.get(month, "季節の養生")
+
+    response = anthropic_client.messages.create(
+        model='claude-haiku-4-5-20251001',
+        max_tokens=600,
+        messages=[{
+            'role': 'user',
+            'content': f"""薬膳ブログの今月（{month}月）おすすめ記事テーマを5個提案してください。
+
+今月のキーワード：{season_hints}
+
+条件：
+- 20〜40代女性が検索しそうな症状（冷え・むくみ・生理痛・PMS・疲労感・肌荒れ・便秘・不眠など）を優先
+- 旬の食材と組み合わせる
+- 5個のうち1個は子ども・家族向けのテーマを入れる
+- 各テーマは「症状×食材」の形式で20字以内
+
+以下のJSON形式のみで回答（説明不要）：
+{{"topics": ["テーマ1", "テーマ2", "テーマ3", "テーマ4", "テーマ5"]}}"""
+        }]
+    )
+    raw = response.content[0].text.strip()
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        return json.loads(match.group()).get('topics', [])
+    return []
+
+
 def generate_yakuzen_article(topic):
     response = anthropic_client.messages.create(
         model='claude-sonnet-4-6',
@@ -164,11 +209,12 @@ def generate_yakuzen_article(topic):
 テーマ・情報：{topic}
 
 条件：
+- ターゲット：20〜40代の健康意識が高い女性（子育て中・働く女性）
+- タイトルに必ず症状キーワードを入れる（例：「〜に悩む女性へ」「〜を改善する」）
 - 1500〜2500文字程度
-- 健康・美容に関心のある女性向け
-- 薬膳の考え方を分かりやすく説明する
-- 「体を温める」「気を補う」など薬膳的な視点を盛り込む
-- 見出し（##）を使って3〜4セクションに分ける
+- 薬膳の考え方を分かりやすく説明する（専門用語は噛み砕く）
+- 使いやすい・手に入りやすい食材を使う
+- 見出し（##）を使って3〜4セクションに分ける（見出しにも症状ワードを入れる）
 - Markdown形式で出力
 - 最初の行は「# タイトル」形式
 - 記事末尾に「<!-- yakuzen-affiliate-cta -->」を1行追加"""
