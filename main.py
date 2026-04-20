@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research
-from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, get_pinterest_access_token, generate_yakuzen_topics
+from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, get_pinterest_access_token
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
 app = Flask(__name__)
@@ -1601,20 +1601,12 @@ def handle_message(event):
             import unicodedata
             normalized = unicodedata.normalize('NFKC', user_message)
             if any(kw in normalized for kw in ['新規', '作成', '新しい', '1', '①']):
-                topics = generate_yakuzen_topics()
-                if topics:
-                    yakuzen_sessions[user_id] = {'state': 'waiting_for_topic_select', 'topics': topics}
-                    save_yakuzen_sessions(yakuzen_sessions)
-                    lines = [f"{i+1}️⃣ {t}" for i, t in enumerate(topics)]
-                    lines.append("6️⃣ 自分でテーマを入力する")
-                    msg = "🌿 今月のおすすめテーマです！\n番号を選んでください👇\n\n" + "\n".join(lines)
-                    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
-                else:
-                    yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
-                    save_yakuzen_sessions(yakuzen_sessions)
-                    line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                        text="✍️ 薬膳記事を新規作成します！\n\nテーマや書きたいことを教えてください。"
-                    ))
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="✍️ 今の季節・人気ワードからテーマを自動選定して記事を作成します！\n少しお待ちください（1〜2分かかります）"
+                ))
+                threading.Thread(target=process_yakuzen_new_article, args=(user_id,)).start()
             elif any(kw in normalized for kw in ['リライト', '更新', '既存', '2', '②']):
                 del yakuzen_sessions[user_id]
                 save_yakuzen_sessions(yakuzen_sessions)
@@ -1622,39 +1614,16 @@ def handle_message(event):
                     text="🌿 今の季節に合った記事を自動選択してリライトします！\n数分かかります、そのままお待ちください..."
                 ))
                 threading.Thread(target=auto_rewrite_yakuzen, args=(user_id,)).start()
-            else:
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！"
-                ))
-            return
-
-        elif state == 'waiting_for_topic_select':
-            import unicodedata
-            normalized = unicodedata.normalize('NFKC', user_message)
-            topics = session.get('topics', [])
-            del yakuzen_sessions[user_id]
-            save_yakuzen_sessions(yakuzen_sessions)
-            selected_topic = None
-            for i, label in enumerate(['1','2','3','4','5'], 1):
-                if normalized.strip() in [str(i), f'{i}️⃣']:
-                    selected_topic = topics[i-1] if i-1 < len(topics) else None
-                    break
-            if not selected_topic:
-                for i, t in enumerate(topics):
-                    if str(i+1) in normalized:
-                        selected_topic = t
-                        break
-            if not selected_topic or '6' in normalized or '自分' in normalized:
+            elif any(kw in normalized for kw in ['テーマ', '指定', '自分', '3', '③']):
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
                 save_yakuzen_sessions(yakuzen_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="✍️ テーマを自由に入力してください！"
+                    text="✍️ テーマを入力してください！\n例：「更年期のほてりに薬膳」「子どもの風邪予防レシピ」"
                 ))
-                return
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                text=f"✍️ 「{selected_topic}」で記事を作成中です...少しお待ちください！（1〜2分かかります）"
-            ))
-            threading.Thread(target=process_yakuzen_new_article, args=(user_id, selected_topic)).start()
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！\n（テーマを自分で決めたい場合は「3」）"
+                ))
             return
 
         elif state == 'waiting_for_new_topic':
@@ -1670,7 +1639,7 @@ def handle_message(event):
     if any(kw in user_message for kw in yakuzen_keywords):
         yakuzen_sessions[user_id] = {'state': 'waiting_for_mode'}
         save_yakuzen_sessions(yakuzen_sessions)
-        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（新しい記事を書く）\n2️⃣ リライト（既存記事を更新する）\n\n番号か言葉で教えてください！"
+        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n\n番号か言葉で教えてください！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 

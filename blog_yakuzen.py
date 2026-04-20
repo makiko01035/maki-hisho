@@ -153,49 +153,42 @@ def auto_rewrite_yakuzen(user_id):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
 
 
-def generate_yakuzen_topics():
-    """今月おすすめの症状×食材テーマを5個生成"""
+def select_yakuzen_topic():
+    """今月・季節・人気検索ワードを考慮して記事テーマを1つ自動選定"""
     today = datetime.date.today()
     month = today.month
-    season_hints = {
-        1: "冬・乾燥・冷え・免疫低下",
-        2: "冬から春・花粉準備・むくみ",
-        3: "春・花粉症・気の巡り・肝",
-        4: "春・花粉症・PMS・肝・デトックス",
-        5: "晩春・疲労感・胃腸疲れ・気の補充",
-        6: "梅雨・むくみ・だるさ・湿気・脾",
-        7: "夏・夏バテ・冷え・心・熱中症",
-        8: "真夏・夏バテ・不眠・冷え対策",
-        9: "初秋・肺・乾燥・肌荒れ・免疫",
-        10: "秋・乾燥・便秘・肺・肌荒れ",
-        11: "晩秋・冷え・貧血・腎・疲労回復",
-        12: "冬・冷え・むくみ・腎・年末疲れ",
-    }.get(month, "季節の養生")
+    seasonal = {
+        1:  "インフルエンザ予防・冷え・免疫低下・乾燥肌",
+        2:  "インフルエンザ予防・冷え・花粉症準備・むくみ",
+        3:  "花粉症・春の疲れ・デトックス・肝機能",
+        4:  "花粉症・PMS・春の倦怠感・気の巡り",
+        5:  "五月病・疲労感・胃腸疲れ・頭痛",
+        6:  "梅雨のむくみ・だるさ・湿気による不調・冷え",
+        7:  "夏バテ・熱中症対策・食欲不振・冷え",
+        8:  "夏バテ・夏の冷え・不眠・疲労回復",
+        9:  "秋の乾燥・肌荒れ・免疫低下・便秘",
+        10: "乾燥・便秘・秋冷え・肌荒れ",
+        11: "インフルエンザ予防・冷え・貧血・疲れ",
+        12: "冷え・年末疲れ・冬の免疫・むくみ",
+    }.get(month, "冷え・疲れ・免疫")
 
     response = anthropic_client.messages.create(
         model='claude-haiku-4-5-20251001',
-        max_tokens=600,
+        max_tokens=100,
         messages=[{
             'role': 'user',
-            'content': f"""薬膳ブログの今月（{month}月）おすすめ記事テーマを5個提案してください。
+            'content': f"""薬膳ブログの記事テーマを1つ決めてください。今日は{today}（{month}月）です。
 
-今月のキーワード：{season_hints}
-
-条件：
-- 20〜40代女性が検索しそうな症状（冷え・むくみ・生理痛・PMS・疲労感・肌荒れ・便秘・不眠など）を優先
+優先すること：
+- 今月の季節ワード：{seasonal}
+- 20〜40代女性の検索頻度が高い症状（冷え・むくみ・生理痛・PMS・疲労・肌荒れ・便秘・不眠）
 - 旬の食材と組み合わせる
-- 5個のうち1個は子ども・家族向けのテーマを入れる
-- 各テーマは「症状×食材」の形式で20字以内
+- 子ども・家族向けテーマを月1〜2回程度混ぜる
 
-以下のJSON形式のみで回答（説明不要）：
-{{"topics": ["テーマ1", "テーマ2", "テーマ3", "テーマ4", "テーマ5"]}}"""
+テーマのみ出力（説明不要）。例：「花粉症の季節に試したい！鼻炎を和らげる旬の薬膳レシピ」"""
         }]
     )
-    raw = response.content[0].text.strip()
-    match = re.search(r'\{.*\}', raw, re.DOTALL)
-    if match:
-        return json.loads(match.group()).get('topics', [])
-    return []
+    return response.content[0].text.strip()
 
 
 def generate_yakuzen_article(topic):
@@ -321,8 +314,10 @@ def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured
     raise Exception(f"WP投稿エラー: {res.status_code} {res.text[:200]}")
 
 
-def process_yakuzen_new_article(user_id, topic):
+def process_yakuzen_new_article(user_id, topic=None):
     try:
+        if not topic:
+            topic = select_yakuzen_topic()
         article_md = generate_yakuzen_article(topic)
         lines = article_md.split('\n')
         title = lines[0].lstrip('# ').strip()
