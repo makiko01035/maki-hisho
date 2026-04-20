@@ -109,16 +109,24 @@ def search_and_score(token, keyword, min_price, max_price):
         return None
 
     prices = []
+    watch_counts = []
     for item in items:
         try:
             prices.append(float(item["price"]["value"]))
         except Exception:
             pass
+        try:
+            watch_counts.append(int(item.get("watchCount", 0)))
+        except Exception:
+            watch_counts.append(0)
+
     if not prices:
         return None
 
     avg = sum(prices) / len(prices)
-    score = (avg * len(items)) / max(total, 1)
+    avg_watch = sum(watch_counts) / len(watch_counts) if watch_counts else 0
+    # ウォッチャー数をスコアに加味（需要の指標）
+    score = (avg * len(items) / max(total, 1)) * (1 + avg_watch * 0.1)
 
     if total <= 30 and avg >= 25:
         judge = "◎超おすすめ"
@@ -136,6 +144,7 @@ def search_and_score(token, keyword, min_price, max_price):
         "keyword": keyword,
         "total": total,
         "avg": round(avg, 1),
+        "avg_watch": round(avg_watch, 1),
         "score": round(score, 2),
         "judge": judge,
     }
@@ -194,9 +203,14 @@ def run_ebay_research(user_id, user_query=None):
         for i, r in enumerate(results[:5], 1):
             msg += f"{i}位 {r['keyword']}\n"
             msg += f"   競合: {r['total']}件 / 平均${r['avg']}\n"
+            msg += f"   👀 平均ウォッチ: {r['avg_watch']}件\n"
             msg += f"   {r['judge']}\n\n"
 
-        msg += "💡 メルカリで仕入れてみましょう！\neBayタイトルは「eBayタイトル作って：商品名」で作れます。"
+        msg += "💡 次のステップ：\n"
+        msg += "① eBayで上記キーワードを検索\n"
+        msg += "② Sold Listings（販売済み）でフィルター\n"
+        msg += "③ 30日で売れてるか確認してから仕入れ！\n"
+        msg += "④ eBayタイトルは「eBayタイトル作って：商品名」で作れます。"
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
 
     except Exception as e:
