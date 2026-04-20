@@ -1577,8 +1577,16 @@ def handle_message(event):
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
     if any(kw in user_message for kw in ebay_research_keywords):
+        # 「eBayリサーチ：〇〇」形式で条件指定があれば抽出
+        user_query = None
+        for sep in ['：', ':']:
+            if sep in user_message:
+                parts = user_message.split(sep, 1)
+                if len(parts) == 2 and parts[1].strip():
+                    user_query = parts[1].strip()
+                    break
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📦 eBayリサーチを開始します！\n結果が届くまで2〜3分お待ちください🔍"))
-        threading.Thread(target=run_ebay_research, args=(user_id,)).start()
+        threading.Thread(target=run_ebay_research, args=(user_id, user_query)).start()
         return
 
     # セキスイブログ：キーワード検出 → テーマ提案
