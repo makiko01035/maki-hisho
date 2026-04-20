@@ -414,22 +414,140 @@ def generate_instagram_caption(title, content_md, article_url):
     return response.content[0].text.strip()
 
 
+def extract_slide_content(title, content_md):
+    """記事から2枚目（材料）・3枚目（効能）用テキストを抽出"""
+    response = anthropic_client.messages.create(
+        model='claude-haiku-4-5-20251001',
+        max_tokens=400,
+        messages=[{
+            'role': 'user',
+            'content': f"""薬膳ブログ記事から以下を抽出してください。
+
+タイトル：{title}
+本文：{content_md[:2000]}
+
+以下のJSON形式のみで回答（説明不要）：
+{{
+  "ingredients": ["食材1（効能一言）", "食材2（効能一言）", "食材3（効能一言）"],
+  "effects": ["効能まとめ1", "効能まとめ2", "効能まとめ3"]
+}}
+
+条件：
+- ingredients：3〜4個、「生姜（体を温める）」のような形式
+- effects：3個、「〜を改善する」「〜に効く」などシンプルに"""
+        }]
+    )
+    raw = response.content[0].text.strip()
+    match = re.search(r'\{.*\}', raw, re.DOTALL)
+    if match:
+        return json.loads(match.group())
+    return {'ingredients': [], 'effects': []}
+
+
+def build_slide_image(header, items, accent_color=(139, 105, 20)):
+    """テキストリスト画像を生成してJPEGバイト列を返す"""
+    from PIL import Image, ImageDraw, ImageFont
+    from io import BytesIO
+
+    W, H = 1080, 1080
+    bg_color = (245, 240, 232)
+    img = Image.new('RGB', (W, H), bg_color)
+    draw = ImageDraw.Draw(img)
+    font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
+
+    # アクセントライン上部
+    draw.rectangle([(0, 0), (W, 12)], fill=accent_color)
+    draw.rectangle([(0, H - 12), (W, H)], fill=accent_color)
+
+    # ヘッダー
+    font_h = ImageFont.truetype(font_path, 52)
+    bbox = draw.textbbox((0, 0), header, font=font_h)
+    draw.text(((W - (bbox[2] - bbox[0])) // 2, 80), header, font=font_h, fill=accent_color)
+
+    # 区切り線
+    draw.rectangle([(80, 160), (W - 80, 166)], fill=accent_color)
+
+    # アイテムリスト
+    font_item = ImageFont.truetype(font_path, 42)
+    y = 210
+    for item in items:
+        draw.text((100, y), f"• {item}", font=font_item, fill=(60, 40, 20))
+        y += 80
+
+    # フッター
+    font_f = ImageFont.truetype(font_path, 34)
+    footer = "@foodmakehealth"
+    bbox_f = draw.textbbox((0, 0), footer, font=font_f)
+    draw.text(((W - (bbox_f[2] - bbox_f[0])) // 2, H - 80), footer, font=font_f, fill=accent_color)
+
+    buf = BytesIO()
+    img.convert('RGB').save(buf, format='JPEG', quality=90)
+    return buf.getvalue()
+
+
+def upload_bytes_to_yakuzen_wp(img_bytes, filename):
+    """画像バイト列をWPメディアにアップロードしてURLを返す"""
+    wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+    try:
+        res = requests.post(
+            f"{wp_url}/wp-json/wp/v2/media",
+            auth=(wp_user, wp_pass),
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'image/jpeg'
+            },
+            data=img_bytes,
+            timeout=30
+        )
+        if res.status_code == 201:
+            return res.json()['source_url']
+    except Exception as e:
+        print(f"WP bytes upload error: {e}")
+    return None
+
+
+def build_carousel_images(title, content_md, slide1_url):
+    """2枚目・3枚目のスライド画像を生成してURLリストを返す"""
+    try:
+        data = extract_slide_content(title, content_md)
+        slug = re.sub(r'[^a-z0-9]', '-', title[:20].lower())
+
+        img2 = build_slide_image("✦ 使う食材 ✦", data.get('ingredients', []))
+        url2 = upload_bytes_to_yakuzen_wp(img2, f"slide2-{slug}.jpg")
+
+        img3 = build_slide_image("✦ 体への効能 ✦", data.get('effects', []))
+        url3 = upload_bytes_to_yakuzen_wp(img3, f"slide3-{slug}.jpg")
+
+        urls = [u for u in [slide1_url, url2, url3] if u]
+        return urls
+    except Exception as e:
+        print(f"Carousel build error: {e}")
+        return [slide1_url] if slide1_url else []
+
+
 def build_sns_message(title, link, image_url, content_md):
     """Instagram・Pinterest用の投稿セットをまとめてLINEメッセージ化"""
     ig_caption = generate_instagram_caption(title, content_md, link)
     pin = generate_yakuzen_pin_text(title, link, content_md)
-    img_line = f"\n📸 画像（タップして保存）：\n{image_url}" if image_url else ""
+    carousel_urls = build_carousel_images(title, content_md, image_url)
+
+    img_lines = ""
+    for i, url in enumerate(carousel_urls, 1):
+        img_lines += f"📸 {i}枚目：{url}\n"
+
     return (
         f"━━━━━━━━━━━━━━\n"
-        f"【Instagram @foodmakehealth】\n\n"
-        f"{ig_caption}\n"
-        f"{img_line}\n\n"
+        f"【Instagram @foodmakehealth】\n"
+        f"↓3枚保存してカルーセル投稿\n\n"
+        f"{img_lines}\n"
+        f"【キャプション】\n"
+        f"{ig_caption}\n\n"
         f"━━━━━━━━━━━━━━\n"
         f"【Pinterest】\n"
         f"ボード：{pin['board']}\n"
         f"タイトル：{pin['pin_title']}\n"
         f"説明：{pin['description']}\n"
-        f"画像：{image_url or 'なし'}"
+        f"画像：{carousel_urls[0] if carousel_urls else 'なし'}"
     )
 
 
