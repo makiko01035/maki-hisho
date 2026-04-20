@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research
-from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, get_pinterest_access_token
+from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
 app = Flask(__name__)
@@ -1611,7 +1611,7 @@ def handle_message(event):
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_rewrite_target'}
                 save_yakuzen_sessions(yakuzen_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="🌿 リライトします！\n\n記事のURLを貼り付けるか、「自動」と送ってください。\n例：https://foodmakehealth.com/xxx/"
+                    text="🌿 リライトします！\n\n・URLを貼り付ける\n・キーワードを入力（例：アーユルヴェーダ、花粉症）\n・「自動」で季節に合った記事を自動選択"
                 ))
             elif any(kw in normalized for kw in ['テーマ', '指定', '自分', '3', '③']):
                 yakuzen_sessions[user_id] = {'state': 'waiting_for_new_topic'}
@@ -1635,12 +1635,18 @@ def handle_message(event):
                     text="🌿 季節に合った記事を自動選択してリライトします！\n数分かかります..."
                 ))
                 threading.Thread(target=auto_rewrite_yakuzen, args=(user_id,)).start()
-            else:
+            elif 'foodmakehealth.com' in user_message:
                 slug = user_message.strip().rstrip('/').split('/')[-1]
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
                     text=f"✍️ 「{slug}」の記事をリライト中です...少しお待ちください！"
                 ))
                 threading.Thread(target=rewrite_yakuzen_by_slug, args=(user_id, slug)).start()
+            else:
+                keyword = user_message.strip()
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text=f"🔍 「{keyword}」で記事を検索してリライトします...少しお待ちください！"
+                ))
+                threading.Thread(target=rewrite_yakuzen_by_keyword, args=(user_id, keyword)).start()
             return
 
         elif state == 'waiting_for_new_topic':

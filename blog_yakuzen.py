@@ -369,6 +369,22 @@ def process_yakuzen_new_article(user_id, topic=None):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 記事作成中にエラーが発生しました。\n{str(e)[:150]}"))
 
 
+def rewrite_yakuzen_by_keyword(user_id, keyword):
+    """キーワードで記事を検索してリライト（複数ヒット時は最初の1件）"""
+    try:
+        posts = search_yakuzen_posts(keyword)
+        if not posts:
+            line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 「{keyword}」に一致する記事が見つかりませんでした。"))
+            return
+        post = posts[0]
+        title = post['title']['rendered']
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"📄 「{title}」をリライトします！"))
+        process_yakuzen_rewrite(user_id, post['id'], title, post.get('content', {}).get('rendered', ''))
+    except Exception as e:
+        print(f"rewrite_by_keyword error: {e}")
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
+
+
 def rewrite_yakuzen_by_slug(user_id, slug):
     """URLのslugで記事を特定してリライト"""
     try:
