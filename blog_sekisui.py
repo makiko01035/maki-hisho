@@ -65,6 +65,30 @@ def generate_sekisui_article(user_input):
     return response.content[0].text.strip()
 
 
+SEKISUI_PEXELS_KEYWORDS = [
+    "japanese house interior", "modern house interior", "new home living room",
+    "house exterior japan", "bright living room", "modern kitchen interior",
+    "japanese home design", "cozy home interior", "house construction",
+    "family home interior", "new house bright room", "home design modern",
+]
+
+def _title_to_pexels_keyword(title: str) -> str:
+    """日本語タイトルをPexels検索用英語キーワードに変換"""
+    try:
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=30,
+            messages=[{'role': 'user', 'content':
+                f'次の日本語の住宅ブログ記事タイトルに合う、Pexels画像検索用の英語キーワードを1〜3語で返してください。キーワードのみ回答。\n{title}'}]
+        )
+        kw = resp.content[0].text.strip().lower()
+        return kw if kw else 'japanese house interior'
+    except Exception:
+        import hashlib
+        idx = int(hashlib.md5(title.encode()).hexdigest(), 16) % len(SEKISUI_PEXELS_KEYWORDS)
+        return SEKISUI_PEXELS_KEYWORDS[idx]
+
+
 def fetch_pexels_image_for_wp(keyword):
     pexels_key = os.environ.get('PEXELS_API_KEY')
     if not pexels_key:
@@ -73,16 +97,18 @@ def fetch_pexels_image_for_wp(keyword):
         res = requests.get(
             'https://api.pexels.com/v1/search',
             headers={'Authorization': pexels_key},
-            params={'query': keyword, 'per_page': 1, 'orientation': 'landscape'},
+            params={'query': keyword, 'per_page': 5, 'orientation': 'landscape'},
             timeout=10
         )
         photos = res.json().get('photos', [])
         if not photos:
             return None
-        img_res = requests.get(photos[0]['src']['large2x'], timeout=10)
+        import random
+        photo = random.choice(photos)
+        img_res = requests.get(photo['src']['large2x'], timeout=10)
         if img_res.status_code != 200:
             return None
-        return img_res.content, f"pexels_{photos[0]['id']}.jpg"
+        return img_res.content, f"pexels_{photo['id']}.jpg"
     except Exception as e:
         print(f"Pexels error: {e}")
         return None
@@ -121,7 +147,9 @@ def post_to_sekisui_wp(title, content_md):
     slug = f"sekisui-{ascii_part}-{date_str}" if ascii_part else f"sekisui-{date_str}"
     data = {'title': title, 'content': html, 'status': 'publish', 'slug': slug}
 
-    img_result = fetch_pexels_image_for_wp(title)
+    pexels_kw = _title_to_pexels_keyword(title)
+    print(f"Pexels keyword: {pexels_kw}")
+    img_result = fetch_pexels_image_for_wp(pexels_kw)
     if img_result:
         img_data, filename = img_result
         # タイトルオーバーレイを合成してからアップロード
@@ -155,7 +183,8 @@ def post_to_sekisui_wp(title, content_md):
             img_data = buf.getvalue()
             filename = 'ig_' + filename
         except Exception as oe:
-            print(f"Overlay error (使用元画像): {oe}")
+            import traceback
+            print(f"Overlay error: {oe}\n{traceback.format_exc()}")
         media_id = upload_image_to_wp(wp_url, wp_user, wp_pass, img_data, filename)
         if media_id:
             data['featured_media'] = media_id
