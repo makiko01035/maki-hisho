@@ -1842,6 +1842,22 @@ def send_zaitage_reminder():
         print(f"Zaitage reminder error: {e}")
 
 
+def send_x_engage_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        msg = (
+            "𝕏【X エンゲージメントタイム】\n\n"
+            "今日の10分アクション👇\n\n"
+            "① 検索：「AI副業」「ワーママ 副業」「ClaudeCode」\n"
+            "② フォロワー300〜5000人の投稿に共感リプを3件\n"
+            "③ 自分にリプが来てたら返信する\n\n"
+            "リポストは不要。リプライだけでOK✨"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"X engage reminder error: {e}")
+
+
 def send_famm_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -2105,6 +2121,8 @@ scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minu
 scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
 scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
 scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
+# 毎週月・水・金 朝9時20分：X エンゲージメントリマインダー
+scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon,wed,fri', hour=9, minute=20)
 # 毎月末日朝9時：noteリマインド
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
