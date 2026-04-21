@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webマーケティング 学習まとめ</title>
+<style>
+  body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 20px; }
+  h1 { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white; padding: 20px 24px; border-radius: 12px; font-size: 1.4em; margin-bottom: 24px; }
+  h2 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 12px; margin-top: 30px; margin-bottom: 14px; }
+  h3 { color: #333; margin-top: 16px; margin-bottom: 8px; font-size: 1em; }
+  .card { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .point { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; }
+  .warn { background: #fdf0f0; border-left: 5px solid #e53935; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; }
+  .green { background: #f0fdf4; border-left: 5px solid #2e7d32; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; }
+  .yellow { background: #fffbe6; border-left: 4px solid #f9a825; padding: 12px 14px; border-radius: 6px; margin-top: 10px; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th { background: #1a73e8; color: white; padding: 10px 14px; text-align: left; font-size: 0.9em; }
+  td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 0.9em; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f8f9fe; }
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+  .flow-box { background: #1a73e8; color: white; padding: 10px 16px; border-radius: 8px; font-size: 0.88em; text-align: center; line-height: 1.4; }
+  .flow-box.sub { background: #5c9de8; }
+  .flow-arrow { font-size: 1.3em; color: #999; }
+  .badge { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 0.82em; margin: 3px; font-weight: bold; }
+  .badge-blue { background: #e8f0fe; color: #1a73e8; }
+  .badge-red { background: #fde8e8; color: #c62828; }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-orange { background: #fff3e0; color: #e65100; }
+  .num { display: inline-flex; align-items: center; justify-content: center; background: #1a73e8; color: white; border-radius: 50%; width: 26px; height: 26px; font-size: 0.82em; font-weight: bold; margin-right: 8px; flex-shrink: 0; }
+  .item { display: flex; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .item:last-child { border-bottom: none; }
+  .pasona-row { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+  .pasona-letter { font-size: 1.8em; font-weight: bold; color: #1a73e8; min-width: 36px; }
+  .pasona-content strong { display: block; margin-bottom: 4px; }
+  .pasona-content p { margin: 0; font-size: 0.9em; color: #555; }
+  .lp-step { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; border-bottom: 1px solid #eee; }
+  .lp-step:last-child { border-bottom: none; }
+  .step-num { background: #1a73e8; color: white; border-radius: 6px; padding: 4px 10px; font-size: 0.85em; font-weight: bold; flex-shrink: 0; }
+  .step-content strong { display: block; margin-bottom: 4px; }
+  .step-content p { margin: 0; font-size: 0.88em; color: #555; }
+  .principle { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #eee; }
+  .principle:last-child { border-bottom: none; }
+  .prin-label { background: #e53935; color: white; border-radius: 6px; padding: 4px 10px; font-size: 0.82em; font-weight: bold; white-space: nowrap; flex-shrink: 0; }
+  .prin-label.blue { background: #1a73e8; }
+  .prin-label.green { background: #2e7d32; }
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+  .media-card { background: #f8f9fe; border-radius: 8px; padding: 14px; border-top: 4px solid #1a73e8; }
+  .media-card.paid { border-top-color: #e53935; }
+  .media-card.earned { border-top-color: #2e7d32; }
+  .media-card strong { display: block; margin-bottom: 8px; }
+  .media-card ul { margin: 0; padding-left: 18px; font-size: 0.88em; color: #555; }
+  .summary-box { background: linear-gradient(135deg, #e8f0fe, #f0fdf4); border-radius: 10px; padding: 18px 20px; margin-top: 10px; }
+  .summary-box ul { margin: 0; padding-left: 20px; }
+  .summary-box li { margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>📊 Webマーケティング 学習まとめ　まき（2026-04-22）</h1>
+
+<!-- 全体像 -->
+<div class="card">
+  <h2>全体の学習マップ</h2>
+  <div class="flow">
+    <div class="flow-box">ターゲット・ペルソナ設計</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">Web集客手段の選択</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">LPでコンバージョン</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box">データ分析・PDCA</div>
+  </div>
+  <div class="yellow">
+    まきさんへ：この順番通りにやれば最短でWebマーケターとして動ける。どこに行き詰まっても「今どのステップか？」を確認するのが最短ルート。
+  </div>
+</div>
+
+<!-- 三原則 -->
+<div class="card">
+  <h2>コピーライティング三原則（マクスウェル・サックハイム）</h2>
+  <p>人はそもそも広告を「読まない・信じない・行動しない」。これを順番に突破するのがコピーの仕事。</p>
+
+  <div class="principle">
+    <div class="prin-label">Not Read</div>
+    <div>
+      <strong>見込み客は読まない</strong>
+      <p style="margin:4px 0 0;font-size:0.9em;color:#555;">「自分のことだ」と感じさせる。ベネフィット（得られる未来・悩みの解決）をシンプルに伝える。<br>
+      例：「30代の悩み肌に驚くほど速攻浸透」→ 30代肌悩み女性が一瞬で立ち止まる</p>
+    </div>
+  </div>
+  <div class="principle">
+    <div class="prin-label">Not Believe</div>
+    <div>
+      <strong>見込み客は信じない</strong>
+      <p style="margin:4px 0 0;font-size:0.9em;color:#555;">突破策：① 共感（同じ悩みを持つ人の声・レビュー）　② 権威性（医師監修・実績・数字）<br>
+      Amazonで買う前にレビューを確認する心理と同じ。</p>
+    </div>
+  </div>
+  <div class="principle">
+    <div class="prin-label">Not Act</div>
+    <div>
+      <strong>見込み客は行動しない</strong>
+      <p style="margin:4px 0 0;font-size:0.9em;color:#555;">「現状維持したい」という本能がある。<br>
+      突破策：限定性・緊急性（「限定50名」「今だけ全額返金保証」）で「今やらなきゃ」を作る。<br>
+      ※嘘の限定性はNG。必ず事実ベースで。</p>
+    </div>
+  </div>
+</div>
+
+<!-- ペルソナ -->
+<div class="card">
+  <h2>リサーチとペルソナ設計（コピーの8割はここで決まる）</h2>
+
+  <div class="warn">
+    <strong>ターゲット ≠ ペルソナ</strong><br>
+    ターゲット：「30代女性OL」（広い層）→ 刺さらない<br>
+    ペルソナ：「田原理恵・34歳・パート主婦・八王子市・子2人・年収650万世帯・趣味ショッピング」→ 刺さる
+  </div>
+
+  <div class="point">
+    <strong>ペルソナ設定で決まること</strong><br>
+    ・どんな悩みを抱えているか　・どんな未来を望んでいるか<br>
+    ・どこにいるか（使うSNS・メディア）　→ 集客チャネルの選択が変わる
+  </div>
+
+  <div class="green">
+    <strong>ペルソナ設定の注意点</strong><br>
+    想像だけで作らない。SNS・口コミ・インタビューなど事実ベースで作ること。<br>
+    自社に都合の良い顧客像にしないこと。
+  </div>
+</div>
+
+<!-- PASONAの法則 -->
+<div class="card">
+  <h2>PASONAの法則（売れるコピーの型）</h2>
+  <p style="margin-bottom:16px;">神田昌典が提唱。これに当てはめて書くだけで自然と売れる文章になる。</p>
+
+  <div class="pasona-row">
+    <div class="pasona-letter">P</div>
+    <div class="pasona-content">
+      <strong>Problem（問題）</strong>
+      <p>お客さんが直面している問題・切望する欲求を明確化する</p>
+    </div>
+  </div>
+  <div class="pasona-row">
+    <div class="pasona-letter">A</div>
+    <div class="pasona-content">
+      <strong>Affinity（親近感）</strong>
+      <p>「私も同じでした」と同じ痛みや望みをストーリーで共有する</p>
+    </div>
+  </div>
+  <div class="pasona-row">
+    <div class="pasona-letter">S</div>
+    <div class="pasona-content">
+      <strong>Solution（解決策）</strong>
+      <p>問題が解決できる方法・商品があることを伝える</p>
+    </div>
+  </div>
+  <div class="pasona-row">
+    <div class="pasona-letter">O</div>
+    <div class="pasona-content">
+      <strong>Offer（提案）</strong>
+      <p>具体的な提案・価格・特典・モニター価格などを明示する</p>
+    </div>
+  </div>
+  <div class="pasona-row">
+    <div class="pasona-letter">N</div>
+    <div class="pasona-content">
+      <strong>Narrow Down（絞り込み）</strong>
+      <p>「こんな人に届けたい」と対象を絞る（逆に刺さりやすくなる）</p>
+    </div>
+  </div>
+  <div class="pasona-row">
+    <div class="pasona-letter">A</div>
+    <div class="pasona-content">
+      <strong>Action（行動）</strong>
+      <p>今すぐ行動しなければいけない理由・限定性・緊急性を添えてCTAへ</p>
+    </div>
+  </div>
+
+  <div class="yellow">
+    ブログ・X・LP・LINE全部これで書けばOK。まきさんが使う文章は何でもPASONAで整理してみる。
+  </div>
+</div>
+
+<!-- LP構成 -->
+<div class="card">
+  <h2>ランディングページ（LP）の基本構成</h2>
+  <p style="margin-bottom:14px;">縦長一枚・リンクなし。ファーストビューで8割決まる。</p>
+
+  <div class="lp-step">
+    <div class="step-num">① ファーストビュー</div>
+    <div class="step-content">
+      <strong>キャッチコピー＋商品画像＋基本情報</strong>
+      <p>ベネフィットを意識したコピー。商品名・価格・内容量・使用期間など具体的に記載。ここでNot Readを突破。</p>
+    </div>
+  </div>
+  <div class="lp-step">
+    <div class="step-num">② 共感の喚起</div>
+    <div class="step-content">
+      <strong>「こんなお悩みありませんか？」</strong>
+      <p>ペルソナが実際に悩んでいることをリスト化。感情を共有して最後まで読む準備を整える。</p>
+    </div>
+  </div>
+  <div class="lp-step">
+    <div class="step-num">③ 商品紹介</div>
+    <div class="step-content">
+      <strong>画像・スタッフの顔・オファーのイメージ図</strong>
+      <p>具体的にイメージできるよう視覚的に伝える。</p>
+    </div>
+  </div>
+  <div class="lp-step">
+    <div class="step-num">④ ベネフィット</div>
+    <div class="step-content">
+      <strong>「使うとどうなれるか」を具体的に</strong>
+      <p>商品の機能（フィーチャー）ではなく、使った後の理想の未来（ベネフィット）を書く。ドリルではなく「開けた穴」を売る。</p>
+    </div>
+  </div>
+  <div class="lp-step">
+    <div class="step-num">⑤ 信頼性・証拠</div>
+    <div class="step-content">
+      <strong>権威性・口コミ・数字でNot Believeを突破</strong>
+      <p>専門家コメント・Before/After・レビュー・実績数字など。「この商品は本物だ」と感じさせる。</p>
+    </div>
+  </div>
+  <div class="lp-step">
+    <div class="step-num">⑥ アクション（CTA）</div>
+    <div class="step-content">
+      <strong>シンプルに「何をすればいいか」を明示</strong>
+      <p>目立つボタン＋限定性・緊急性のコピー。「今すぐ〇〇する」形で行動を後押し。</p>
+    </div>
+  </div>
+</div>
+
+<!-- トリプルメディア -->
+<div class="card">
+  <h2>Web集客の3つのメディア（トリプルメディア）</h2>
+
+  <div class="media-grid">
+    <div class="media-card">
+      <strong>オウンドメディア <span class="badge badge-blue">自社所有</span></strong>
+      <ul>
+        <li>コーポレートサイト</li>
+        <li>ブログ（SEO）</li>
+        <li>メルマガ</li>
+        <li>ECサイト</li>
+      </ul>
+      <p style="font-size:0.82em;color:#777;margin:8px 0 0;">効果は遅いが資産になる。Googleアップデートの影響あり。</p>
+    </div>
+    <div class="media-card paid">
+      <strong>ペイドメディア <span class="badge badge-red">有料</span></strong>
+      <ul>
+        <li>リスティング広告</li>
+        <li>SNS広告</li>
+        <li>ディスプレイ広告</li>
+        <li>動画広告</li>
+      </ul>
+      <p style="font-size:0.82em;color:#777;margin:8px 0 0;">即効性あり。費用をかければかけるほど集客できる。</p>
+    </div>
+    <div class="media-card earned">
+      <strong>アーンドメディア <span class="badge badge-green">口コミ</span></strong>
+      <ul>
+        <li>SNS投稿・シェア</li>
+        <li>口コミサイト</li>
+        <li>レビュー</li>
+        <li>PR記事</li>
+      </ul>
+      <p style="font-size:0.82em;color:#777;margin:8px 0 0;">信頼性が高い。コントロールは難しいが影響力大。</p>
+    </div>
+  </div>
+
+  <div class="yellow" style="margin-top:14px;">
+    どのメディアを選ぶかは「ターゲットがどこにいるか」で決まる。SNSユーザーにはSNS広告、シニア層にはオフライン。まずペルソナを決めてから手段を選ぶ。
+  </div>
+</div>
+
+<!-- Webマーケターの働き方 -->
+<div class="card">
+  <h2>Webマーケターの働き方・キャリアパス</h2>
+
+  <div class="flow" style="margin-bottom:16px;">
+    <div class="flow-box">転職（事業会社）</div>
+    <div class="flow-arrow">or</div>
+    <div class="flow-box">転職（支援会社）</div>
+    <div class="flow-arrow">or</div>
+    <div class="flow-box">副業・フリーランス</div>
+    <div class="flow-arrow">or</div>
+    <div class="flow-box">起業</div>
+  </div>
+
+  <table>
+    <tr>
+      <th>種類</th>
+      <th>特徴</th>
+      <th>例</th>
+    </tr>
+    <tr>
+      <td><strong>事業会社（社内マーケター）</strong></td>
+      <td>自社製品・サービスをマーケティングで売る。全般業務を経験できる。社内でマーケターが少ないので自走力が必要。</td>
+      <td>トヨタ・資生堂など</td>
+    </tr>
+    <tr>
+      <td><strong>支援会社（代理店・エージェント）</strong></td>
+      <td>クライアント企業の売上アップを支援。専門性が身につく。最新情報・データに触れやすい。</td>
+      <td>サイバーエージェント・博報堂・電通など</td>
+    </tr>
+  </table>
+</div>
+
+<!-- 今日の課題・LITHAのLP -->
+<div class="card">
+  <h2>今日の課題：LITHAホワイトニング歯磨き粉 LP（readdy.ai）</h2>
+
+  <div class="point">
+    <strong>商品概要</strong><br>
+    LITHA（リサ）ホワイトニング歯磨き粉　チューブ式 / ガラス瓶式　4,200円 / 90g
+  </div>
+
+  <table style="margin-bottom:14px;">
+    <tr>
+      <th>LP要素</th>
+      <th>内容</th>
+    </tr>
+    <tr>
+      <td><strong>キャッチコピー</strong></td>
+      <td>コーヒーも、赤ワインも、もう気にしない。毎日2分で、プロ級の白い歯へ。</td>
+    </tr>
+    <tr>
+      <td><strong>ペルソナ</strong></td>
+      <td>32歳会社員・接客・営業職。毎朝コーヒー2杯。商談・Zoomが多く口元を見られる。黄ばみが気になるが歯科ホワイトニングは高くて無理。</td>
+    </tr>
+    <tr>
+      <td><strong>共感コピー</strong></td>
+      <td>コーヒーで歯が黄ばんできた / 歯科ホワイトニングは高い / 市販では効果なし / 笑顔に自信が持てない</td>
+    </tr>
+    <tr>
+      <td><strong>強み（Solution）</strong></td>
+      <td>ハイドロキシアパタイト配合・研磨剤不使用・毎日使える・2タイプ展開</td>
+    </tr>
+    <tr>
+      <td><strong>信頼性</strong></td>
+      <td>歯科医師監修・Before/After・成分根拠</td>
+    </tr>
+    <tr>
+      <td><strong>CTA</strong></td>
+      <td>「今すぐ白い歯を手に入れる」＋初回限定モニター価格</td>
+    </tr>
+  </table>
+
+  <div class="summary-box">
+    <strong>使ったフレームワーク</strong>
+    <ul>
+      <li>三原則（Not Read → Not Believe → Not Act）を順番に突破する構成</li>
+      <li>PASONAの法則で文章の流れを設計</li>
+      <li>ペルソナを「32歳接客業女性」に絞り込んで刺さるコピーに</li>
+    </ul>
+  </div>
+</div>
+
+<!-- まとめ -->
+<div class="card">
+  <h2>まとめ：まきさんが覚えておくこと</h2>
+  <div class="green">
+    <strong>1. 「誰に届けるか」が全ての出発点</strong><br>
+    ターゲットよりペルソナ。1人の人物をリアルに設定してから手段を選ぶ。
+  </div>
+  <div class="green">
+    <strong>2. 人は「読まない・信じない・行動しない」</strong><br>
+    この3つを意識するだけでコピーの質が変わる。
+  </div>
+  <div class="green">
+    <strong>3. PASONAに当てはめるだけで売れる文章になる</strong><br>
+    ブログ・X・LP・LINE全て共通。まきさんの文章はすべてPASONAで作れる。
+  </div>
+  <div class="green">
+    <strong>4. 集客手段はペルソナが「どこにいるか」で選ぶ</strong><br>
+    トレンドのツールより「ターゲットがいる場所」を優先する。
+  </div>
+</div>
+
+<p style="text-align:center;color:#aaa;font-size:0.82em;margin-top:30px;">
+  株式会社BREAK「売れるコピーライティングマニュアル」「Web集客完全習得ガイド」「Webマーケター成功へのロードマップ」より学習まとめ　2026-04-22
+</p>
+
+</body>
+</html>

@@ -920,6 +920,10 @@ def company_office():
 def instagram_roadmap():
     return send_from_directory('.', 'instagram_roadmap.html')
 
+@app.route('/web-marketing')
+def web_marketing_notes():
+    return send_from_directory('.', 'web_marketing_notes.html')
+
 @app.route('/game/rhythm')
 def game_rhythm():
     return send_from_directory('.', 'maruchan_rhythm.html')
