@@ -4,7 +4,10 @@
 import json
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = [
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/webmasters.readonly',
+]
 
 def main():
     flow = InstalledAppFlow.from_client_secrets_file(

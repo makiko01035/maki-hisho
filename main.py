@@ -2036,6 +2036,122 @@ def generate_x_post(slot=0):
     return get_tweet_for_slot(slot)
 
 
+def get_google_creds():
+    raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+        return Credentials(
+            token=data.get('token'),
+            refresh_token=data.get('refresh_token'),
+            client_id=data.get('client_id'),
+            client_secret=data.get('client_secret'),
+            token_uri='https://oauth2.googleapis.com/token',
+            scopes=data.get('scopes', []),
+        )
+    except Exception:
+        return None
+
+
+def fetch_search_console(creds, site_url, days=28):
+    try:
+        service = build('searchconsole', 'v1', credentials=creds)
+        end_date = datetime.date.today()
+        start_date = end_date - datetime.timedelta(days=days)
+        body = {
+            'startDate': start_date.isoformat(),
+            'endDate': end_date.isoformat(),
+            'dimensions': ['query'],
+            'rowLimit': 10,
+            'orderBy': [{'fieldName': 'impressions', 'sortOrder': 'DESCENDING'}],
+        }
+        result = service.searchanalytics().query(siteUrl=site_url, body=body).execute()
+        return result.get('rows', [])
+    except Exception as e:
+        print(f"Search Console error ({site_url}): {e}")
+        return None
+
+
+def fetch_x_weekly_metrics():
+    try:
+        import tweepy
+        client = _get_x_client()
+        if not client:
+            return None
+        me = client.get_me()
+        if not me.data:
+            return None
+        user_id = me.data.id
+        tweets = client.get_users_tweets(
+            id=user_id,
+            max_results=10,
+            tweet_fields=['public_metrics', 'created_at'],
+        )
+        if not tweets.data:
+            return None
+        results = []
+        for t in tweets.data:
+            m = t.public_metrics
+            results.append({
+                'text': t.text[:40],
+                'impressions': m.get('impression_count', 0),
+                'likes': m.get('like_count', 0),
+                'retweets': m.get('retweet_count', 0),
+            })
+        results.sort(key=lambda x: x['impressions'], reverse=True)
+        return results[:3]
+    except Exception as e:
+        print(f"X metrics error: {e}")
+        return None
+
+
+def send_weekly_seo_report():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        creds = get_google_creds()
+        lines = ['📊 週次レポート\n']
+
+        for label, site_url in [('薬膳ブログ', 'https://foodmakehealth.com/'), ('セキスイブログ', 'https://order-sekisui.com/')]:
+            lines.append(f'【{label}】')
+            if creds:
+                rows = fetch_search_console(creds, site_url)
+                if rows:
+                    lines.append('🔍 検索キーワード TOP5')
+                    for i, row in enumerate(rows[:5], 1):
+                        query = row['keys'][0]
+                        clicks = int(row.get('clicks', 0))
+                        impressions = int(row.get('impressions', 0))
+                        position = round(row.get('position', 0), 1)
+                        lines.append(f'{i}. {query}')
+                        lines.append(f'   表示{impressions}回 / クリック{clicks}回 / 順位{position}位')
+                    low_ctr = [r for r in rows if r.get('impressions', 0) >= 20 and r.get('ctr', 1) < 0.03]
+                    if low_ctr:
+                        lines.append('📝 リライト候補（表示多いのにクリック少ない）')
+                        for r in low_ctr[:2]:
+                            lines.append(f'・{r["keys"][0]}（表示{int(r["impressions"])}回）')
+                else:
+                    lines.append('（データなし or 認証スコープ未更新）')
+            else:
+                lines.append('（Google認証未設定）')
+            lines.append('')
+
+        x_data = fetch_x_weekly_metrics()
+        lines.append('【X（@maki_claude_lab）】')
+        if x_data:
+            lines.append('🐦 直近10投稿TOP3')
+            for i, t in enumerate(x_data, 1):
+                lines.append(f'{i}. {t["text"]}…')
+                lines.append(f'   👁{t["impressions"]} ❤️{t["likes"]} 🔁{t["retweets"]}')
+        else:
+            lines.append('（X APIデータ取得できず）')
+
+        message = '\n'.join(lines)
+        line_bot_api.push_message(user_id, TextSendMessage(text=message))
+    except Exception as e:
+        print(f"Weekly SEO report error: {e}")
+
+
 def send_note_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -2125,6 +2241,8 @@ scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
 scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
 # 毎週月・水・金 朝9時20分：X エンゲージメントリマインダー
 scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon,wed,fri', hour=9, minute=20)
+# 毎週月曜朝9時30分：週次SEOレポート（薬膳・セキスイ・X）
+scheduler.add_job(send_weekly_seo_report, 'cron', day_of_week='mon', hour=9, minute=30)
 # 毎月末日朝9時：noteリマインド
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
