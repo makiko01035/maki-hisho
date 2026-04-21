@@ -581,17 +581,17 @@ def extract_slide_content(title, content_md):
 
 def _resolve_font_path():
     """フォントパスを返す。ローカルになければGitHubからダウンロード"""
-    local = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
+    local = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.otf')
     if os.path.exists(local):
         print(f"[Font] local found: {local}")
         return local
-    tmp = '/tmp/NotoSansJP-Bold.ttf'
+    tmp = '/tmp/NotoSansJP-Bold.otf'
     if os.path.exists(tmp):
         print(f"[Font] tmp cache: {tmp}")
         return tmp
     try:
         import requests as _req
-        url = "https://github.com/makiko01035/maki-hisho/raw/main/fonts/NotoSansJP-Bold.ttf"
+        url = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/SubsetOTF/JP/NotoSansJP-Bold.otf"
         r = _req.get(url, timeout=30)
         r.raise_for_status()
         with open(tmp, 'wb') as f:
