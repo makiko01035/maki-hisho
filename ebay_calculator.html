@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仕入れ判断シート｜まきの物販部</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 16px; }
+  h1 { background: linear-gradient(135deg, #e65100, #bf360c); color: white; padding: 18px 20px; border-radius: 12px; font-size: 1.2em; margin-bottom: 20px; }
+  .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  h2 { color: #e65100; font-size: 1em; border-left: 4px solid #e65100; padding-left: 10px; margin: 0 0 16px; }
+  label { display: block; font-size: 0.88em; color: #666; margin-bottom: 4px; margin-top: 14px; }
+  label:first-of-type { margin-top: 0; }
+  input, select { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 1em; outline: none; transition: border 0.2s; }
+  input:focus, select:focus { border-color: #e65100; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button { width: 100%; background: linear-gradient(135deg, #e65100, #bf360c); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 1.05em; font-weight: bold; cursor: pointer; margin-top: 16px; }
+  button:active { opacity: 0.85; }
+  .result { display: none; }
+  .verdict { text-align: center; font-size: 1.6em; font-weight: bold; padding: 18px; border-radius: 12px; margin-bottom: 16px; }
+  .verdict.buy { background: #e8f5e9; color: #2e7d32; }
+  .verdict.watch { background: #fffbe6; color: #f57f17; }
+  .verdict.pass { background: #fde8e8; color: #c62828; }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .metric { background: #f8f9fa; border-radius: 10px; padding: 14px; text-align: center; }
+  .metric .label { font-size: 0.78em; color: #888; margin-bottom: 4px; }
+  .metric .value { font-size: 1.3em; font-weight: bold; color: #333; }
+  .metric .value.good { color: #2e7d32; }
+  .metric .value.bad { color: #c62828; }
+  .fx-table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
+  .fx-table th { background: #e65100; color: white; padding: 8px 12px; text-align: left; }
+  .fx-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  .fx-table tr:last-child td { border-bottom: none; }
+  .fx-table tr.current td { background: #fff3e0; font-weight: bold; }
+  .rule-note { font-size: 0.8em; color: #999; margin-top: 10px; line-height: 1.6; }
+  .exclude-warn { background: #fde8e8; border-left: 4px solid #e53935; padding: 10px 14px; border-radius: 8px; font-size: 0.88em; color: #c62828; margin-top: 12px; display: none; }
+  .reset-btn { background: #eee; color: #555; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>仕入れ判断シート</h1>
+
+<div class="card">
+  <h2>商品情報を入力</h2>
+
+  <label>商品名（メモ用）</label>
+  <input type="text" id="name" placeholder="例：白鳳堂 メイクブラシセット">
+
+  <label>仕入れ価格（円）</label>
+  <input type="number" id="buy_price" placeholder="例：3000" min="0">
+
+  <div class="row2">
+    <div>
+      <label>重量（g）</label>
+      <input type="number" id="weight" placeholder="例：300" min="0">
+    </div>
+    <div>
+      <label>長辺（cm）</label>
+      <input type="number" id="size" placeholder="例：30" min="0">
+    </div>
+  </div>
+
+  <label>送料見込み（円）</label>
+  <input type="number" id="shipping" value="2000" min="0">
+
+  <label>為替レート（円/ドル）</label>
+  <input type="number" id="fx" value="150" min="100" max="200">
+
+  <button onclick="calculate()">判断する</button>
+</div>
+
+<div class="card result" id="result_area">
+  <div class="exclude-warn" id="exclude_warn"></div>
+  <div class="verdict" id="verdict_box"></div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="label">eBay推奨価格</div>
+      <div class="value" id="r_price">—</div>
+    </div>
+    <div class="metric">
+      <div class="label">利益額</div>
+      <div class="value" id="r_profit">—</div>
+    </div>
+    <div class="metric">
+      <div class="label">利益率</div>
+      <div class="value" id="r_margin">—</div>
+    </div>
+    <div class="metric">
+      <div class="label">eBay手数料(13%)</div>
+      <div class="value" id="r_fee">—</div>
+    </div>
+  </div>
+
+  <h2>為替リスクシミュレーション</h2>
+  <table class="fx-table">
+    <tr><th>為替</th><th>販売価格</th><th>利益額</th><th>利益率</th></tr>
+    <tbody id="fx_rows"></tbody>
+  </table>
+
+  <p class="rule-note" id="rule_note"></p>
+  <button class="reset-btn" onclick="reset()">リセット</button>
+</div>
+
+<script>
+function getSellPrice(buyPrice) {
+  if (buyPrice <= 3000) return buyPrice * 2.10 + 2500;
+  if (buyPrice <= 7000) return buyPrice * 1.90 + 2500;
+  if (buyPrice <= 15000) return buyPrice * 1.80 + 2500;
+  if (buyPrice <= 30000) return buyPrice * 1.70 + 2500;
+  return null;
+}
+
+function calcProfit(sellJpy, buyPrice, shipping) {
+  const ebayFee = sellJpy * 0.13;
+  return sellJpy - ebayFee - buyPrice - shipping;
+}
+
+function calculate() {
+  const name     = document.getElementById('name').value || '商品';
+  const buyPrice = parseFloat(document.getElementById('buy_price').value) || 0;
+  const weight   = parseFloat(document.getElementById('weight').value) || 0;
+  const size     = parseFloat(document.getElementById('size').value) || 0;
+  const shipping = parseFloat(document.getElementById('shipping').value) || 2000;
+  const fx       = parseFloat(document.getElementById('fx').value) || 150;
+
+  // 除外チェック
+  const warnEl = document.getElementById('exclude_warn');
+  let warns = [];
+  if (weight >= 2000) warns.push('重量2kg以上（除外条件）');
+  if (size >= 60)     warns.push('長辺60cm以上（除外条件）');
+  if (buyPrice > 30000) warns.push('仕入れ30,000円超（除外条件）');
+
+  if (warns.length > 0) {
+    warnEl.textContent = '⚠ ' + warns.join(' / ') + ' → この商品は仕入れNG';
+    warnEl.style.display = 'block';
+  } else {
+    warnEl.style.display = 'none';
+  }
+
+  const sellJpy = getSellPrice(buyPrice);
+  if (!sellJpy) {
+    alert('仕入れ価格を入力してください');
+    return;
+  }
+
+  const sellUsd  = sellJpy / fx;
+  const ebayFee  = sellJpy * 0.13;
+  const profit   = calcProfit(sellJpy, buyPrice, shipping);
+  const margin   = sellJpy > 0 ? (profit / sellJpy * 100) : 0;
+
+  // 判定
+  const verdictBox = document.getElementById('verdict_box');
+  if (warns.length > 0) {
+    verdictBox.textContent = '✗ 見送り（除外条件）';
+    verdictBox.className = 'verdict pass';
+  } else if (margin >= 30) {
+    verdictBox.textContent = '◎ 買い！（利益率' + margin.toFixed(1) + '%）';
+    verdictBox.className = 'verdict buy';
+  } else if (margin >= 20) {
+    verdictBox.textContent = '△ 要検討（利益率' + margin.toFixed(1) + '%）';
+    verdictBox.className = 'verdict watch';
+  } else {
+    verdictBox.textContent = '✗ 見送り（利益率' + margin.toFixed(1) + '%）';
+    verdictBox.className = 'verdict pass';
+  }
+
+  // 数値表示
+  const fmt = (n) => Math.round(n).toLocaleString();
+  document.getElementById('r_price').innerHTML  = '$' + sellUsd.toFixed(0) + '<br><small>（約' + fmt(sellJpy) + '円）</small>';
+  document.getElementById('r_profit').innerHTML = fmt(profit) + '円';
+  document.getElementById('r_profit').className = 'value ' + (profit >= 0 ? 'good' : 'bad');
+  document.getElementById('r_margin').innerHTML = margin.toFixed(1) + '%';
+  document.getElementById('r_margin').className = 'value ' + (margin >= 30 ? 'good' : margin >= 20 ? '' : 'bad');
+  document.getElementById('r_fee').innerHTML    = fmt(ebayFee) + '円';
+
+  // 為替シミュレーション
+  const fxRates = [130, 140, 150, 160, 165];
+  const tbody = document.getElementById('fx_rows');
+  tbody.innerHTML = '';
+  fxRates.forEach(rate => {
+    const p = calcProfit(sellJpy, buyPrice, shipping);
+    const usd = (sellJpy / rate).toFixed(0);
+    const m = (p / sellJpy * 100).toFixed(1);
+    const isCurrent = rate === Math.round(fx);
+    const row = `<tr class="${isCurrent ? 'current' : ''}">
+      <td>${rate}円/$${isCurrent ? '（現在）' : ''}</td>
+      <td>$${usd}</td>
+      <td>${fmt(p)}円</td>
+      <td>${m}%</td>
+    </tr>`;
+    tbody.innerHTML += row;
+  });
+
+  // ルール表示
+  let ruleUsed = '';
+  if (buyPrice <= 3000) ruleUsed = '仕入れ×210%+2,500円';
+  else if (buyPrice <= 7000) ruleUsed = '仕入れ×190%+2,500円';
+  else if (buyPrice <= 15000) ruleUsed = '仕入れ×180%+2,500円';
+  else ruleUsed = '仕入れ×170%+2,500円';
+  document.getElementById('rule_note').textContent =
+    `適用ルール：${ruleUsed}　送料：${fmt(shipping)}円　eBay手数料：13%`;
+
+  document.getElementById('result_area').style.display = 'block';
+  document.getElementById('result_area').scrollIntoView({behavior: 'smooth'});
+}
+
+function reset() {
+  document.getElementById('name').value = '';
+  document.getElementById('buy_price').value = '';
+  document.getElementById('weight').value = '';
+  document.getElementById('size').value = '';
+  document.getElementById('shipping').value = '2000';
+  document.getElementById('fx').value = '150';
+  document.getElementById('result_area').style.display = 'none';
+}
+</script>
+</body>
+</html>

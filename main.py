@@ -928,6 +928,10 @@ def web_marketing_notes():
 def ebay_guide():
     return send_from_directory('.', 'ebay_guide.html')
 
+@app.route('/ebay-calc')
+def ebay_calculator():
+    return send_from_directory('.', 'ebay_calculator.html')
+
 @app.route('/game/rhythm')
 def game_rhythm():
     return send_from_directory('.', 'maruchan_rhythm.html')
