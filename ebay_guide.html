@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>eBay物販 攻略まとめ｜まきの会社</title>
+<style>
+  body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 20px; }
+  h1 { background: linear-gradient(135deg, #e65100, #bf360c); color: white; padding: 20px 24px; border-radius: 12px; font-size: 1.4em; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 0.88em; margin-bottom: 24px; padding-left: 4px; }
+  h2 { color: #e65100; border-left: 5px solid #e65100; padding-left: 12px; margin-top: 30px; margin-bottom: 14px; font-size: 1.1em; }
+  h3 { color: #555; margin-top: 16px; margin-bottom: 8px; font-size: 0.98em; }
+  .card { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .point { background: #fff3e0; border-left: 5px solid #e65100; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; font-size: 0.92em; line-height: 1.6; }
+  .warn { background: #fdf0f0; border-left: 5px solid #e53935; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; font-size: 0.92em; }
+  .green { background: #f0fdf4; border-left: 5px solid #2e7d32; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; font-size: 0.92em; }
+  .blue { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; font-size: 0.92em; }
+  .yellow { background: #fffbe6; border-left: 4px solid #f9a825; padding: 12px 14px; border-radius: 6px; margin-bottom: 10px; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th { background: #e65100; color: white; padding: 10px 14px; text-align: left; font-size: 0.88em; }
+  td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 0.88em; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .badge { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 0.82em; margin: 3px; font-weight: bold; }
+  .badge-orange { background: #fff3e0; color: #e65100; }
+  .badge-red { background: #fde8e8; color: #c62828; }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-blue { background: #e8f0fe; color: #1a73e8; }
+  .todo { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 0.92em; }
+  .todo:last-child { border-bottom: none; }
+  .todo-icon { font-size: 1.2em; flex-shrink: 0; }
+  code { background: #f4f4f4; padding: 2px 8px; border-radius: 4px; font-size: 0.88em; font-family: monospace; }
+  .section-note { color: #888; font-size: 0.82em; margin-top: -10px; margin-bottom: 14px; }
+  .updated { text-align: right; color: #aaa; font-size: 0.8em; margin-top: 30px; }
+</style>
+</head>
+<body>
+
+<h1>eBay物販 攻略まとめ</h1>
+<p class="subtitle">メルカリ仕入れ → eBay販売（無在庫）｜2026年4月更新</p>
+
+<!-- ============ 現在の状況 ============ -->
+<h2>現在の出品状況（2026-04-22時点）</h2>
+<div class="card">
+  <table>
+    <tr><th>カテゴリー</th><th>品数</th><th>状況</th></tr>
+    <tr><td>白鳳堂（Hakuhodo）メイクブラシ</td><td>22品</td><td><span class="badge badge-green">需要あり・値下げ済</span></td></tr>
+    <tr><td>熊野筆（Kumano Fude）</td><td>数品</td><td><span class="badge badge-blue">継続出品</span></td></tr>
+    <tr><td>村上隆トレーディングカード</td><td>約30品</td><td><span class="badge badge-orange">単品値下げ・ボックス整理済</span></td></tr>
+    <tr><td>SOU SOU 手ぬぐい・ハンカチ</td><td>数品</td><td><span class="badge badge-blue">継続出品</span></td></tr>
+    <tr><td>Iwako・Sanrio 消しゴム</td><td>数品</td><td><span class="badge badge-blue">継続出品</span></td></tr>
+    <tr><td>風呂敷（新規）</td><td>3品</td><td><span class="badge badge-green">新規追加・要タイトル最適化</span></td></tr>
+    <tr><td>プリキュアウエハース</td><td>2品のみ残存</td><td><span class="badge badge-red">23品取り下げ済（利益なし）</span></td></tr>
+  </table>
+</div>
+
+<!-- ============ 価格計算ルール ============ -->
+<h2>価格計算ルール</h2>
+<div class="card">
+  <table>
+    <tr><th>仕入れ価格</th><th>eBay販売価格（BIN）</th></tr>
+    <tr><td>〜3,000円</td><td>仕入れ × 210% + 2,500円</td></tr>
+    <tr><td>〜7,000円</td><td>仕入れ × 190% + 2,500円</td></tr>
+    <tr><td>〜15,000円</td><td>仕入れ × 180% + 2,500円</td></tr>
+    <tr><td>〜30,000円</td><td>仕入れ × 170% + 2,500円</td></tr>
+    <tr><td>30,000円超</td><td>除外</td></tr>
+  </table>
+  <div class="yellow" style="margin-top:14px;">目標利益率 30%以上 ／ 梱包重量 +0.3kg加算して送料計算</div>
+</div>
+
+<!-- ============ 仕入れ判断基準 ============ -->
+<h2>カテゴリー別 仕入れ判断基準</h2>
+<p class="section-note">メルカリでの仕入れ上限の目安（利益30%を確保できるライン）</p>
+<div class="card">
+  <table>
+    <tr><th>カテゴリー</th><th>メルカリ上限</th><th>eBay想定価格</th><th>メルカリ検索ワード</th></tr>
+    <tr><td>白鳳堂・熊野筆（セット）</td><td>〜3,000円</td><td>$58〜$100</td><td>白鳳堂 化粧筆 セット、熊野筆 未使用</td></tr>
+    <tr><td>風呂敷 シルク・縮緬</td><td>〜3,000円</td><td>$50〜$100</td><td>風呂敷 絹、風呂敷 縮緬、風呂敷 シルク</td></tr>
+    <tr><td>風呂敷 藍染め</td><td>〜5,000円</td><td>$80〜$180</td><td>風呂敷 藍染め、風呂敷 ろうけつ</td></tr>
+    <tr><td>風呂敷 刺し子・ボロ</td><td>〜8,000円</td><td>$120〜$575</td><td>風呂敷 刺し子、古布 刺し子、ボロ布</td></tr>
+    <tr><td>村上隆 ボックス・セット</td><td>除外</td><td>競合に単品が多く価格競争</td><td>—</td></tr>
+    <tr><td>プリキュアウエハース単品</td><td>除外</td><td>競合$2〜$7で利益出ない</td><td>—</td></tr>
+  </table>
+  <div class="green" style="margin-top:14px;">
+    <strong>風呂敷で高値がつく条件</strong><br>
+    桐箱入り +$20〜30 ／ 大判100cm以上 +$50〜 ／ ろうけつ染め $50〜100 ／ VTG（ヴィンテージ）表記できる古いもの
+  </div>
+</div>
+
+<!-- ============ noteから学んだこと ============ -->
+<h2>noteから学んだ攻略ポイント</h2>
+<p class="section-note">参考：hyexport_ebay note（2026-04-22 読み込み）</p>
+
+<div class="card">
+  <h3>競合分析</h3>
+  <div class="point">
+    <strong>売却済み（Sold Items）を必ず確認する</strong><br>
+    現在の出品価格ではなく「実際に売れた価格」が正解。Terapeak（Seller Hub・無料）で見られる。自分が$15で出している商品が競合では$38で売れていることがある。
+  </div>
+  <div class="point">
+    <strong>競合上位3品をこの3点で分析する</strong><br>
+    ① 価格　② クーポン・プロモーション率　③ タイトルのキーワード構造
+  </div>
+  <div class="warn">
+    <strong>注意：今回の反省点</strong><br>
+    村上隆単品カード → 競合$6〜$19なのに$26〜$36で出品していた。Sold Items確認を習慣にする。
+  </div>
+</div>
+
+<div class="card">
+  <h3>タイトル最適化</h3>
+  <div class="point">
+    <strong>タイトルはAIに「作らせる」より「構造を分析させる」</strong><br>
+    売れている上位商品のタイトルをClaudeに貼り付けて「どのキーワードが重要か分析して」と依頼する。
+  </div>
+  <div class="point">
+    <strong>風呂敷タイトルテンプレート</strong><br>
+    <code>VTG Japanese Furoshiki Silk Chirimen [色] [柄] Wrapping Cloth Japan</code><br>
+    <code>VTG Japanese Furoshiki Indigo Dye [サイズ]cm Cotton Vintage Japan</code><br>
+    <code>Japanese Antique Sashiko Furoshiki Indigo Cotton Embroidery Handcraft Japan</code>
+  </div>
+</div>
+
+<div class="card">
+  <h3>データ分析（Seller Hub活用）</h3>
+  <div class="point">
+    <strong>Seller HubのCSVデータをClaudeに分析させる</strong><br>
+    ・トラフィックレポート（30日）<br>
+    ・注文データ（90日）<br>
+    ・アクティブリスト<br>
+    → 「ビュー数はあるのに売れない商品」を特定して値下げ or 削除判断
+  </div>
+  <div class="blue">
+    <strong>Claude Projectsに店舗情報を登録しておくと効率UP</strong><br>
+    eBay店舗情報・ターゲット市場・分析ルールを事前登録 → 毎回説明不要になる
+  </div>
+</div>
+
+<div class="card">
+  <h3>顧客対応ルール</h3>
+  <div class="point">
+    <strong>キャンセル・返品は発送前後で対応を分ける</strong><br>
+    発送前 → 柔軟に対応　／　発送後 → ポリシーに基づいて対応
+  </div>
+  <div class="point">
+    <strong>24時間以内に返信がなければ発送を進める</strong><br>
+    待ちすぎて出品制限になるリスクを防ぐ
+  </div>
+</div>
+
+<!-- ============ 今すぐやること ============ -->
+<h2>積み残し・次のアクション</h2>
+<div class="card">
+  <div class="todo">
+    <span class="todo-icon">🔲</span>
+    <div><strong>風呂敷3品のタイトル最適化</strong><br>現在出品中の$28・$33・$43の3品にVTGキーワード・素材・サイズを追加する</div>
+  </div>
+  <div class="todo">
+    <span class="todo-icon">🔲</span>
+    <div><strong>風呂敷・白鳳堂の出品説明文テンプレを作成</strong><br>毎回書かずに済むように定型文を用意する（クレーム防止文言も含む）</div>
+  </div>
+  <div class="todo">
+    <span class="todo-icon">🔲</span>
+    <div><strong>Seller HubのCSVダウンロードしてClaude分析</strong><br>ビュー数があるのに売れない商品を特定して価格調整する</div>
+  </div>
+  <div class="todo">
+    <span class="todo-icon">🔲</span>
+    <div><strong>メルカリで縮緬・藍染め・刺し子の風呂敷を探す（まきさんがやること）</strong><br>「風呂敷 縮緬」「風呂敷 藍染め」「風呂敷 刺し子」「古布」で検索。気になったら画像を送ってくれれば仕入れ判断します。</div>
+  </div>
+  <div class="todo">
+    <span class="todo-icon">🔲</span>
+    <div><strong>5月1日：出品金額リセット確認</strong><br>現在$7,245/$7,000超過中。5月1日朝9:45にLINEでリセット通知が届く。リセット後に追加出品できる。</div>
+  </div>
+  <div class="todo">
+    <span class="todo-icon">🔲</span>
+    <div><strong>5月26日以降：リミットアップ申請</strong><br>出品開始45日経過後に申請可能。200品→500品を目指す。</div>
+  </div>
+</div>
+
+<!-- ============ 出品制限 ============ -->
+<h2>出品制限の現状</h2>
+<div class="card">
+  <table>
+    <tr><th>項目</th><th>現在</th><th>上限</th><th>状況</th></tr>
+    <tr><td>出品数</td><td>約100品</td><td>200品</td><td><span class="badge badge-green">余裕あり</span></td></tr>
+    <tr><td>出品金額</td><td>$7,245</td><td>$7,000</td><td><span class="badge badge-red">超過中 → 5/1リセット</span></td></tr>
+    <tr><td>リミットアップ申請</td><td>—</td><td>—</td><td><span class="badge badge-orange">5/26以降に申請可</span></td></tr>
+  </table>
+</div>
+
+<p class="updated">最終更新：2026-04-22｜まきの会社 物販部</p>
+
+</body>
+</html>

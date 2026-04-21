@@ -924,6 +924,10 @@ def instagram_roadmap():
 def web_marketing_notes():
     return send_from_directory('.', 'web_marketing_notes.html')
 
+@app.route('/ebay-guide')
+def ebay_guide():
+    return send_from_directory('.', 'ebay_guide.html')
+
 @app.route('/game/rhythm')
 def game_rhythm():
     return send_from_directory('.', 'maruchan_rhythm.html')
