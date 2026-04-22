@@ -1108,6 +1108,14 @@ def setup_richmenu_endpoint():
     return f'<html><head><meta charset="utf-8"></head><body><h2>❌ エラー</h2><p>{result}</p></body></html>', 500
 
 
+@app.route('/richmenu-preview')
+def richmenu_preview():
+    from flask import send_file
+    import io
+    data = create_rich_menu_image()
+    return send_file(io.BytesIO(data), mimetype='image/png')
+
+
 @app.route('/ebay-callback')
 def ebay_callback():
     code = request.args.get('code')
