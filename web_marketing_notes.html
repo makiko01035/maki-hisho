@@ -5,22 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Webマーケティング 学習まとめ</title>
 <style>
-  body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 20px; }
-  h1 { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white; padding: 20px 24px; border-radius: 12px; font-size: 1.4em; margin-bottom: 24px; }
-  h2 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 12px; margin-top: 30px; margin-bottom: 14px; }
+  body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 24px; font-size: 16px; }
+  h1 { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white; padding: 24px; border-radius: 12px; font-size: 1.4em; margin-bottom: 24px; }
+  h2 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 16px; margin-top: 32px; margin-bottom: 16px; }
   h3 { color: #333; margin-top: 16px; margin-bottom: 8px; font-size: 1em; }
-  .card { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
-  .point { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; }
-  .warn { background: #fdf0f0; border-left: 5px solid #e53935; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; }
-  .green { background: #f0fdf4; border-left: 5px solid #2e7d32; padding: 14px 16px; border-radius: 8px; margin-bottom: 12px; }
-  .yellow { background: #fffbe6; border-left: 4px solid #f9a825; padding: 12px 14px; border-radius: 6px; margin-top: 10px; font-size: 0.9em; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th { background: #1a73e8; color: white; padding: 10px 14px; text-align: left; font-size: 0.9em; }
-  td { padding: 10px 14px; border-bottom: 1px solid #eee; font-size: 0.9em; vertical-align: top; }
+  .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .point { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .warn { background: #fdf0f0; border-left: 5px solid #e53935; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .green { background: #f0fdf4; border-left: 5px solid #2e7d32; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .yellow { background: #fffbe6; border-left: 4px solid #f9a825; padding: 12px 16px; border-radius: 6px; margin-top: 8px; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #1a73e8; color: white; padding: 8px 16px; text-align: left; font-size: 0.9em; }
+  td { padding: 8px 16px; border-bottom: 1px solid #eee; font-size: 0.9em; vertical-align: top; }
   tr:last-child td { border-bottom: none; }
   tr:nth-child(even) td { background: #f8f9fe; }
-  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
-  .flow-box { background: #1a73e8; color: white; padding: 10px 16px; border-radius: 8px; font-size: 0.88em; text-align: center; line-height: 1.4; }
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .flow-box { background: #1a73e8; color: white; padding: 8px 16px; border-radius: 8px; font-size: 0.88em; text-align: center; line-height: 1.4; }
   .flow-box.sub { background: #5c9de8; }
   .flow-arrow { font-size: 1.3em; color: #999; }
   .badge { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 0.82em; margin: 3px; font-weight: bold; }
@@ -28,31 +28,31 @@
   .badge-red { background: #fde8e8; color: #c62828; }
   .badge-green { background: #e8f5e9; color: #2e7d32; }
   .badge-orange { background: #fff3e0; color: #e65100; }
-  .num { display: inline-flex; align-items: center; justify-content: center; background: #1a73e8; color: white; border-radius: 50%; width: 26px; height: 26px; font-size: 0.82em; font-weight: bold; margin-right: 8px; flex-shrink: 0; }
-  .item { display: flex; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .num { display: inline-flex; align-items: center; justify-content: center; background: #1a73e8; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: 0.82em; font-weight: bold; margin-right: 8px; flex-shrink: 0; }
+  .item { display: flex; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #eee; }
   .item:last-child { border-bottom: none; }
-  .pasona-row { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
-  .pasona-letter { font-size: 1.8em; font-weight: bold; color: #1a73e8; min-width: 36px; }
+  .pasona-row { display: flex; gap: 16px; margin-bottom: 8px; align-items: flex-start; }
+  .pasona-letter { font-size: 1.8em; font-weight: bold; color: #1a73e8; min-width: 32px; }
   .pasona-content strong { display: block; margin-bottom: 4px; }
   .pasona-content p { margin: 0; font-size: 0.9em; color: #555; }
-  .lp-step { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; border-bottom: 1px solid #eee; }
+  .lp-step { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-bottom: 1px solid #eee; }
   .lp-step:last-child { border-bottom: none; }
   .step-num { background: #1a73e8; color: white; border-radius: 6px; padding: 4px 10px; font-size: 0.85em; font-weight: bold; flex-shrink: 0; }
   .step-content strong { display: block; margin-bottom: 4px; }
   .step-content p { margin: 0; font-size: 0.88em; color: #555; }
-  .principle { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #eee; }
+  .principle { display: flex; gap: 16px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #eee; }
   .principle:last-child { border-bottom: none; }
   .prin-label { background: #e53935; color: white; border-radius: 6px; padding: 4px 10px; font-size: 0.82em; font-weight: bold; white-space: nowrap; flex-shrink: 0; }
   .prin-label.blue { background: #1a73e8; }
   .prin-label.green { background: #2e7d32; }
-  .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
-  .media-card { background: #f8f9fe; border-radius: 8px; padding: 14px; border-top: 4px solid #1a73e8; }
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+  .media-card { background: #f8f9fe; border-radius: 8px; padding: 16px; border-top: 4px solid #1a73e8; }
   .media-card.paid { border-top-color: #e53935; }
   .media-card.earned { border-top-color: #2e7d32; }
   .media-card strong { display: block; margin-bottom: 8px; }
-  .media-card ul { margin: 0; padding-left: 18px; font-size: 0.88em; color: #555; }
-  .summary-box { background: linear-gradient(135deg, #e8f0fe, #f0fdf4); border-radius: 10px; padding: 18px 20px; margin-top: 10px; }
-  .summary-box ul { margin: 0; padding-left: 20px; }
+  .media-card ul { margin: 0; padding-left: 16px; font-size: 0.88em; color: #555; }
+  .summary-box { background: linear-gradient(135deg, #e8f0fe, #f0fdf4); border-radius: 10px; padding: 16px 24px; margin-top: 8px; }
+  .summary-box ul { margin: 0; padding-left: 24px; }
   .summary-box li { margin-bottom: 8px; }
 </style>
 </head>
