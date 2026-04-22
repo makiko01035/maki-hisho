@@ -1025,7 +1025,11 @@ def create_rich_menu_image():
     W, H = 2500, 843
     img = Image.new('RGB', (W, H), '#FFFFFF')
     draw = ImageDraw.Draw(img)
-    font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    font_candidates = [
+        os.path.join(base_dir, 'fonts', 'NotoSansJP-Bold.otf'),
+        os.path.join(base_dir, 'fonts', 'NotoSansJP-Bold.ttf'),
+    ]
     menus = [
         {"label": "eBayリサーチ", "bg": "#FF6B35", "fg": "#FFFFFF"},
         {"label": "仕入れ計算",   "bg": "#4ECDC4", "fg": "#FFFFFF"},
@@ -1035,10 +1039,16 @@ def create_rich_menu_image():
         {"label": "今日の予定",   "bg": "#FFD93D", "fg": "#333333"},
     ]
     cell_w, cell_h = W // 3, H // 2
-    try:
-        font = ImageFont.truetype(font_path, 90)
-    except Exception:
-        font = ImageFont.load_default()
+    font = None
+    for fp in font_candidates:
+        if os.path.exists(fp):
+            try:
+                font = ImageFont.truetype(fp, 160)
+                break
+            except Exception:
+                continue
+    if font is None:
+        font = ImageFont.load_default(size=160)
     for i, menu in enumerate(menus):
         row, col = i // 3, i % 3
         x, y = col * cell_w, row * cell_h
