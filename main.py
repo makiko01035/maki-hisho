@@ -1083,7 +1083,7 @@ def setup_rich_menu():
             {"bounds": {"x": 0,    "y": 0,   "width": 833, "height": 421},
              "action": {"type": "message", "text": "eBayリサーチ"}},
             {"bounds": {"x": 833,  "y": 0,   "width": 834, "height": 421},
-             "action": {"type": "message", "text": "/ebay-calc"}},
+             "action": {"type": "uri", "uri": "https://maki-hisho.onrender.com/ebay-calc"}},
             {"bounds": {"x": 1667, "y": 0,   "width": 833, "height": 421},
              "action": {"type": "uri", "uri": "https://maki-hisho.onrender.com/ebay-log"}},
             {"bounds": {"x": 0,    "y": 421, "width": 833, "height": 422},
