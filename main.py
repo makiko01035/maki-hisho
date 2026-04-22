@@ -2339,6 +2339,7 @@ def post_to_x_evening():
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
+scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
 # 毎月1日朝8時30分：HSBC換金リマインダー
