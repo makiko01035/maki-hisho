@@ -1019,6 +1019,95 @@ def auth_pinterest_boards():
     return f'エラー: {res.status_code} {res.text}', 400
 
 
+def create_rich_menu_image():
+    from PIL import Image, ImageDraw, ImageFont
+    import io
+    W, H = 2500, 843
+    img = Image.new('RGB', (W, H), '#FFFFFF')
+    draw = ImageDraw.Draw(img)
+    font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
+    menus = [
+        {"label": "eBayリサーチ", "bg": "#FF6B35", "fg": "#FFFFFF"},
+        {"label": "仕入れ計算",   "bg": "#4ECDC4", "fg": "#FFFFFF"},
+        {"label": "eBayログ",     "bg": "#45B7D1", "fg": "#FFFFFF"},
+        {"label": "薬膳記事",     "bg": "#96CEB4", "fg": "#FFFFFF"},
+        {"label": "セキスイ記事", "bg": "#88C878", "fg": "#FFFFFF"},
+        {"label": "今日の予定",   "bg": "#FFD93D", "fg": "#333333"},
+    ]
+    cell_w, cell_h = W // 3, H // 2
+    try:
+        font = ImageFont.truetype(font_path, 90)
+    except Exception:
+        font = ImageFont.load_default()
+    for i, menu in enumerate(menus):
+        row, col = i // 3, i % 3
+        x, y = col * cell_w, row * cell_h
+        draw.rectangle([x + 4, y + 4, x + cell_w - 4, y + cell_h - 4], fill=menu["bg"])
+        bbox = draw.textbbox((0, 0), menu["label"], font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        draw.text((x + (cell_w - tw) // 2, y + (cell_h - th) // 2), menu["label"], fill=menu["fg"], font=font)
+    for col in range(1, 3):
+        draw.rectangle([col * cell_w - 4, 0, col * cell_w + 4, H], fill='#FFFFFF')
+    draw.rectangle([0, cell_h - 4, W, cell_h + 4], fill='#FFFFFF')
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return buf.read()
+
+
+def setup_rich_menu():
+    token = os.environ.get('LINE_CHANNEL_ACCESS_TOKEN', '')
+    auth = {'Authorization': f'Bearer {token}'}
+    try:
+        res = requests.get('https://api.line.me/v2/bot/richmenu/list', headers=auth)
+        for rm in res.json().get('richmenus', []):
+            requests.delete(f"https://api.line.me/v2/bot/richmenu/{rm['richMenuId']}", headers=auth)
+    except Exception:
+        pass
+    rich_menu = {
+        "size": {"width": 2500, "height": 843},
+        "selected": True,
+        "name": "まきの秘書メニュー",
+        "chatBarText": "メニュー",
+        "areas": [
+            {"bounds": {"x": 0,    "y": 0,   "width": 833, "height": 421},
+             "action": {"type": "message", "text": "eBayリサーチ"}},
+            {"bounds": {"x": 833,  "y": 0,   "width": 834, "height": 421},
+             "action": {"type": "message", "text": "/ebay-calc"}},
+            {"bounds": {"x": 1667, "y": 0,   "width": 833, "height": 421},
+             "action": {"type": "uri", "uri": "https://maki-hisho.onrender.com/ebay-log"}},
+            {"bounds": {"x": 0,    "y": 421, "width": 833, "height": 422},
+             "action": {"type": "message", "text": "薬膳記事"}},
+            {"bounds": {"x": 833,  "y": 421, "width": 834, "height": 422},
+             "action": {"type": "message", "text": "セキスイ記事"}},
+            {"bounds": {"x": 1667, "y": 421, "width": 833, "height": 422},
+             "action": {"type": "message", "text": "今日の予定"}},
+        ]
+    }
+    res = requests.post('https://api.line.me/v2/bot/richmenu',
+                        headers={**auth, 'Content-Type': 'application/json'}, json=rich_menu)
+    if res.status_code != 200:
+        return False, f"作成失敗: {res.status_code} {res.text}"
+    rm_id = res.json()['richMenuId']
+    image_data = create_rich_menu_image()
+    res = requests.post(f'https://api-data.line.me/v2/bot/richmenu/{rm_id}/content',
+                        headers={**auth, 'Content-Type': 'image/png'}, data=image_data)
+    if res.status_code != 200:
+        return False, f"画像アップロード失敗: {res.status_code} {res.text}"
+    res = requests.post(f'https://api.line.me/v2/bot/user/all/richmenu/{rm_id}', headers=auth)
+    if res.status_code != 200:
+        return False, f"デフォルト設定失敗: {res.status_code} {res.text}"
+    return True, rm_id
+
+
+@app.route('/setup-richmenu')
+def setup_richmenu_endpoint():
+    ok, result = setup_rich_menu()
+    if ok:
+        return f'<html><head><meta charset="utf-8"></head><body><h2>✅ リッチメニュー登録完了！</h2><p>ID: {result}</p></body></html>'
+    return f'<html><head><meta charset="utf-8"></head><body><h2>❌ エラー</h2><p>{result}</p></body></html>', 500
+
+
 @app.route('/ebay-callback')
 def ebay_callback():
     code = request.args.get('code')
