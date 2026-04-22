@@ -1081,17 +1081,7 @@ def setup_richmenu_endpoint():
 @app.route('/richmenu-preview')
 def richmenu_preview():
     from flask import send_file
-    from PIL import ImageFont
     import io, traceback
-    font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
-    font_exists = os.path.exists(font_path)
-    font_error = None
-    try:
-        ImageFont.truetype(font_path, 90)
-    except Exception as e:
-        font_error = str(e)
-    if font_error or not font_exists:
-        return f'<pre>font_path={font_path}\nfont_exists={font_exists}\nfont_error={font_error}</pre>', 500
     try:
         data = create_rich_menu_image()
         return send_file(io.BytesIO(data), mimetype='image/png')
