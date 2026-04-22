@@ -1111,9 +1111,14 @@ def setup_richmenu_endpoint():
 @app.route('/richmenu-preview')
 def richmenu_preview():
     from flask import send_file
-    import io
-    data = create_rich_menu_image()
-    return send_file(io.BytesIO(data), mimetype='image/png')
+    import io, traceback
+    try:
+        font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'NotoSansJP-Bold.ttf')
+        font_exists = os.path.exists(font_path)
+        data = create_rich_menu_image()
+        return send_file(io.BytesIO(data), mimetype='image/png')
+    except Exception as e:
+        return f'<pre>font_path={font_path}\nfont_exists={font_exists}\n\n{traceback.format_exc()}</pre>', 500
 
 
 @app.route('/ebay-callback')
