@@ -281,7 +281,8 @@ def _build_overlay_jpeg(img_url: str, title: str) -> bytes:
     from PIL import Image, ImageDraw, ImageFont
     from io import BytesIO
 
-    r = requests.get(img_url, timeout=15)
+    r = requests.get(img_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'})
+    r.raise_for_status()
     img = Image.open(BytesIO(r.content)).convert('RGBA')
     img = img.resize((1080, 1080), Image.LANCZOS)
 
