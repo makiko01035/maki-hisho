@@ -398,6 +398,25 @@ def wp_post_published():
         return {'error': str(e)}, 500
 
 
+@app.route('/post-sekisui-direct', methods=['POST'])
+def post_sekisui_direct():
+    """Claude Codeから直接セキスイ記事を投稿するエンドポイント"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('ANTHROPIC_API_KEY', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    title = data.get('title', '')
+    content_md = data.get('content_md', '')
+    if not title or not content_md:
+        return {'error': 'title and content_md required'}, 400
+    try:
+        from blog_sekisui import post_to_sekisui_wp
+        post_id, post_url = post_to_sekisui_wp(title, content_md)
+        return {'status': 'ok', 'post_id': post_id, 'url': post_url}, 201
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
