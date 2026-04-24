@@ -421,6 +421,21 @@ def post_sekisui_direct():
         return {'error': str(e)}, 500
 
 
+@app.route('/debug-image')
+def debug_image():
+    """画像URLの取得状態をデバッグするエンドポイント"""
+    img_url = request.args.get('url', '')
+    if not img_url:
+        return 'url param required', 400
+    try:
+        r = requests.get(img_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'}, allow_redirects=True)
+        ct = r.headers.get('Content-Type', 'unknown')
+        first_bytes = r.content[:16].hex()
+        return {'status': r.status_code, 'content_type': ct, 'size': len(r.content), 'first_bytes_hex': first_bytes}
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
