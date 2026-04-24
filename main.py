@@ -281,8 +281,11 @@ def _build_overlay_jpeg(img_url: str, title: str) -> bytes:
     from PIL import Image, ImageDraw, ImageFont
     from io import BytesIO
 
-    r = requests.get(img_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'})
+    r = requests.get(img_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'}, allow_redirects=True)
     r.raise_for_status()
+    content_type = r.headers.get('Content-Type', '')
+    if 'image' not in content_type:
+        raise ValueError(f"Not image: {content_type} | first80: {r.content[:80]}")
     img = Image.open(BytesIO(r.content)).convert('RGBA')
     img = img.resize((1080, 1080), Image.LANCZOS)
 
