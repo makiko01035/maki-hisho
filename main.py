@@ -402,7 +402,7 @@ def wp_post_published():
 def post_sekisui_direct():
     """Claude Codeから直接セキスイ記事を投稿するエンドポイント"""
     secret = request.headers.get('X-Secret', '')
-    if secret != os.environ.get('ANTHROPIC_API_KEY', ''):
+    if secret != os.environ.get('LINE_USER_ID', ''):
         return {'error': 'unauthorized'}, 401
     data = request.json or {}
     title = data.get('title', '')
