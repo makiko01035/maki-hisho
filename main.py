@@ -1700,6 +1700,13 @@ def handle_message(event):
         ))
         return
 
+    # SEOレポート即時取得
+    seo_keywords = ['SEOレポート', 'seoレポート', '流入確認', '流入みせて', 'ブログ流入', '検索流入']
+    if any(kw in user_message for kw in seo_keywords):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📊 Search Consoleを確認中です...少しお待ちください！"))
+        threading.Thread(target=send_weekly_seo_report).start()
+        return
+
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
     msg_lower = user_message.lower()
