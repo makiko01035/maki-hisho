@@ -456,8 +456,28 @@ def search_rakuten_items(keyword, hits=3):
         return []
 
 
-def _build_rakuten_section(title):
-    keyword = title.replace('薬膳', '').strip()[:20] or title
+def _extract_rakuten_keyword(title, content_md):
+    try:
+        response = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=30,
+            messages=[{
+                'role': 'user',
+                'content': f"""この薬膳ブログ記事で紹介している食材・食品名を1つだけ答えてください。
+タイトル：{title}
+記事冒頭：{content_md[:600]}
+
+食材名のみ回答（例：なつめ、クコの実、黒ごま、生姜）。説明不要。"""
+            }]
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        print(f"楽天キーワード抽出エラー: {e}")
+        return title.replace('薬膳', '').strip()[:20] or title
+
+
+def _build_rakuten_section(title, content_md=''):
+    keyword = _extract_rakuten_keyword(title, content_md)
     items = search_rakuten_items(keyword)
     if not items:
         return ''
@@ -473,7 +493,7 @@ def _build_rakuten_section(title):
   </div>
 </div>'''
     return f'''<div style="background:#fff5f5;border-left:4px solid #bf0000;padding:20px;margin:30px 0;border-radius:4px;">
-<p style="font-weight:bold;margin:0 0 16px;">🛒 楽天市場で探す</p>
+<p style="font-weight:bold;margin:0 0 16px;">🛒 楽天市場で探す（{keyword}）</p>
 {cards}
 </div>'''
 
@@ -482,7 +502,7 @@ def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
     html = html.replace('<!-- yakuzen-affiliate-cta -->', _build_affiliate_cta(title, content_md))
-    rakuten_section = _build_rakuten_section(title)
+    rakuten_section = _build_rakuten_section(title, content_md)
     if rakuten_section:
         html += rakuten_section
     data = {'title': title, 'content': html, 'status': status}
