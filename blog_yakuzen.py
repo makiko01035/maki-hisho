@@ -7,6 +7,9 @@ import markdown as md_lib
 from linebot.models import TextSendMessage
 from clients import line_bot_api, anthropic_client
 
+RAKUTEN_APP_ID = os.environ.get('RAKUTEN_APP_ID', '')
+RAKUTEN_AFFILIATE_ID = os.environ.get('RAKUTEN_AFFILIATE_ID', '')
+
 YAKUZEN_BOARD_RULES = {
     '季節': '季節の養生', '養生': '季節の養生', '花粉': '季節の養生',
     '春': '季節の養生', '夏': '季節の養生', '秋': '季節の養生', '冬': '季節の養生',
@@ -420,10 +423,68 @@ def _build_affiliate_cta(title, content_md):
 </div>'''
 
 
+def search_rakuten_items(keyword, hits=3):
+    if not RAKUTEN_APP_ID or not RAKUTEN_AFFILIATE_ID:
+        return []
+    try:
+        res = requests.get(
+            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
+            params={
+                'applicationId': RAKUTEN_APP_ID,
+                'affiliateId': RAKUTEN_AFFILIATE_ID,
+                'keyword': keyword,
+                'hits': hits,
+                'sort': '-reviewCount',
+                'format': 'json',
+            },
+            timeout=10
+        )
+        data = res.json()
+        items = []
+        for item_wrap in data.get('Items', []):
+            i = item_wrap.get('Item', item_wrap)
+            image_url = i['mediumImageUrls'][0].get('imageUrl', '') if i.get('mediumImageUrls') else ''
+            items.append({
+                'name': i.get('itemName', ''),
+                'price': i.get('itemPrice', 0),
+                'url': i.get('affiliateUrl') or i.get('itemUrl', ''),
+                'image': image_url,
+            })
+        return items
+    except Exception as e:
+        print(f"楽天API エラー: {e}")
+        return []
+
+
+def _build_rakuten_section(title):
+    keyword = title.replace('薬膳', '').strip()[:20] or title
+    items = search_rakuten_items(keyword)
+    if not items:
+        return ''
+    cards = ''
+    for item in items:
+        name = item['name'][:50] + ('...' if len(item['name']) > 50 else '')
+        cards += f'''<div style="display:flex;gap:12px;margin-bottom:12px;padding:12px;border:1px solid #e8d5c5;border-radius:6px;background:#fff;">
+  <a href="{item['url']}" target="_blank" rel="nofollow" style="flex-shrink:0;"><img src="{item['image']}" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:4px;"></a>
+  <div>
+    <a href="{item['url']}" target="_blank" rel="nofollow" style="font-size:0.9em;font-weight:bold;color:#333;text-decoration:none;">{name}</a>
+    <p style="margin:4px 0 8px;color:#bf0000;font-weight:bold;">¥{item['price']:,}</p>
+    <a href="{item['url']}" target="_blank" rel="nofollow" style="background:#bf0000;color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.85em;font-weight:bold;">楽天で見る →</a>
+  </div>
+</div>'''
+    return f'''<div style="background:#fff5f5;border-left:4px solid #bf0000;padding:20px;margin:30px 0;border-radius:4px;">
+<p style="font-weight:bold;margin:0 0 16px;">🛒 楽天市場で探す</p>
+{cards}
+</div>'''
+
+
 def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured_media_id=None):
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
     html = html.replace('<!-- yakuzen-affiliate-cta -->', _build_affiliate_cta(title, content_md))
+    rakuten_section = _build_rakuten_section(title)
+    if rakuten_section:
+        html += rakuten_section
     data = {'title': title, 'content': html, 'status': status}
     if featured_media_id:
         data['featured_media'] = featured_media_id
