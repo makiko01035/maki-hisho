@@ -165,8 +165,9 @@ def post_to_sekisui_wp(title, content_md):
                 d.line([(0, y), (1080, y)], fill=(0, 0, 0, int(180 * y / 1080)))
             img = Image.alpha_composite(img, ov)
             draw = ImageDraw.Draw(img)
-            font_path = _os.path.join(_os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
-            font = ImageFont.truetype(font_path, 60)
+            font_path = _os.path.join(_os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.otf')
+            with open(font_path, 'rb') as _ff:
+                font = ImageFont.truetype(BytesIO(_ff.read()), 60)
             lines_t, t = [], title
             while len(t) > 14:
                 lines_t.append(t[:14]); t = t[14:]
