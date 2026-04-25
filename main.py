@@ -415,27 +415,32 @@ def rewrite_yakuzen_direct():
     instruction = data.get('instruction', '')
     if not post_id:
         return {'error': 'post_id required'}, 400
-    try:
-        from blog_yakuzen import get_yakuzen_wp_creds, generate_yakuzen_rewrite, post_to_yakuzen_wp
-        import html as html_lib, re as re_lib
-        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
-        res = requests.get(
-            f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
-            params={'_fields': 'title,content'},
-            auth=(wp_user, wp_pass), timeout=30
-        )
-        post = res.json()
-        title = post['title']['rendered']
-        content_html = post['content']['rendered']
-        new_md = generate_yakuzen_rewrite(title, content_html, instruction)
-        lines = new_md.split('\n')
-        new_title = lines[0].lstrip('# ').strip()
-        new_content = '\n'.join(lines[1:]).lstrip('\n')
-        new_post_id, new_url = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish')
-        return {'status': 'ok', 'title': new_title, 'url': new_url}, 200
-    except Exception as e:
-        import traceback
-        return {'error': str(e), 'trace': traceback.format_exc()}, 500
+    def _do_rewrite(post_id, instruction):
+        try:
+            from blog_yakuzen import get_yakuzen_wp_creds, generate_yakuzen_rewrite, post_to_yakuzen_wp
+            wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+            r = requests.get(
+                f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+                params={'_fields': 'title,content'},
+                auth=(wp_user, wp_pass), timeout=30
+            )
+            post = r.json()
+            title = post['title']['rendered']
+            content_html = post['content']['rendered']
+            new_md = generate_yakuzen_rewrite(title, content_html, instruction)
+            lines = new_md.split('\n')
+            new_title = lines[0].lstrip('# ').strip()
+            new_content = '\n'.join(lines[1:]).lstrip('\n')
+            _, new_url = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish')
+            user_id = os.environ.get('LINE_USER_ID', '')
+            line_bot_api.push_message(user_id, TextSendMessage(text=f'✅ SEOリライト完了！\n📝 {new_title}\n🔗 {new_url}'))
+        except Exception as e:
+            import traceback
+            user_id = os.environ.get('LINE_USER_ID', '')
+            line_bot_api.push_message(user_id, TextSendMessage(text=f'❌ リライトエラー：{str(e)[:200]}'))
+
+    threading.Thread(target=_do_rewrite, args=(post_id, instruction)).start()
+    return {'status': 'accepted', 'message': 'リライト開始。完了はLINEに通知します'}, 202
 
 
 @app.route('/post-sekisui-direct', methods=['POST'])
