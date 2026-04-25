@@ -297,8 +297,9 @@ def _build_overlay_jpeg(img_url: str, title: str) -> bytes:
     img = Image.alpha_composite(img, overlay)
 
     draw = ImageDraw.Draw(img)
-    font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.ttf')
-    font = ImageFont.truetype(font_path, 60)
+    font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.otf')
+    with open(font_path, 'rb') as _f:
+        font = ImageFont.truetype(BytesIO(_f.read()), 60)
 
     max_chars = 14
     lines = []
@@ -2174,6 +2175,9 @@ TWEET_STOCK = [
     "ジャンルを絞らずに2年・600投稿→フォロワー50人。絞ったら4ヶ月で5万人。プロに聞いた話。やることより「何をやらないか」の方が大事だった。 #AI副業 #インスタ",
     "インスタ投稿も全自動にしたい。テキスト→画像→動画→投稿まで全部つなげる計画中。まずMeta APIの審査を通すのが先だけど😅 #AI副業 #自動化 #ClaudeCode",
     "インスタで収益化するには「売らない」が正解と知った。価値を提供しまくって、欲しい人だけに案内する。LINEボットでやってることと同じだ。 #AI副業 #インスタ #マーケティング",
+    # ── LINEリッチメニュー・物販フロー ──
+    "LINEにリッチメニューを追加した📱 Terapeak・メルカリ・利益計算の物販フロー3ステップがボタン1つでアクセスできる。仕入れリサーチがスマホだけで完結するようになった。 #AI副業 #eBay #物販",
+    "仕入れの判断フローを整理した✨ Terapeakで売れ筋確認→メルカリで仕入れ価格確認→利益計算ツールで採算確認。この3ステップ全部LINEのボタンから一発で飛べるようにした。 #AI副業 #eBay #物販",
     # ── コピーライティング・note ──
     "「AI使ってるのになぜか読まれない…」それ、ツールの問題じゃなくてコピーの問題かもしれません。私もずっとズレてた。「伝えたいことを書く」と「読まれる文章を書く」は全然違う。その差に気づいてから、Xの反応が変わりました。学んだことをnoteにまとめました👇無料で読めます→ https://note.com/maki_claude_lab/n/n8f70a6d95f32 #AI副業 #副業ワーママ #コピーライティング",
 ]
