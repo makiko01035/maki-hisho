@@ -1849,15 +1849,41 @@ def handle_message(event):
 
 def send_morning_message():
     try:
-        events = get_upcoming_events(days=1)
+        service = get_calendar_service()
         now = datetime.datetime.now(JST)
         weekdays = ['月', '火', '水', '木', '金', '土', '日']
-        today_str = f"{now.strftime('%m月%d日')}({weekdays[now.weekday()]})"
 
-        msg = f"🌅 おはようございます！\n📅 {today_str}の予定\n"
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+        tomorrow_start = today_start + datetime.timedelta(days=1)
+        tomorrow_end = today_end + datetime.timedelta(days=1)
 
-        if events:
-            msg += "\n"
+        calendars = service.calendarList().list().execute().get('items', [])
+
+        def fetch_day_events(start, end):
+            all_events = []
+            for cal in calendars:
+                try:
+                    result = service.events().list(
+                        calendarId=cal['id'],
+                        timeMin=start.isoformat(),
+                        timeMax=end.isoformat(),
+                        maxResults=20,
+                        singleEvents=True,
+                        orderBy='startTime'
+                    ).execute()
+                    for event in result.get('items', []):
+                        event['_calendar_name'] = cal.get('summary', '')
+                    all_events.extend(result.get('items', []))
+                except Exception:
+                    pass
+            all_events.sort(key=lambda e: e['start'].get('dateTime', e['start'].get('date', '')))
+            return all_events
+
+        def format_day(events):
+            if not events:
+                return "予定なし 🌸\n"
+            lines = ""
             for event in events:
                 start = event['start'].get('dateTime', event['start'].get('date'))
                 if 'T' in start:
@@ -1866,14 +1892,21 @@ def send_morning_message():
                 else:
                     time_str = "終日"
                 title = event.get('summary', '（タイトルなし）')
-                cal_name = event.get('_calendar_name', '')
-                msg += f"⏰ {time_str}  {title}\n"
-                if cal_name:
-                    msg += f"   📂 {cal_name}\n"
-                msg += "\n"
-            msg += "今日も素敵な1日を！✨"
-        else:
-            msg += "\n予定はありません 🌸\nゆっくり過ごせそうですね！"
+                lines += f"⏰ {time_str}  {title}\n"
+            return lines
+
+        today_events = fetch_day_events(today_start, today_end)
+        tomorrow_events = fetch_day_events(tomorrow_start, tomorrow_end)
+
+        today_str = f"{now.strftime('%m/%d')}({weekdays[now.weekday()]})"
+        tomorrow_str = f"{(now + datetime.timedelta(days=1)).strftime('%m/%d')}({weekdays[(now.weekday() + 1) % 7]})"
+
+        msg = f"🌅 おはようございます！\n\n"
+        msg += f"📅 今日 {today_str}\n"
+        msg += format_day(today_events)
+        msg += f"\n📅 明日 {tomorrow_str}\n"
+        msg += format_day(tomorrow_events)
+        msg += "\n今日も素敵な1日を！✨"
 
         user_id = os.environ['LINE_USER_ID']
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
