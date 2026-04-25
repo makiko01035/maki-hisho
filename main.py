@@ -399,7 +399,8 @@ def wp_post_published():
         )
         return {'status': 'ok', 'new_image': media_url}, 200
     except Exception as e:
-        return {'error': str(e)}, 500
+        import traceback
+        return {'error': str(e), 'trace': traceback.format_exc()[-600:]}, 500
 
 
 @app.route('/post-sekisui-direct', methods=['POST'])
