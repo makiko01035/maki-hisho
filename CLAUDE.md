@@ -24,7 +24,7 @@
 ## 担当業務
 
 - まきのGoogleカレンダー管理・確認（makiko01035@gmail.com + 共有カレンダー）
-- 毎朝7時：今日の予定をLINEに送信
+- 毎朝7時：今日・明日の予定をLINEに送信（今日セクション・明日セクションに分けて表示）
 - 毎週日曜20時：3日以内の予定リマインド
 - 話しかけに対してClaudeが返答（カレンダー情報も参照）
 - **セキスイブログ記事作成・即公開**（LINEから「セキスイ記事書きたい」で起動）
@@ -147,7 +147,7 @@ git push origin main
 - 目的：認知拡大 → フォロワー獲得 → note・コンサルへの導線
 - 将来目標：フォロワー1,000人でnote有料記事販売開始
 - noteアカウント：maki_claude_lab（作成済み・2026-04-16）
-- note有料記事：「プログラミングゼロからClaude Codeで秘書ボットを作るまで」1,480円（**公開済み** 2026-04-17）
+- note有料記事：「プログラミングゼロからClaude Codeで秘書ボットを作るまで」980円（**公開済み** 2026-04-17）
 - 毎月末日朝9時：noteリマインドをLINEで自動送信（「note書きたい」と話しかけるだけでドラフト作成可能）
 - noteは不定期更新。まきの実体験が溜まったタイミングで執筆。月1本ペースが目安
 - noteに貼るときはClaude Codeに「noteに記事貼りたい」と声かけるだけでOK
@@ -167,7 +167,10 @@ git push origin main
 - `https://maki-hisho.onrender.com/check-creds` を開く
 - `OK` → 認証情報は正常、別の原因
 - `JSON parse error` → RenderのGOOGLE_CREDENTIALSが壊れている
-  → `credentials_for_render.txt` の内容をRenderに貼り直す
+  → まず `credentials_for_render.txt` の内容をRenderに貼り直す
+  → それでも同じエラーが出る場合は制御文字混入の可能性あり
+    → Claude Codeに「google_creds_clean.txt を再生成して」と依頼
+    → 生成された `google_creds_clean.txt` の内容をRenderに貼り直す
 
 ---
 
