@@ -404,6 +404,40 @@ def wp_post_published():
         return {'error': str(e), 'trace': traceback.format_exc()[-600:]}, 500
 
 
+@app.route('/rewrite-yakuzen-direct', methods=['POST'])
+def rewrite_yakuzen_direct():
+    """Claude Codeから直接薬膳記事をSEOリライトするエンドポイント"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('LINE_USER_ID', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    post_id = data.get('post_id')
+    instruction = data.get('instruction', '')
+    if not post_id:
+        return {'error': 'post_id required'}, 400
+    try:
+        from blog_yakuzen import get_yakuzen_wp_creds, generate_yakuzen_rewrite, post_to_yakuzen_wp
+        import html as html_lib, re as re_lib
+        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+        res = requests.get(
+            f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+            params={'_fields': 'title,content'},
+            auth=(wp_user, wp_pass), timeout=30
+        )
+        post = res.json()
+        title = post['title']['rendered']
+        content_html = post['content']['rendered']
+        new_md = generate_yakuzen_rewrite(title, content_html, instruction)
+        lines = new_md.split('\n')
+        new_title = lines[0].lstrip('# ').strip()
+        new_content = '\n'.join(lines[1:]).lstrip('\n')
+        new_post_id, new_url = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish')
+        return {'status': 'ok', 'title': new_title, 'url': new_url}, 200
+    except Exception as e:
+        import traceback
+        return {'error': str(e), 'trace': traceback.format_exc()}, 500
+
+
 @app.route('/post-sekisui-direct', methods=['POST'])
 def post_sekisui_direct():
     """Claude Codeから直接セキスイ記事を投稿するエンドポイント"""
