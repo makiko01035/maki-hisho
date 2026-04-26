@@ -357,9 +357,45 @@ def overlay_image():
         return {'error': str(e)}, 500
 
 
+def _do_overlay_and_update(post_id, wp_url, wp_user, wp_pass):
+    """バックグラウンドでオーバーレイ画像を生成してWPのアイキャッチを更新する"""
+    try:
+        post_res = requests.get(f"{wp_url}/wp-json/wp/v2/posts/{post_id}", auth=(wp_user, wp_pass), timeout=15)
+        if post_res.status_code != 200:
+            print(f"[overlay] post not found: {post_id}")
+            return
+        post = post_res.json()
+        title = post['title']['rendered']
+        featured_media_id = post.get('featured_media', 0)
+        if not featured_media_id:
+            print(f"[overlay] no featured image: {post_id}")
+            return
+
+        media_res = requests.get(f"{wp_url}/wp-json/wp/v2/media/{featured_media_id}", auth=(wp_user, wp_pass), timeout=15)
+        if media_res.status_code != 200:
+            print(f"[overlay] media not found: {featured_media_id}")
+            return
+        img_url = media_res.json()['source_url']
+
+        img_data = _build_overlay_jpeg(img_url, title)
+        filename = f'ig_{post_id}.jpg'
+        new_media_id, media_url = _upload_to_wp(img_data, filename, wp_url, wp_user, wp_pass)
+
+        requests.post(
+            f"{wp_url}/wp-json/wp/v2/posts/{post_id}",
+            auth=(wp_user, wp_pass),
+            json={'featured_media': new_media_id},
+            timeout=15,
+        )
+        print(f"[overlay] done: {post_id} -> {media_url}")
+    except Exception as e:
+        import traceback
+        print(f"[overlay] error: {e}\n{traceback.format_exc()}")
+
+
 @app.route('/wp-post-published', methods=['POST'])
 def wp_post_published():
-    """WP Webhooksから記事公開通知を受け取り、オーバーレイ画像を作成してfeatured_mediaを更新する"""
+    """WP Webhooksから記事公開通知を受け取り、バックグラウンドでオーバーレイ画像を更新する"""
     data = request.json or {}
 
     post_status = data.get('post_status', '')
@@ -372,36 +408,9 @@ def wp_post_published():
     wp_user = os.environ.get('SEKISUI_WP_USER', 'makiko01035')
     wp_pass = os.environ.get('SEKISUI_WP_APP_PASSWORD', '')
 
-    try:
-        post_res = requests.get(f"{wp_url}/wp-json/wp/v2/posts/{post_id}", auth=(wp_user, wp_pass))
-        if post_res.status_code != 200:
-            return {'error': 'post not found'}, 404
-        post = post_res.json()
-        title = post['title']['rendered']
-        featured_media_id = post.get('featured_media', 0)
-        if not featured_media_id:
-            return {'status': 'skipped', 'reason': 'no featured image'}, 200
-
-        media_res = requests.get(f"{wp_url}/wp-json/wp/v2/media/{featured_media_id}", auth=(wp_user, wp_pass))
-        if media_res.status_code != 200:
-            return {'error': 'media not found'}, 404
-        img_url = media_res.json()['source_url']
-
-        img_data = _build_overlay_jpeg(img_url, title)
-        filename = f'ig_{post_id}.jpg'
-        new_media_id, media_url = _upload_to_wp(img_data, filename, wp_url, wp_user, wp_pass)
-        if not new_media_id:
-            return {'error': 'upload failed'}, 500
-
-        requests.post(
-            f"{wp_url}/wp-json/wp/v2/posts/{post_id}",
-            auth=(wp_user, wp_pass),
-            json={'featured_media': new_media_id},
-        )
-        return {'status': 'ok', 'new_image': media_url}, 200
-    except Exception as e:
-        import traceback
-        return {'error': str(e), 'trace': traceback.format_exc()[-600:]}, 500
+    import threading
+    threading.Thread(target=_do_overlay_and_update, args=(post_id, wp_url, wp_user, wp_pass), daemon=True).start()
+    return {'status': 'accepted'}, 202
 
 
 @app.route('/rewrite-yakuzen-direct', methods=['POST'])
