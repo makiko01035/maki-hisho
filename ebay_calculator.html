@@ -8,6 +8,11 @@
   * { box-sizing: border-box; }
   body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 16px; }
   h1 { background: linear-gradient(135deg, #e65100, #bf360c); color: white; padding: 18px 20px; border-radius: 12px; font-size: 1.2em; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab { flex: 1; padding: 10px; border: none; border-radius: 10px; font-size: 0.95em; font-weight: bold; cursor: pointer; background: #ddd; color: #666; }
+  .tab.active { background: linear-gradient(135deg, #e65100, #bf360c); color: white; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
   .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
   h2 { color: #e65100; font-size: 1em; border-left: 4px solid #e65100; padding-left: 10px; margin: 0 0 16px; }
   label { display: block; font-size: 0.88em; color: #666; margin-bottom: 4px; margin-top: 14px; }
@@ -15,8 +20,9 @@
   input, select { width: 100%; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: 1em; outline: none; transition: border 0.2s; }
   input:focus, select:focus { border-color: #e65100; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  button { width: 100%; background: linear-gradient(135deg, #e65100, #bf360c); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 1.05em; font-weight: bold; cursor: pointer; margin-top: 16px; }
-  button:active { opacity: 0.85; }
+  button.main-btn { width: 100%; background: linear-gradient(135deg, #e65100, #bf360c); color: white; border: none; padding: 14px; border-radius: 10px; font-size: 1.05em; font-weight: bold; cursor: pointer; margin-top: 16px; }
+  button.main-btn:active { opacity: 0.85; }
+  button.sub-btn { width: 100%; background: #eee; color: #555; border: none; padding: 12px; border-radius: 10px; font-size: 0.95em; font-weight: bold; cursor: pointer; margin-top: 10px; }
   .result { display: none; }
   .verdict { text-align: center; font-size: 1.6em; font-weight: bold; padding: 18px; border-radius: 12px; margin-bottom: 16px; }
   .verdict.buy { background: #e8f5e9; color: #2e7d32; }
@@ -28,6 +34,12 @@
   .metric .value { font-size: 1.3em; font-weight: bold; color: #333; }
   .metric .value.good { color: #2e7d32; }
   .metric .value.bad { color: #c62828; }
+  .limit-box { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 16px; }
+  .limit-box .limit-label { font-size: 0.9em; color: #555; margin-bottom: 8px; }
+  .limit-box .limit-value { font-size: 2.2em; font-weight: bold; color: #2e7d32; }
+  .limit-box.ng { background: linear-gradient(135deg, #fde8e8, #ffcdd2); }
+  .limit-box.ng .limit-value { color: #c62828; }
+  .limit-box .limit-sub { font-size: 0.85em; color: #666; margin-top: 6px; }
   .fx-table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
   .fx-table th { background: #e65100; color: white; padding: 8px 12px; text-align: left; }
   .fx-table td { padding: 8px 12px; border-bottom: 1px solid #eee; }
@@ -35,87 +47,255 @@
   .fx-table tr.current td { background: #fff3e0; font-weight: bold; }
   .rule-note { font-size: 0.8em; color: #999; margin-top: 10px; line-height: 1.6; }
   .exclude-warn { background: #fde8e8; border-left: 4px solid #e53935; padding: 10px 14px; border-radius: 8px; font-size: 0.88em; color: #c62828; margin-top: 12px; display: none; }
-  .reset-btn { background: #eee; color: #555; margin-top: 10px; }
+  /* メモ機能 */
+  .memo-list { list-style: none; padding: 0; margin: 0; }
+  .memo-item { background: #f8f9fa; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; position: relative; }
+  .memo-item .memo-name { font-weight: bold; font-size: 0.95em; margin-bottom: 4px; }
+  .memo-item .memo-detail { font-size: 0.83em; color: #666; line-height: 1.7; }
+  .memo-item .memo-verdict { display: inline-block; font-size: 0.8em; font-weight: bold; padding: 2px 10px; border-radius: 20px; margin-bottom: 6px; }
+  .memo-item .memo-verdict.buy { background: #e8f5e9; color: #2e7d32; }
+  .memo-item .memo-verdict.ng { background: #fde8e8; color: #c62828; }
+  .memo-item .memo-verdict.watch { background: #fffbe6; color: #f57f17; }
+  .memo-item .del-btn { position: absolute; top: 10px; right: 12px; background: none; border: none; color: #ccc; font-size: 1.2em; cursor: pointer; padding: 0; width: auto; }
+  .memo-item .del-btn:hover { color: #e53935; }
+  .no-memo { text-align: center; color: #aaa; font-size: 0.9em; padding: 24px 0; }
+  .save-btn { background: #1565c0; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9em; font-weight: bold; cursor: pointer; margin-top: 12px; width: 100%; }
+  .save-btn:active { opacity: 0.85; }
+  .clear-all-btn { background: #eee; color: #999; border: none; padding: 8px 16px; border-radius: 8px; font-size: 0.82em; cursor: pointer; display: block; margin: 12px auto 0; }
 </style>
 </head>
 <body>
 
 <h1>仕入れ判断シート</h1>
 
-<div class="card">
-  <h2>商品情報を入力</h2>
-
-  <label>商品名（メモ用）</label>
-  <input type="text" id="name" placeholder="例：白鳳堂 メイクブラシセット">
-
-  <label>仕入れ価格（円）</label>
-  <input type="number" id="buy_price" placeholder="例：3000" min="0">
-
-  <div class="row2">
-    <div>
-      <label>重量（g）</label>
-      <input type="number" id="weight" placeholder="例：300" min="0">
-    </div>
-    <div>
-      <label>長辺（cm）</label>
-      <input type="number" id="size" placeholder="例：30" min="0">
-    </div>
-  </div>
-
-  <label>送料見込み（円）</label>
-  <input type="number" id="shipping" value="2000" min="0">
-
-  <label>為替レート（円/ドル）</label>
-  <input type="number" id="fx" value="150" min="100" max="200">
-
-  <button onclick="calculate()">判断する</button>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('reverse')">Terapeak逆算</button>
+  <button class="tab" onclick="switchTab('forward')">仕入れ→売値</button>
+  <button class="tab" onclick="switchTab('memo')">リサーチメモ</button>
 </div>
 
-<div class="card result" id="result_area">
-  <div class="exclude-warn" id="exclude_warn"></div>
-  <div class="verdict" id="verdict_box"></div>
+<!-- ========== 逆算モード ========== -->
+<div id="tab-reverse" class="tab-content active">
+  <div class="card">
+    <h2>Teapeakの売値から仕入れ上限を逆算</h2>
 
-  <div class="metrics">
-    <div class="metric">
-      <div class="label">eBay推奨価格</div>
-      <div class="value" id="r_price">—</div>
+    <label>商品名（メモ用）</label>
+    <input type="text" id="r_name" placeholder="例：サンリオ靴下 Hello Kitty">
+
+    <div class="row2">
+      <div>
+        <label>eBay相場（$）</label>
+        <input type="number" id="r_ebay_usd" placeholder="例：9" min="0" step="0.5">
+      </div>
+      <div>
+        <label>為替（円/$）</label>
+        <input type="number" id="r_fx" value="150" min="100" max="200">
+      </div>
     </div>
-    <div class="metric">
-      <div class="label">利益額</div>
-      <div class="value" id="r_profit">—</div>
-    </div>
-    <div class="metric">
-      <div class="label">利益率</div>
-      <div class="value" id="r_margin">—</div>
-    </div>
-    <div class="metric">
-      <div class="label">eBay手数料(13%)</div>
-      <div class="value" id="r_fee">—</div>
-    </div>
+
+    <label>国際送料（円）</label>
+    <input type="number" id="r_shipping" value="700" min="0">
+
+    <label>目標利益率（%）</label>
+    <input type="number" id="r_margin_target" value="30" min="0" max="80">
+
+    <button class="main-btn" onclick="calcReverse()">仕入れ上限を計算</button>
   </div>
 
-  <h2>為替リスクシミュレーション</h2>
-  <table class="fx-table">
-    <tr><th>為替</th><th>販売価格</th><th>利益額</th><th>利益率</th></tr>
-    <tbody id="fx_rows"></tbody>
-  </table>
+  <div class="card result" id="r_result">
+    <div class="limit-box" id="r_limit_box">
+      <div class="limit-label">メルカリでこの金額以下なら買い！</div>
+      <div class="limit-value" id="r_limit_value">—</div>
+      <div class="limit-sub" id="r_limit_sub"></div>
+    </div>
 
-  <p class="rule-note" id="rule_note"></p>
-  <button class="reset-btn" onclick="reset()">リセット</button>
+    <div class="metrics">
+      <div class="metric">
+        <div class="label">eBay売値（円換算）</div>
+        <div class="value" id="r_sell_jpy">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">手数料13%</div>
+        <div class="value" id="r_fee2">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">送料</div>
+        <div class="value" id="r_ship2">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">利益（上限仕入れ時）</div>
+        <div class="value" id="r_profit2">—</div>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="saveReverseMemo()">このリサーチをメモに保存</button>
+    <button class="sub-btn" onclick="resetReverse()">リセット</button>
+  </div>
+</div>
+
+<!-- ========== 従来モード ========== -->
+<div id="tab-forward" class="tab-content">
+  <div class="card">
+    <h2>仕入れ価格からeBay売値を計算</h2>
+
+    <label>商品名（メモ用）</label>
+    <input type="text" id="name" placeholder="例：白鳳堂 メイクブラシセット">
+
+    <label>仕入れ価格（円）</label>
+    <input type="number" id="buy_price" placeholder="例：3000" min="0">
+
+    <div class="row2">
+      <div>
+        <label>重量（g）</label>
+        <input type="number" id="weight" placeholder="例：300" min="0">
+      </div>
+      <div>
+        <label>長辺（cm）</label>
+        <input type="number" id="size" placeholder="例：30" min="0">
+      </div>
+    </div>
+
+    <label>送料見込み（円）</label>
+    <input type="number" id="shipping" value="2000" min="0">
+
+    <label>為替レート（円/ドル）</label>
+    <input type="number" id="fx" value="150" min="100" max="200">
+
+    <button class="main-btn" onclick="calculate()">判断する</button>
+  </div>
+
+  <div class="card result" id="result_area">
+    <div class="exclude-warn" id="exclude_warn"></div>
+    <div class="verdict" id="verdict_box"></div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="label">eBay推奨価格</div>
+        <div class="value" id="res_price">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">利益額</div>
+        <div class="value" id="res_profit">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">利益率</div>
+        <div class="value" id="res_margin">—</div>
+      </div>
+      <div class="metric">
+        <div class="label">eBay手数料(13%)</div>
+        <div class="value" id="res_fee">—</div>
+      </div>
+    </div>
+
+    <h2>為替リスクシミュレーション</h2>
+    <table class="fx-table">
+      <tr><th>為替</th><th>販売価格</th><th>利益額</th><th>利益率</th></tr>
+      <tbody id="fx_rows"></tbody>
+    </table>
+
+    <p class="rule-note" id="rule_note"></p>
+    <button class="sub-btn" onclick="reset()">リセット</button>
+  </div>
+</div>
+
+<!-- ========== リサーチメモ ========== -->
+<div id="tab-memo" class="tab-content">
+  <div class="card">
+    <h2>リサーチ記録</h2>
+    <ul class="memo-list" id="memo_list"></ul>
+    <p class="no-memo" id="no_memo">まだメモがありません</p>
+    <button class="clear-all-btn" onclick="clearAllMemo()">全部消す</button>
+  </div>
 </div>
 
 <script>
+// ========== タブ切り替え ==========
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const tabs = ['reverse', 'forward', 'memo'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('active');
+  if (name === 'memo') renderMemo();
+}
+
+// ========== 逆算モード ==========
+function calcReverse() {
+  const ebayUsd = parseFloat(document.getElementById('r_ebay_usd').value) || 0;
+  const fx      = parseFloat(document.getElementById('r_fx').value) || 150;
+  const ship    = parseFloat(document.getElementById('r_shipping').value) || 700;
+  const target  = parseFloat(document.getElementById('r_margin_target').value) || 30;
+
+  if (!ebayUsd) { alert('eBay相場を入力してください'); return; }
+
+  const sellJpy   = ebayUsd * fx;
+  const fee       = sellJpy * 0.13;
+  const targetProfit = sellJpy * (target / 100);
+  const limit     = sellJpy - fee - ship - targetProfit;
+
+  const box = document.getElementById('r_limit_box');
+  const fmt = n => Math.round(n).toLocaleString();
+
+  if (limit <= 0) {
+    box.className = 'limit-box ng';
+    document.getElementById('r_limit_value').textContent = '仕入れ不可';
+    document.getElementById('r_limit_sub').textContent = 'この売値では送料・手数料だけで赤字になります';
+  } else {
+    box.className = 'limit-box';
+    document.getElementById('r_limit_value').textContent = '¥' + fmt(limit) + ' 以下';
+    document.getElementById('r_limit_sub').textContent = '利益率' + target + '%を確保できる仕入れ上限';
+  }
+
+  document.getElementById('r_sell_jpy').textContent  = '¥' + fmt(sellJpy);
+  document.getElementById('r_fee2').textContent       = '¥' + fmt(fee);
+  document.getElementById('r_ship2').textContent      = '¥' + fmt(ship);
+  document.getElementById('r_profit2').textContent    = limit > 0 ? '¥' + fmt(targetProfit) : '赤字';
+
+  document.getElementById('r_result').style.display = 'block';
+  document.getElementById('r_result').scrollIntoView({ behavior: 'smooth' });
+}
+
+function saveReverseMemo() {
+  const name   = document.getElementById('r_name').value || '商品名未入力';
+  const usd    = parseFloat(document.getElementById('r_ebay_usd').value) || 0;
+  const fx     = parseFloat(document.getElementById('r_fx').value) || 150;
+  const ship   = parseFloat(document.getElementById('r_shipping').value) || 700;
+  const target = parseFloat(document.getElementById('r_margin_target').value) || 30;
+  const sellJpy = usd * fx;
+  const fee    = sellJpy * 0.13;
+  const limit  = sellJpy - fee - ship - sellJpy * (target / 100);
+
+  const memo = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString('ja-JP', {month:'numeric', day:'numeric'}),
+    name,
+    mode: 'reverse',
+    ebayUsd: usd,
+    limit: Math.round(limit),
+    verdict: limit > 0 ? 'buy' : 'ng',
+    verdictLabel: limit > 0 ? '◎仕入れOK' : '✗仕入れNG',
+    detail: `eBay相場$${usd} / 仕入れ上限¥${Math.round(limit).toLocaleString()} / 送料¥${ship}`
+  };
+
+  const memos = getMemos();
+  memos.unshift(memo);
+  localStorage.setItem('ebay_memos', JSON.stringify(memos));
+  alert('メモに保存しました！「リサーチメモ」タブで確認できます');
+}
+
+function resetReverse() {
+  document.getElementById('r_name').value = '';
+  document.getElementById('r_ebay_usd').value = '';
+  document.getElementById('r_result').style.display = 'none';
+}
+
+// ========== 従来モード ==========
 function getSellPrice(buyPrice) {
-  if (buyPrice <= 3000) return buyPrice * 2.10 + 2500;
-  if (buyPrice <= 7000) return buyPrice * 1.90 + 2500;
+  if (buyPrice <= 3000)  return buyPrice * 2.10 + 2500;
+  if (buyPrice <= 7000)  return buyPrice * 1.90 + 2500;
   if (buyPrice <= 15000) return buyPrice * 1.80 + 2500;
   if (buyPrice <= 30000) return buyPrice * 1.70 + 2500;
   return null;
-}
-
-function calcProfit(sellJpy, buyPrice, shipping) {
-  const ebayFee = sellJpy * 0.13;
-  return sellJpy - ebayFee - buyPrice - shipping;
 }
 
 function calculate() {
@@ -126,34 +306,25 @@ function calculate() {
   const shipping = parseFloat(document.getElementById('shipping').value) || 2000;
   const fx       = parseFloat(document.getElementById('fx').value) || 150;
 
-  // 除外チェック
   const warnEl = document.getElementById('exclude_warn');
   let warns = [];
-  if (weight >= 2000) warns.push('重量2kg以上（除外条件）');
-  if (size >= 60)     warns.push('長辺60cm以上（除外条件）');
+  if (weight >= 2000)   warns.push('重量2kg以上（除外条件）');
+  if (size >= 60)       warns.push('長辺60cm以上（除外条件）');
   if (buyPrice > 30000) warns.push('仕入れ30,000円超（除外条件）');
-
-  if (warns.length > 0) {
-    warnEl.textContent = '⚠ ' + warns.join(' / ') + ' → この商品は仕入れNG';
-    warnEl.style.display = 'block';
-  } else {
-    warnEl.style.display = 'none';
-  }
+  warnEl.textContent = warns.length ? '⚠ ' + warns.join(' / ') + ' → この商品は仕入れNG' : '';
+  warnEl.style.display = warns.length ? 'block' : 'none';
 
   const sellJpy = getSellPrice(buyPrice);
-  if (!sellJpy) {
-    alert('仕入れ価格を入力してください');
-    return;
-  }
+  if (!sellJpy) { alert('仕入れ価格を入力してください'); return; }
 
-  const sellUsd  = sellJpy / fx;
-  const ebayFee  = sellJpy * 0.13;
-  const profit   = calcProfit(sellJpy, buyPrice, shipping);
-  const margin   = sellJpy > 0 ? (profit / sellJpy * 100) : 0;
+  const sellUsd = sellJpy / fx;
+  const ebayFee = sellJpy * 0.13;
+  const profit  = sellJpy - ebayFee - buyPrice - shipping;
+  const margin  = sellJpy > 0 ? (profit / sellJpy * 100) : 0;
+  const fmt = n => Math.round(n).toLocaleString();
 
-  // 判定
   const verdictBox = document.getElementById('verdict_box');
-  if (warns.length > 0) {
+  if (warns.length) {
     verdictBox.textContent = '✗ 見送り（除外条件）';
     verdictBox.className = 'verdict pass';
   } else if (margin >= 30) {
@@ -167,54 +338,77 @@ function calculate() {
     verdictBox.className = 'verdict pass';
   }
 
-  // 数値表示
-  const fmt = (n) => Math.round(n).toLocaleString();
-  document.getElementById('r_price').innerHTML  = '$' + sellUsd.toFixed(0) + '<br><small>（約' + fmt(sellJpy) + '円）</small>';
-  document.getElementById('r_profit').innerHTML = fmt(profit) + '円';
-  document.getElementById('r_profit').className = 'value ' + (profit >= 0 ? 'good' : 'bad');
-  document.getElementById('r_margin').innerHTML = margin.toFixed(1) + '%';
-  document.getElementById('r_margin').className = 'value ' + (margin >= 30 ? 'good' : margin >= 20 ? '' : 'bad');
-  document.getElementById('r_fee').innerHTML    = fmt(ebayFee) + '円';
+  document.getElementById('res_price').innerHTML  = '$' + sellUsd.toFixed(0) + '<br><small>（約' + fmt(sellJpy) + '円）</small>';
+  document.getElementById('res_profit').innerHTML = fmt(profit) + '円';
+  document.getElementById('res_profit').className = 'value ' + (profit >= 0 ? 'good' : 'bad');
+  document.getElementById('res_margin').innerHTML = margin.toFixed(1) + '%';
+  document.getElementById('res_margin').className = 'value ' + (margin >= 30 ? 'good' : margin >= 20 ? '' : 'bad');
+  document.getElementById('res_fee').innerHTML    = fmt(ebayFee) + '円';
 
-  // 為替シミュレーション
   const fxRates = [130, 140, 150, 160, 165];
   const tbody = document.getElementById('fx_rows');
   tbody.innerHTML = '';
   fxRates.forEach(rate => {
-    const p = calcProfit(sellJpy, buyPrice, shipping);
+    const p = sellJpy - sellJpy * 0.13 - buyPrice - shipping;
     const usd = (sellJpy / rate).toFixed(0);
     const m = (p / sellJpy * 100).toFixed(1);
     const isCurrent = rate === Math.round(fx);
-    const row = `<tr class="${isCurrent ? 'current' : ''}">
+    tbody.innerHTML += `<tr class="${isCurrent ? 'current' : ''}">
       <td>${rate}円/$${isCurrent ? '（現在）' : ''}</td>
-      <td>$${usd}</td>
-      <td>${fmt(p)}円</td>
-      <td>${m}%</td>
-    </tr>`;
-    tbody.innerHTML += row;
+      <td>$${usd}</td><td>${fmt(p)}円</td><td>${m}%</td></tr>`;
   });
 
-  // ルール表示
-  let ruleUsed = '';
-  if (buyPrice <= 3000) ruleUsed = '仕入れ×210%+2,500円';
-  else if (buyPrice <= 7000) ruleUsed = '仕入れ×190%+2,500円';
-  else if (buyPrice <= 15000) ruleUsed = '仕入れ×180%+2,500円';
-  else ruleUsed = '仕入れ×170%+2,500円';
+  let ruleUsed = buyPrice <= 3000 ? '仕入れ×210%+2,500円'
+               : buyPrice <= 7000 ? '仕入れ×190%+2,500円'
+               : buyPrice <= 15000 ? '仕入れ×180%+2,500円' : '仕入れ×170%+2,500円';
   document.getElementById('rule_note').textContent =
     `適用ルール：${ruleUsed}　送料：${fmt(shipping)}円　eBay手数料：13%`;
 
   document.getElementById('result_area').style.display = 'block';
-  document.getElementById('result_area').scrollIntoView({behavior: 'smooth'});
+  document.getElementById('result_area').scrollIntoView({ behavior: 'smooth' });
 }
 
 function reset() {
-  document.getElementById('name').value = '';
-  document.getElementById('buy_price').value = '';
-  document.getElementById('weight').value = '';
-  document.getElementById('size').value = '';
+  ['name','buy_price','weight','size'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('shipping').value = '2000';
   document.getElementById('fx').value = '150';
   document.getElementById('result_area').style.display = 'none';
+}
+
+// ========== リサーチメモ ==========
+function getMemos() {
+  try { return JSON.parse(localStorage.getItem('ebay_memos') || '[]'); } catch { return []; }
+}
+
+function renderMemo() {
+  const memos = getMemos();
+  const list  = document.getElementById('memo_list');
+  const none  = document.getElementById('no_memo');
+  list.innerHTML = '';
+  if (!memos.length) { none.style.display = 'block'; return; }
+  none.style.display = 'none';
+  memos.forEach(m => {
+    list.innerHTML += `
+      <li class="memo-item">
+        <span class="memo-verdict ${m.verdict}">${m.verdictLabel}</span>
+        <div class="memo-name">${m.date} ${m.name}</div>
+        <div class="memo-detail">${m.detail}</div>
+        <button class="del-btn" onclick="deleteMemo(${m.id})">×</button>
+      </li>`;
+  });
+}
+
+function deleteMemo(id) {
+  const memos = getMemos().filter(m => m.id !== id);
+  localStorage.setItem('ebay_memos', JSON.stringify(memos));
+  renderMemo();
+}
+
+function clearAllMemo() {
+  if (confirm('メモを全部消しますか？')) {
+    localStorage.removeItem('ebay_memos');
+    renderMemo();
+  }
 }
 </script>
 </body>
