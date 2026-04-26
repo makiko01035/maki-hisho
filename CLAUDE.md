@@ -117,6 +117,19 @@ git push origin main
 | `登録して` | 読み取ったイベントをGoogleカレンダーに登録 |
 | `〇〇の期限 4月10日` | 申込期限をカレンダーに登録＋リマインド設定 |
 
+## Claude Codeから使える機能
+
+### セキスイ記事を直接投稿（Markdownファイルから）
+```bash
+python post_sekisui_direct.py "C:\path\to\記事.md"
+```
+- Markdownファイルの1行目をタイトルとして使用
+- WPに公開 → Zapierが自動でInstagramにも投稿
+- アイキャッチ画像（Pexels）＋タイトルオーバーレイ画像を自動生成
+
+### セキスイ記事のアイキャッチ自動更新
+記事公開時にWP Webhooksが `/wp-post-published` を呼び出し、バックグラウンドでタイトル入り画像を生成してアイキャッチを差し替える（30〜60秒で完了）。
+
 ## Pinterest連携の現状（2026-04-15時点）
 
 - Pinterest Developer App（MAKOYAKUZEN / ID:1553666）は作成済み
