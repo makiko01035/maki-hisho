@@ -502,9 +502,12 @@ def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
     html = html.replace('<!-- yakuzen-affiliate-cta -->', _build_affiliate_cta(title, content_md))
-    rakuten_section = _build_rakuten_section(title, content_md)
-    if rakuten_section:
-        html += rakuten_section
+    try:
+        rakuten_section = _build_rakuten_section(title, content_md)
+        if rakuten_section:
+            html += rakuten_section
+    except Exception as e:
+        print(f"楽天セクション生成エラー（スキップ）: {e}")
     data = {'title': title, 'content': html, 'status': status}
     if featured_media_id:
         data['featured_media'] = featured_media_id
