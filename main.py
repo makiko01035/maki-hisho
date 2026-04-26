@@ -999,6 +999,10 @@ def company_office():
 def instagram_roadmap():
     return send_from_directory('.', 'instagram_roadmap.html')
 
+@app.route('/x-study-note')
+def x_study_note():
+    return send_from_directory('.', 'x_study_note.html')
+
 @app.route('/web-marketing')
 def web_marketing_notes():
     return send_from_directory('.', 'web_marketing_notes.html')

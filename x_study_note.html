@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X運用 勉強ノート</title>
+<style>
+  body { font-family: 'Hiragino Sans', sans-serif; background: #f5f7fa; color: #333; margin: 0; padding: 24px; font-size: 16px; }
+  h1 { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white; padding: 24px; border-radius: 12px; font-size: 1.4em; margin-bottom: 24px; }
+  h2 { color: #1a73e8; border-left: 5px solid #1a73e8; padding-left: 16px; margin-top: 32px; margin-bottom: 16px; }
+  h3 { color: #333; margin-top: 16px; margin-bottom: 8px; font-size: 1em; }
+  .card { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .point { background: #e8f0fe; border-left: 5px solid #1a73e8; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .warn { background: #fdf0f0; border-left: 5px solid #e53935; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .green { background: #f0fdf4; border-left: 5px solid #2e7d32; padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .yellow { background: #fffbe6; border-left: 4px solid #f9a825; padding: 12px 16px; border-radius: 6px; margin-top: 8px; font-size: 0.9em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #1a73e8; color: white; padding: 8px 16px; text-align: left; font-size: 0.9em; }
+  td { padding: 8px 16px; border-bottom: 1px solid #eee; font-size: 0.9em; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f8f9fe; }
+  .badge { display: inline-block; border-radius: 20px; padding: 3px 12px; font-size: 0.82em; margin: 3px; font-weight: bold; }
+  .badge-blue { background: #e8f0fe; color: #1a73e8; }
+  .badge-red { background: #fde8e8; color: #c62828; }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-orange { background: #fff3e0; color: #e65100; }
+  /* テーブル内バッジ */
+  .b-auto { display: inline-block; background: #1a73e8; color: white; border-radius: 4px; padding: 2px 10px; font-size: 0.82em; font-weight: bold; }
+  .b-hand { display: inline-block; background: #e53935; color: white; border-radius: 4px; padding: 2px 10px; font-size: 0.82em; font-weight: bold; }
+  /* アカウントカード */
+  .account { display: flex; align-items: flex-start; gap: 16px; padding: 16px 0; border-bottom: 1px solid #eee; }
+  .account:last-child { border-bottom: none; }
+  .account-icon { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: white; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; font-size: 1.1em; }
+  .account-body { flex: 1; }
+  .account-name { font-weight: bold; }
+  .account-handle { color: #888; font-size: 0.85em; }
+  /* ツイート表示枠 */
+  .tweet-box { background: #f7f9fa; border: 1px solid #e1e8ed; border-radius: 12px; padding: 16px; margin: 10px 0; font-size: 0.92em; line-height: 1.8; white-space: pre-wrap; }
+  /* アルゴリズム重みグリッド */
+  .weight-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+  .weight-box { text-align: center; padding: 16px; border-radius: 10px; background: white; border: 2px solid #eee; }
+  .weight-box.gold { border-color: #f9a825; background: #fffbe6; }
+  .weight-box.silver { border-color: #bdc3c7; background: #f8f9fa; }
+  .weight-box.bronze { border-color: #e65100; background: #fef5ec; }
+  .weight-num { font-size: 2.2em; font-weight: bold; }
+  /* パターンカードグリッド */
+  .pattern-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
+  .pattern-card { background: #f8f9fe; border-radius: 8px; padding: 16px; border-top: 4px solid #1a73e8; }
+  .pattern-card strong { display: block; margin-bottom: 8px; color: #1a73e8; }
+  /* TODOリスト */
+  .todo-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #eee; }
+  .todo-row:last-child { border-bottom: none; }
+  .todo-row input { width: 20px; height: 20px; cursor: pointer; flex-shrink: 0; }
+  /* media-cardスタイル（web_marketing_notes.htmlと共通）*/
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px; }
+  .media-card { background: #f8f9fe; border-radius: 8px; padding: 16px; border-top: 4px solid #1a73e8; }
+  .media-card strong { display: block; margin-bottom: 8px; }
+  .media-card ul { margin: 0; padding-left: 16px; font-size: 0.88em; color: #555; }
+  @media (max-width: 600px) { .weight-grid { grid-template-columns: 1fr; } .pattern-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>🐦 X運用 勉強ノート　まき（2026-04-26）</h1>
+
+<!-- 参考アカウント -->
+<div class="card">
+  <h2>参考にしたアカウント &amp; 学び</h2>
+
+  <div class="account">
+    <div class="account-icon">孔</div>
+    <div class="account-body">
+      <div class="account-name">キャリア孔明 <span class="account-handle">@career_koumei</span></div>
+      <div style="margin-top:6px;font-size:0.9em;color:#555;">8ヶ月でフォロワー4万人・月2億インプ達成</div>
+      <div class="point" style="margin-top:12px;">
+        <strong>学び：自虐でガードを下げてから刺す</strong><br>
+        「まじめなヤツ、マジで聞いて。その仕事は『自分がやること』じゃない、『終わらせること』だ」<br>
+        → ターゲットに直接語りかける＋カギ括弧で対比させる
+      </div>
+      <div>
+        <span class="badge badge-blue">語りかけ型</span>
+        <span class="badge badge-blue">対比型</span>
+        <span class="badge badge-blue">自虐スタート</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="account">
+    <div class="account-icon">暁</div>
+    <div class="account-body">
+      <div class="account-name">暁ライト 副業noteオタク <span class="account-handle">@akatuki_noter</span></div>
+      <div style="margin-top:6px;font-size:0.9em;color:#555;">2ヶ月で100万円達成・1年で1000万円超（2024年7月〜）</div>
+      <div class="point" style="margin-top:12px;">
+        <strong>学び①：Tier型・リスト型・STEP型が強い</strong><br>
+        Tier S = 実体験あり × 顧客に価値あり<br>
+        → まきさんの実体験投稿はTier S ✅
+      </div>
+      <div class="point">
+        <strong>学び②：「パイを広げる」</strong><br>
+        冒頭を「AI副業」より「時間がないワーママへ」から入ると刺さる層が広がる<br>
+        → 同じ内容でも入り口を広くするだけで見られる人数が増える
+      </div>
+      <div class="point">
+        <strong>学び③：売れたら即投稿</strong><br>
+        「売れましたあ！」と叫ぶ実績投稿が信頼になる<br>
+        → noteが売れたら必ずXで報告する
+      </div>
+      <div class="green">
+        <strong>note記事Tierランキング（暁ライト式）</strong><br>
+        Tier S：実体験あり × 価値あり　（ここを目指す）<br>
+        Tier A：実体験なし × 価値あり<br>
+        Tier C：実体験あり × 価値なし<br>
+        Tier Z：実体験なし × 価値なし　（絶対NG）
+      </div>
+      <div>
+        <span class="badge badge-blue">Tier型</span>
+        <span class="badge badge-blue">リスト型</span>
+        <span class="badge badge-blue">STEP型</span>
+        <span class="badge badge-green">パイを広げる</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="account">
+    <div class="account-icon">#</div>
+    <div class="account-body">
+      <div class="account-name">SHARP シャープ株式会社 <span class="account-handle">@SHARP_JP</span></div>
+      <div style="margin-top:6px;font-size:0.9em;color:#555;">フォロワー83万人・企業アカウントなのにバズりまくる</div>
+      <div class="point" style="margin-top:12px;">
+        <strong>学び①：自虐でPRする</strong><br>
+        「なにかとプラズマクラスターを付けることで知られるシャープですが」<br>
+        → 売りたいのに自分を下げる。ガードが下がって読まれる
+      </div>
+      <div class="point">
+        <strong>学び②：商品と関係ないことも言う</strong><br>
+        「プラズマクラスターもハンディファンも関係ないですけど、こたつ君、かわいいです」<br>
+        → 人間味が出るとフォロワーとの距離がゼロになる
+      </div>
+      <div class="point">
+        <strong>学び③：売らずに信頼を溜める定番ネタを持つ</strong><br>
+        「#たけのこ見たら試運転」を毎年繰り返す<br>
+        → 何も売らずにブランドが記憶される
+      </div>
+      <div>
+        <span class="badge badge-blue">人間味</span>
+        <span class="badge badge-blue">自虐PR</span>
+        <span class="badge badge-blue">定番ネタ</span>
+        <span class="badge badge-green">信頼蓄積</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Xアルゴリズムの重み -->
+<div class="card">
+  <h2>Xアルゴリズムの重み（2026年版）</h2>
+  <div class="weight-grid">
+    <div class="weight-box silver">
+      <div style="font-size:0.9em;">リツイート</div>
+      <div class="weight-num" style="color:#9e9e9e;">×20</div>
+      <div style="font-size:0.85em;color:#888;">拡散力が高い</div>
+    </div>
+    <div class="weight-box bronze">
+      <div style="font-size:0.9em;">引用RT</div>
+      <div class="weight-num" style="color:#e65100;">×15</div>
+      <div style="font-size:0.85em;color:#888;">コメント付き拡散</div>
+    </div>
+    <div class="weight-box gold">
+      <div style="font-size:0.9em;">リプライへの返信</div>
+      <div class="weight-num" style="color:#f9a825;">×75</div>
+      <div style="font-size:0.85em;color:#888;">会話が成立すると爆発</div>
+    </div>
+  </div>
+  <div class="warn" style="margin-top:16px;">
+    <strong>結論：リプライへの返信が最重要（×75倍）</strong><br>
+    自分の投稿にリプライが来たら必ず返信する。これだけで拡散力が大きく変わる。
+  </div>
+</div>
+
+<!-- 自動vs手動 -->
+<div class="card">
+  <h2>自動でやること vs まきさんがやること</h2>
+  <table>
+    <tr><th>区分</th><th>内容</th><th>頻度</th></tr>
+    <tr>
+      <td><span class="b-auto">自動</span></td>
+      <td>TWEET_STOCKから投稿（朝8:30）</td>
+      <td>毎日</td>
+    </tr>
+    <tr>
+      <td><span class="b-auto">自動</span></td>
+      <td>TWEET_STOCKから投稿（昼12:30）</td>
+      <td>奇数日のみ</td>
+    </tr>
+    <tr>
+      <td><span class="b-auto">自動</span></td>
+      <td>TWEET_STOCKから投稿（夜19:30）</td>
+      <td>毎日</td>
+    </tr>
+    <tr>
+      <td><span class="b-hand">手動</span></td>
+      <td>リプライが来たら返信する（×75倍効果）</td>
+      <td>来たらすぐ</td>
+    </tr>
+    <tr>
+      <td><span class="b-hand">手動</span></td>
+      <td>気になる投稿に引用RT（QUOTE_TWEET_TEMPLATESを使う）</td>
+      <td>週1〜2回</td>
+    </tr>
+    <tr>
+      <td><span class="b-hand">手動</span></td>
+      <td>noteが売れたら「売れました！」投稿</td>
+      <td>売れたとき</td>
+    </tr>
+  </table>
+</div>
+
+<!-- バズる投稿の3パターン -->
+<div class="card">
+  <h2>バズる投稿の3パターン</h2>
+  <div class="pattern-grid">
+    <div class="pattern-card">
+      <strong>① 衝撃フック型</strong>
+      <div style="font-size:0.9em;color:#555;margin-bottom:10px;">【悲報】【朗報】【断言】【衝撃】で始める。手を止めさせる冒頭が命。</div>
+      <div class="tweet-box">【断言】プログラミングは不要だった。
+コードは一行も書けない。でも「どうなってほしいか」を言葉で伝えるだけで動くものが出来上がる。</div>
+    </div>
+    <div class="pattern-card">
+      <strong>② Before→After型</strong>
+      <div style="font-size:0.9em;color:#555;margin-bottom:10px;">「1ヶ月前：〇〇。今：〇〇。」変化が一目でわかる。</div>
+      <div class="tweet-box">1ヶ月前：チラシを1件ずつ手入力してた。
+今：LINEに写真を送るだけ。
+
+毎回10分かかってた作業が0秒になった。</div>
+    </div>
+    <div class="pattern-card">
+      <strong>③ 数字まとめ型</strong>
+      <div style="font-size:0.9em;color:#555;margin-bottom:10px;">「〇〇の〇つ↓」リスト形式。ブックマーク・RT誘発しやすい。</div>
+      <div class="tweet-box">LINEボット1本でできること↓
+・ブログ投稿
+・カレンダー管理
+・eBayリサーチ
+・X自動投稿
+全部LINEから完結してる。</div>
+    </div>
+  </div>
+</div>
+
+<!-- 今回追加した新パターン -->
+<div class="card">
+  <h2>新パターン（暁ライト・シャープから学んだ）</h2>
+
+  <h3>④ Tier型</h3>
+  <div class="tweet-box">【Claude Code副業の投稿Tierランキング】
+
+Tier S：実体験あり × 誰かの役に立つ
+Tier A：実体験なし × 誰かの役に立つ
+Tier C：実体験あり × 誰の役にも立たない
+Tier Z：実体験なし × 誰の役にも立たない
+
+自分の体験を話すだけでTier Sになれる。
+技術や知識より「経験」の方が価値がある。 #AI副業 #ClaudeCode</div>
+
+  <h3>⑤ やること/やらないことリスト型</h3>
+  <div class="tweet-box">【Claude Code副業でやって良かったこと】
+・完璧より完了を優先する
+・エラーはそのままClaudeに貼る
+・毎日触る（楽しいからできる）
+・小さく作って動かして改善する
+
+【やらなくて良かったこと】
+・プログラミングを学ぼうとする
+・全部一人でやろうとする
+・完成してから公開しようとする #ClaudeCode #AI副業</div>
+
+  <h3>⑥ 日常・人間味型（シャープの「こたつ君かわいい」を参考に）</h3>
+  <div class="tweet-box">ママ友にClaude Code勧めすぎてひかれた。
+「無料でできるから！」「コードなしで作れるから！」「本当にすごいから！」
+3回連続で布教したらLINEの返信が遅くなった。
+でも諦めない。 #ClaudeCode</div>
+
+  <h3>⑦ ターゲットに語りかける型（キャリア孔明式）</h3>
+  <div class="tweet-box">副業したいけど時間がないワーママ、マジで聞いて。
+時間がないのは「やり方の問題」じゃない、「仕組みがない問題」。
+仕組みさえ作れば、寝てる間も動き続ける。 #ワーママ #AI副業</div>
+
+  <div class="yellow">まきさんへ：⑦のように「ワーママ」から入ると、AI副業に興味がない人にも刺さる。これが「パイを広げる」。</div>
+</div>
+
+<!-- 現在のストック状況 -->
+<div class="card">
+  <h2>現在のTWEET_STOCK状況（2026-04-26）</h2>
+  <table>
+    <tr><th>種類</th><th>本数</th><th>内容</th></tr>
+    <tr><td>有益系（実体験報告）</td><td>87本</td><td>Before→After・衝撃フック・数字まとめ</td></tr>
+    <tr><td>日常・人間味系</td><td>10本</td><td>Claude Code愛・ママ友布教・子どもの反応など</td></tr>
+    <tr><td><strong>合計</strong></td><td><strong>97本</strong></td><td>約32日分のストック（1日3本換算）</td></tr>
+  </table>
+  <div style="margin-top:12px;">
+    <span class="badge badge-blue">QUOTE_TWEET_TEMPLATES</span> 引用RT用テンプレ：20本（別リスト）
+  </div>
+  <div class="point" style="margin-top:16px;">
+    <strong>投稿スケジュール</strong><br>
+    朝8:30（毎日）・昼12:30（奇数日）・夜19:30（毎日）<br>
+    1日2〜3本、ローテーションは日付ベースで自動管理
+  </div>
+</div>
+
+<!-- 固定投稿案 -->
+<div class="card">
+  <h2>固定投稿案（「パイを広げる」設計）</h2>
+  <div class="point">
+    暁ライトさんの「パイを広げる」概念を応用。「AI副業」より「時間がないワーママ」から入ると刺さる層が広がる。
+  </div>
+  <div class="tweet-box">【Claude Codeで0→副業システム構築まで1ヶ月でやったこと全部】
+
+コードが書けない医療職ワーママです、まきと申します。
+
+1ヶ月でできたこと：
+・LINE秘書ボット（カレンダー・リマインダー・自動返信）
+・ブログ自動投稿（記事作成→公開まで全自動）
+・eBay管理ツール
+・ゲームシリーズ3作品
+・X自動投稿（今見てるこれも自動です）
+
+費用：Claude Code代のみ
+プログラミング経験：ゼロ
+
+全工程をnoteにまとめました（1,480円）→
+https://note.com/maki_claude_lab/n/n0bf26963cd26
+
+保存して後で読んでください📌</div>
+  <div class="yellow">設定方法：Xで投稿→長押し（または「…」）→「プロフィールに固定する」</div>
+</div>
+
+<!-- 積み残し・今後やること -->
+<div class="card">
+  <h2>積み残し &amp; 今後やること</h2>
+  <div class="todo-row"><input type="checkbox"> <span><strong>固定投稿を設定する</strong>（まきさんがXで手動設定）</span></div>
+  <div class="todo-row"><input type="checkbox"> <span>noteが売れたら「売れました！」をXに投稿する習慣をつける</span></div>
+  <div class="todo-row"><input type="checkbox"> <span>引用RTを週1〜2回やってみる（QUOTE_TWEET_TEMPLATESを使う）</span></div>
+  <div class="todo-row"><input type="checkbox"> <span>リプライが来たら必ず返信する（×75倍効果）</span></div>
+  <div class="todo-row"><input type="checkbox"> <span>フォロワー1,000人達成したらnote有料記事の本格販売開始</span></div>
+</div>
+
+<div style="text-align:center;color:#aaa;font-size:0.85em;padding:20px 0;">
+  X運用 勉強ノート｜まきのAI会社 2026-04-26
+</div>
+
+</body>
+</html>
