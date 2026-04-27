@@ -1759,6 +1759,13 @@ def handle_message(event):
         threading.Thread(target=send_weekly_seo_report).start()
         return
 
+    # Xレポート即時取得
+    x_report_keywords = ['Xレポート', 'xレポート', 'X分析', 'x分析', 'ツイート分析', '投稿分析']
+    if any(kw in user_message for kw in x_report_keywords):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📊 X投稿のパフォーマンスを集計中です...少しお待ちください！"))
+        threading.Thread(target=send_x_weekly_report).start()
+        return
+
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
     msg_lower = user_message.lower()
@@ -2260,6 +2267,11 @@ TWEET_STOCK = [
     "「やってみたかったけど躊躇してた」が全部できるようになった。Claude Codeのおかげで。躊躇の理由はだいたい「技術がないから」だった。技術がなくても作れると知ってから、躊躇する理由がなくなった。 #ClaudeCode #AI副業",
     "ママ友に「なんか最近楽しそうだね」と言われた。「Claude Codeで色々作ってるんだよね」と答えたら「何それ」と聞かれた。説明しようとしたら30分経ってた。布教が止まらない。 #ClaudeCode #AI副業",
     "子どもが「ママのパソコン、いつも同じ画面だね」と言った。Claude Codeの画面のことだ。毎日開いてるから確かに同じ画面。「何してるの？」「色々作ってる」「ふーん」。これが今の私の副業のリアル。 #ClaudeCode #AI副業",
+    # ── eBayタイトル・リサーチ改善 ──
+    "eBay57品のタイトルをAIで一括改善した。「Funny Erasers」→「Iwako Japanese Puzzle Eraser Japan Kawaii Novelty」みたいな感じで。ウォッチゼロが続いてた理由が分かった。検索に引っかかってなかっただけ。タイトルは商品の顔。 #AI副業 #eBay #物販",
+    "利益計算ツールを「仕入れ→売値計算」から「Terapeak売値→仕入れ上限逆算」に作り直した。以前は仕入れ¥400→eBay推奨$22と出てたが相場は$9。ツールが甘かった。逆算にしたら「$9なら¥339以下で仕入れろ」と一瞬で分かるようになった。 #AI副業 #eBay #物販",
+    "eBayリサーチの結果を毎回忘れて同じカテゴリを何度も調べてた。解決策：利益計算ツールに「リサーチメモ保存」機能を追加。今はボタン1つで調べた日・仕入れ上限・判定が残る。記憶に頼る作業は全部仕組み化するに限る。 #AI副業 #eBay #物販",
+    "Teapeakで調べたらHakuhodo化粧筆はメルカリ仕入れでは利益が出ないと判明。逆にサンリオ靴下は¥400以下で仕入れれば利益が出る。リサーチ前と後で仕入れ判断が全然違う。感覚で動いてたのがデータで動けるようになった。 #AI副業 #eBay #物販",
 ]
 
 # 引用RT用テンプレート（バズってる投稿に引用するとき使う）
@@ -2437,6 +2449,80 @@ def send_note_reminder():
         print(f"Note reminder error: {e}")
 
 
+def send_x_weekly_report():
+    """過去7日間のX投稿パフォーマンスをLINEに送信"""
+    try:
+        client = _get_x_client()
+        if not client:
+            return
+
+        me = client.get_me()
+        user_id_x = me.data.id
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start_time = now - datetime.timedelta(days=7)
+
+        tweets = client.get_users_tweets(
+            id=user_id_x,
+            max_results=100,
+            start_time=start_time,
+            tweet_fields=['public_metrics', 'non_public_metrics', 'created_at', 'text'],
+            exclude=['retweets', 'replies']
+        )
+
+        line_uid = os.environ['LINE_USER_ID']
+
+        if not tweets.data:
+            line_bot_api.push_message(line_uid, TextSendMessage(
+                text="📊 今週のXレポート\n\n先週の投稿データがありませんでした。"
+            ))
+            return
+
+        def get_imp(tweet):
+            nm = tweet.non_public_metrics or {}
+            return nm.get('impression_count')
+
+        def get_score(tweet):
+            imp = get_imp(tweet)
+            if imp is not None:
+                return imp
+            pm = tweet.public_metrics or {}
+            return pm.get('like_count', 0) * 3 + pm.get('retweet_count', 0) * 5 + pm.get('reply_count', 0) * 2
+
+        sorted_tweets = sorted(tweets.data, key=get_score, reverse=True)
+        total = len(sorted_tweets)
+        use_imp = get_imp(sorted_tweets[0]) is not None
+        metric_label = "imp" if use_imp else "エンゲージ"
+
+        def fmt(tweet, rank):
+            score = get_imp(tweet) if use_imp else get_score(tweet)
+            pm = tweet.public_metrics or {}
+            likes = pm.get('like_count', 0)
+            rts = pm.get('retweet_count', 0)
+            text_prev = tweet.text[:25] + '…' if len(tweet.text) > 25 else tweet.text
+            return f"{rank}位 {score:,}{metric_label}「{text_prev}」❤{likes} RT{rts}"
+
+        top3 = sorted_tweets[:min(3, total)]
+        worst3 = sorted_tweets[max(0, total - 3):]
+
+        lines = [
+            f"📊 今週のXレポート（{start_time.strftime('%m/%d')}〜{now.strftime('%m/%d')}）",
+            f"投稿数：{total}本\n",
+            "🏆 トップ3",
+        ]
+        for i, t in enumerate(top3, 1):
+            lines.append(fmt(t, i))
+        if total > 3:
+            lines.append("\n📉 ワースト3")
+            for i, t in enumerate(worst3, 1):
+                lines.append(fmt(t, total - len(worst3) + i))
+        lines.append("\n💡 トップ投稿の型を「これ増やして」と話しかけてね！")
+
+        line_bot_api.push_message(line_uid, TextSendMessage(text='\n'.join(lines)))
+    except Exception as e:
+        print(f"X weekly report error: {e}")
+
+
 def _get_x_client():
     import tweepy
     api_key = (os.environ.get('X_API_KEY') or '').strip()
@@ -2521,6 +2607,8 @@ scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon,wed,fri', hou
 scheduler.add_job(send_weekly_seo_report, 'cron', day_of_week='mon', hour=9, minute=30)
 # 毎月末日朝9時：noteリマインド
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
+# 毎週月曜9時40分：週次Xパフォーマンスレポート（PDCA用）
+scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 scheduler.start()
