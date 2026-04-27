@@ -2529,6 +2529,7 @@ def send_x_weekly_report():
             "今週の傾向：〇〇型が強い（例：Before→After型、数字まとめ型、実体験型、共感型、断言型）\n"
             "来週やること：〇〇（具体的に1行で）"
         )
+        analysis_text = ""
         try:
             analysis_resp = anthropic_client.messages.create(
                 model="claude-haiku-4-5-20251001",
@@ -2541,8 +2542,105 @@ def send_x_weekly_report():
             pass
 
         line_bot_api.push_message(line_uid, TextSendMessage(text='\n'.join(lines)))
+
+        # TWEET_STOCKを自動改善（バックグラウンド）
+        if analysis_text:
+            threading.Thread(
+                target=auto_improve_tweet_stock,
+                args=(top_texts, analysis_text)
+            ).start()
     except Exception as e:
         print(f"X weekly report error: {e}")
+
+
+def auto_improve_tweet_stock(top_tweets_text, analysis_text):
+    """トップ型の投稿を3本生成→GitHub APIでTWEET_STOCKに自動追加→Renderが自動デプロイ"""
+    import base64
+    import requests as req_lib
+
+    github_token = (os.environ.get('GITHUB_TOKEN') or '').strip()
+    if not github_token:
+        return
+
+    repo = 'makiko01035/maki-hisho'
+    file_path = 'main.py'
+    headers = {
+        'Authorization': f'token {github_token}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    line_uid = os.environ.get('LINE_USER_ID', '')
+
+    # 新投稿3本を生成
+    gen_prompt = (
+        "あなたはXアカウント（@maki_claude_lab：ワーママ×医療職×AI副業実験中）の投稿担当です。\n"
+        "以下の分析を参考に、同じ型の新しい投稿を3本作成してください。\n\n"
+        f"【先週のトップ投稿（参考）】\n{top_tweets_text}\n\n"
+        f"【分析結果】\n{analysis_text}\n\n"
+        "条件：\n"
+        "- 各投稿は140文字以内\n"
+        "- ハッシュタグは #AI副業 #ワーママ #ClaudeCode のいずれか1〜2個\n"
+        "- まきの実体験・等身大のトーンで書く\n"
+        "- 3本を1行ずつ、番号なし・余計な説明なしで出力"
+    )
+    try:
+        gen_resp = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=500,
+            messages=[{"role": "user", "content": gen_prompt}]
+        )
+        new_tweets = [
+            t.strip() for t in gen_resp.content[0].text.strip().split('\n')
+            if t.strip() and len(t.strip()) > 10
+        ][:3]
+    except Exception as e:
+        print(f"auto_improve generate error: {e}")
+        return
+
+    if not new_tweets:
+        return
+
+    # GitHub APIでmain.pyを取得
+    r = req_lib.get(f'https://api.github.com/repos/{repo}/contents/{file_path}', headers=headers)
+    if r.status_code != 200:
+        print(f"GitHub get error: {r.status_code}")
+        return
+
+    data = r.json()
+    sha = data['sha']
+    content = base64.b64decode(data['content']).decode('utf-8')
+
+    # TWEET_STOCKの末尾（最初の ^\] の位置）に追加
+    stock_start = content.find('TWEET_STOCK = [')
+    if stock_start == -1:
+        return
+    stock_end = content.find('\n]', stock_start)
+    if stock_end == -1:
+        return
+
+    insert_lines = '\n'.join([f'    "{t}",' for t in new_tweets])
+    new_content = content[:stock_end] + '\n' + insert_lines + content[stock_end:]
+
+    # GitHub APIでコミット
+    today = datetime.date.today().strftime('%Y-%m-%d')
+    commit_msg = f"広報部PDCA：{today} トップ型投稿を{len(new_tweets)}本自動追加"
+    update_payload = {
+        'message': commit_msg,
+        'content': base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
+        'sha': sha,
+        'branch': 'main'
+    }
+    r2 = req_lib.put(
+        f'https://api.github.com/repos/{repo}/contents/{file_path}',
+        headers=headers, json=update_payload
+    )
+    if r2.status_code in (200, 201):
+        preview = '\n'.join([f'・{t[:35]}…' for t in new_tweets])
+        if line_uid:
+            line_bot_api.push_message(line_uid, TextSendMessage(
+                text=f"✅ TWEET_STOCKを自動更新！\n\n追加した投稿（{len(new_tweets)}本）：\n{preview}\n\n2〜3分でRenderに反映されます。"
+            ))
+    else:
+        print(f"GitHub put error: {r2.status_code} {r2.text[:200]}")
 
 
 def _get_x_client():
