@@ -2466,7 +2466,7 @@ def send_x_weekly_report():
             id=user_id_x,
             max_results=100,
             start_time=start_time,
-            tweet_fields=['public_metrics', 'non_public_metrics', 'created_at', 'text'],
+            tweet_fields=['public_metrics', 'created_at', 'text'],
             exclude=['retweets', 'replies']
         )
 
@@ -2478,29 +2478,20 @@ def send_x_weekly_report():
             ))
             return
 
-        def get_imp(tweet):
-            nm = tweet.non_public_metrics or {}
-            return nm.get('impression_count')
-
         def get_score(tweet):
-            imp = get_imp(tweet)
-            if imp is not None:
-                return imp
             pm = tweet.public_metrics or {}
             return pm.get('like_count', 0) * 3 + pm.get('retweet_count', 0) * 5 + pm.get('reply_count', 0) * 2
 
         sorted_tweets = sorted(tweets.data, key=get_score, reverse=True)
         total = len(sorted_tweets)
-        use_imp = get_imp(sorted_tweets[0]) is not None
-        metric_label = "imp" if use_imp else "エンゲージ"
 
         def fmt(tweet, rank):
-            score = get_imp(tweet) if use_imp else get_score(tweet)
             pm = tweet.public_metrics or {}
             likes = pm.get('like_count', 0)
             rts = pm.get('retweet_count', 0)
+            replies = pm.get('reply_count', 0)
             text_prev = tweet.text[:25] + '…' if len(tweet.text) > 25 else tweet.text
-            return f"{rank}位 {score:,}{metric_label}「{text_prev}」❤{likes} RT{rts}"
+            return f"{rank}位「{text_prev}」❤{likes} RT{rts} 返{replies}"
 
         top3 = sorted_tweets[:min(3, total)]
         worst3 = sorted_tweets[max(0, total - 3):]
