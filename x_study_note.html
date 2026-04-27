@@ -56,6 +56,9 @@
   .media-card { background: #f8f9fe; border-radius: 8px; padding: 16px; border-top: 4px solid #1a73e8; }
   .media-card strong { display: block; margin-bottom: 8px; }
   .media-card ul { margin: 0; padding-left: 16px; font-size: 0.88em; color: #555; }
+  .memo-item { padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 0.9em; line-height: 1.6; }
+  .memo-item:last-of-type { border-bottom: none; }
+  .memo-date { color: #aaa; font-size: 0.82em; margin-right: 8px; }
   @media (max-width: 600px) { .weight-grid { grid-template-columns: 1fr; } .pattern-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -645,8 +648,15 @@ https://note.com/maki_claude_lab/n/n0bf26963cd26
   <div class="todo-row"><input type="checkbox"> <span>毎週月曜のXレポートを見て、AIの改善提案を実行（リプライ増やすなど）</span></div>
 </div>
 
+<!-- 自分メモ -->
+<div class="card">
+  <h2>✏️ 自分メモ</h2>
+  <div style="font-size:0.85em;color:#888;margin-bottom:12px;">LINEで「メモ：〇〇」と送ると自動追加されます</div>
+  <!-- MEMO_INSERT_POINT -->
+</div>
+
 <div style="text-align:center;color:#aaa;font-size:0.85em;padding:20px 0;">
-  X運用 勉強ノート｜まきのAI会社 2026-04-26
+  X運用 勉強ノート｜まきのAI会社 2026-04-27
 </div>
 
 </body>

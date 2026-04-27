@@ -1797,6 +1797,20 @@ def handle_message(event):
         threading.Thread(target=send_daily_work_log).start()
         return
 
+    # 勉強ノートへのメモ追加
+    if user_message.startswith('メモ：') or user_message.startswith('メモ:'):
+        memo_text = user_message.split('：', 1)[-1].split(':', 1)[-1].strip()
+        if memo_text:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✏️ 勉強ノートに追加中...2〜3分で反映されます"))
+            def _add_memo():
+                ok = add_study_memo(memo_text)
+                uid = os.environ.get('LINE_USER_ID', '')
+                if uid:
+                    msg = "✅ 勉強ノートにメモを追加しました！" if ok else "❌ メモ追加に失敗しました"
+                    line_bot_api.push_message(uid, TextSendMessage(text=msg))
+            threading.Thread(target=_add_memo).start()
+        return
+
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
     msg_lower = user_message.lower()
@@ -2648,6 +2662,51 @@ def send_daily_work_log():
         line_bot_api.push_message(line_uid, TextSendMessage(text='\n'.join(lines)))
     except Exception as e:
         print(f"Daily work log error: {e}")
+
+
+def add_study_memo(memo_text):
+    """LINEからのメモをx_study_note.htmlに追記してGitHub APIでコミット"""
+    import base64
+    import requests as req_lib
+
+    github_token = (os.environ.get('GITHUB_TOKEN') or '').strip()
+    if not github_token:
+        return False
+
+    repo = 'makiko01035/maki-hisho'
+    file_path = 'x_study_note.html'
+    headers = {
+        'Authorization': f'token {github_token}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+
+    r = req_lib.get(f'https://api.github.com/repos/{repo}/contents/{file_path}', headers=headers)
+    if r.status_code != 200:
+        return False
+
+    data = r.json()
+    sha = data['sha']
+    content = base64.b64decode(data['content']).decode('utf-8')
+
+    now = datetime.datetime.now(JST)
+    date_str = now.strftime('%m/%d %H:%M')
+    memo_html = (
+        f'  <div class="memo-item"><span class="memo-date">{date_str}</span>{memo_text}</div>\n'
+        f'  <!-- MEMO_INSERT_POINT -->'
+    )
+    new_content = content.replace('  <!-- MEMO_INSERT_POINT -->', memo_html)
+
+    update_payload = {
+        'message': f'勉強ノート：自分メモ追加（{date_str}）',
+        'content': base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
+        'sha': sha,
+        'branch': 'main'
+    }
+    r2 = req_lib.put(
+        f'https://api.github.com/repos/{repo}/contents/{file_path}',
+        headers=headers, json=update_payload
+    )
+    return r2.status_code in (200, 201)
 
 
 def auto_improve_tweet_stock(top_tweets_text, analysis_text):
