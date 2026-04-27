@@ -2456,7 +2456,7 @@ def send_x_weekly_report():
         if not client:
             return
 
-        me = client.get_me()
+        me = client.get_me(user_auth=True)
         user_id_x = me.data.id
 
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -2466,6 +2466,7 @@ def send_x_weekly_report():
             id=user_id_x,
             max_results=10,
             tweet_fields=['public_metrics', 'text'],
+            user_auth=True
         )
 
         line_uid = os.environ['LINE_USER_ID']
