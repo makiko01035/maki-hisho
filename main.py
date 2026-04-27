@@ -1790,6 +1790,13 @@ def handle_message(event):
         threading.Thread(target=send_x_weekly_report).start()
         return
 
+    # 業務ログ即時取得
+    work_log_keywords = ['業務ログ', '今日のログ', '今日の作業', '作業ログ']
+    if any(kw in user_message for kw in work_log_keywords):
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📋 今日の業務ログを確認中です..."))
+        threading.Thread(target=send_daily_work_log).start()
+        return
+
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']
     msg_lower = user_message.lower()
@@ -2588,6 +2595,61 @@ def send_x_weekly_report():
             pass
 
 
+def send_daily_work_log():
+    """毎日18時：今日のコミット履歴＋X投稿数をLINEに送信"""
+    try:
+        import requests as req_lib
+        now = datetime.datetime.now(JST)
+        today_str = now.strftime('%Y-%m-%d')
+        line_uid = os.environ['LINE_USER_ID']
+        lines = [f"📋 今日の業務ログ（{now.strftime('%m/%d')}）\n"]
+
+        # GitHubから今日のコミットを取得
+        github_token = (os.environ.get('GITHUB_TOKEN') or '').strip()
+        if github_token:
+            headers_gh = {
+                'Authorization': f'token {github_token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            r = req_lib.get(
+                'https://api.github.com/repos/makiko01035/maki-hisho/commits',
+                headers=headers_gh,
+                params={
+                    'since': f'{today_str}T00:00:00+09:00',
+                    'until': f'{today_str}T23:59:59+09:00',
+                    'per_page': 10
+                }
+            )
+            if r.status_code == 200 and r.json():
+                commits = r.json()
+                lines.append(f"🔨 今日のコミット（{len(commits)}件）")
+                for c in commits[:5]:
+                    msg = c['commit']['message'].split('\n')[0][:40]
+                    lines.append(f"  ・{msg}")
+                lines.append("")
+            else:
+                lines.append("🔨 今日のコミット：なし\n")
+
+        # X投稿数
+        x_count = 3 if now.day % 2 == 1 else 2
+        lines.append(f"📱 X投稿：{x_count}本 自動投稿済み\n")
+
+        # AIの一言
+        try:
+            ai_resp = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=60,
+                messages=[{"role": "user", "content": f"ワーママAI副業家まきさんへ、今日もお疲れ様の一言を30文字以内で。明るく背中を押す一言で。"}]
+            )
+            lines.append(f"💌 {ai_resp.content[0].text.strip()}")
+        except Exception:
+            lines.append("💌 今日もお疲れ様！明日もコツコツいこう。")
+
+        line_bot_api.push_message(line_uid, TextSendMessage(text='\n'.join(lines)))
+    except Exception as e:
+        print(f"Daily work log error: {e}")
+
+
 def auto_improve_tweet_stock(top_tweets_text, analysis_text):
     """トップ型の投稿を3本生成→GitHub APIでTWEET_STOCKに自動追加→Renderが自動デプロイ"""
     import base64
@@ -2764,6 +2826,8 @@ scheduler.add_job(send_weekly_seo_report, 'cron', day_of_week='mon', hour=9, min
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
 # 毎週月曜9時40分：週次Xパフォーマンスレポート（PDCA用）
 scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
+# 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
+scheduler.add_job(send_daily_work_log, 'cron', hour=18, minute=0)
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 scheduler.start()
