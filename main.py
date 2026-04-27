@@ -182,7 +182,7 @@ def format_events(events):
 
 
 def check_deadline_reminders():
-    """申込期限の1週間前・3日前・前日・当日にLINE通知を送る"""
+    """申込期限の1週間前・3日前・前日・当日、申込開始日の当日にLINE通知を送る"""
     try:
         service = get_calendar_service()
         cal_id = get_or_create_maybe_calendar(service)
@@ -212,11 +212,15 @@ def check_deadline_reminders():
             ).execute()
 
             for e in result.get('items', []):
-                if '【申込期限】' not in e.get('summary', ''):
-                    continue
-                title = e['summary'].replace('【申込期限】', '').strip()
-                msg = f"{icon} 【申込期限 {label}！】\n「{title}」の申し込み期限は{label}です！\n{action}"
-                line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+                summary = e.get('summary', '')
+                if '【申込期限】' in summary:
+                    title = summary.replace('【申込期限】', '').strip()
+                    msg = f"{icon} 【申込期限 {label}！】\n「{title}」の申し込み期限は{label}です！\n{action}"
+                    line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+                elif '【申込開始】' in summary and days_ahead == 0:
+                    title = summary.replace('【申込開始】', '').strip()
+                    msg = f"🟢 【申込開始 今日！】\n「{title}」の申し込みが今日から始まりました！\n忘れずに申し込んでください！"
+                    line_bot_api.push_message(user_id, TextSendMessage(text=msg))
     except Exception as e:
         print(f"Deadline reminder error: {e}")
 
@@ -1334,20 +1338,24 @@ JSON形式のみ返してください。"""
                     },
                     {
                         'type': 'text',
-                        'text': """このチラシやプリントから全てのイベント・日程情報を抽出してください。
+                        'text': f"""このチラシやプリントから全てのイベント・日程情報を抽出してください。
 複数の日程がある場合は全て抽出してください。
+今日の日付: {datetime.datetime.now(JST).strftime('%Y-%m-%d')}
+年が書かれていない日付は今日の年（{datetime.datetime.now(JST).year}年）を使ってください。ただし、今日の日付より前になる場合は翌年にしてください。
 以下のJSON配列形式のみ返してください（情報がない場合はnullにしてください）：
 [
-  {
+  {{
     "title": "イベント名",
     "date": "YYYY-MM-DD",
     "start_time": "HH:MM",
     "end_time": "HH:MM",
     "location": "場所",
     "description": "その他メモ",
+    "application_start": "YYYY-MM-DD",
     "application_deadline": "YYYY-MM-DD"
-  }
+  }}
 ]
+application_startは申込開始日・受付開始日・予約開始日などの日付です。ない場合はnullにしてください。
 application_deadlineは申込締切・申込期限・締切日などの日付です。ない場合はnullにしてください。
 必ずJSON配列（[...]）で返してください。"""
                     }
@@ -1392,6 +1400,8 @@ application_deadlineは申込締切・申込期限・締切日などの日付で
                 msg += f"　🕐 {time_str}\n"
             if ev.get('location'):
                 msg += f"　📍 {ev['location']}\n"
+            if ev.get('application_start'):
+                msg += f"　🟢 申込開始: {ev['application_start']}\n"
             if ev.get('application_deadline'):
                 msg += f"　⚠️ 申込期限: {ev['application_deadline']}\n"
             msg += "\n"
@@ -1591,6 +1601,7 @@ def handle_message(event):
             cal_id = get_or_create_maybe_calendar(service)
             registered = []
             deadline_count = 0
+            start_count = 0
 
             for extracted in extracted_list:
                 if extracted.get('date') and extracted.get('start_time'):
@@ -1624,6 +1635,17 @@ def handle_message(event):
                 service.events().insert(calendarId=cal_id, body=event_body).execute()
                 registered.append(extracted.get('title') or 'イベント')
 
+                app_start = extracted.get('application_start')
+                if app_start:
+                    start_event = {
+                        'summary': f"【申込開始】{extracted.get('title') or 'イベント'}",
+                        'description': '申込開始日です。忘れずに申し込みを！',
+                        'start': {'date': app_start},
+                        'end': {'date': app_start},
+                    }
+                    service.events().insert(calendarId=cal_id, body=start_event).execute()
+                    start_count += 1
+
                 deadline = extracted.get('application_deadline')
                 if deadline:
                     deadline_event = {
@@ -1638,6 +1660,8 @@ def handle_message(event):
             reply = f"✅ {len(registered)}件を「気になるイベント」に登録しました！\n\n"
             for title in registered:
                 reply += f"📌 {title}\n"
+            if start_count:
+                reply += f"\n🟢 申込開始日{start_count}件も登録しました！\n当日にお知らせします！"
             if deadline_count:
                 reply += f"\n⚠️ 申込期限{deadline_count}件も登録しました！\n1週間前・3日前・前日・当日にお知らせします！"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
