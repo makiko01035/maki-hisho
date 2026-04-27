@@ -2464,10 +2464,8 @@ def send_x_weekly_report():
 
         tweets = client.get_users_tweets(
             id=user_id_x,
-            max_results=100,
-            start_time=start_time,
-            tweet_fields=['public_metrics', 'created_at', 'text'],
-            exclude=['retweets', 'replies']
+            max_results=10,
+            tweet_fields=['public_metrics', 'text'],
         )
 
         line_uid = os.environ['LINE_USER_ID']
@@ -2542,6 +2540,14 @@ def send_x_weekly_report():
             ).start()
     except Exception as e:
         print(f"X weekly report error: {e}")
+        try:
+            line_uid = os.environ.get('LINE_USER_ID', '')
+            if line_uid:
+                line_bot_api.push_message(line_uid, TextSendMessage(
+                    text=f"❌ Xレポートエラー：\n{str(e)[:200]}"
+                ))
+        except Exception:
+            pass
 
 
 def auto_improve_tweet_stock(top_tweets_text, analysis_text):
