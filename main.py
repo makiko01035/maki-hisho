@@ -2516,7 +2516,29 @@ def send_x_weekly_report():
             lines.append("\n📉 ワースト3")
             for i, t in enumerate(worst3, 1):
                 lines.append(fmt(t, total - len(worst3) + i))
-        lines.append("\n💡 トップ投稿の型を「これ増やして」と話しかけてね！")
+
+        # トップ投稿をAIで分析して型と改善提案を生成
+        top_texts = '\n'.join([f"{i+1}位: {t.text}" for i, t in enumerate(top3)])
+        worst_texts = '\n'.join([f"{t.text}" for t in worst3]) if total > 3 else "なし"
+        analysis_prompt = (
+            "あなたはXアカウント（@maki_claude_lab：ワーママ×医療職×AI副業実験中）の投稿分析者です。\n"
+            "以下のパフォーマンスデータを見て、簡潔に分析してください。\n\n"
+            f"【今週のトップ投稿】\n{top_texts}\n\n"
+            f"【今週のワースト投稿】\n{worst_texts}\n\n"
+            "以下の形式で答えてください（全体で100文字以内）：\n"
+            "今週の傾向：〇〇型が強い（例：Before→After型、数字まとめ型、実体験型、共感型、断言型）\n"
+            "来週やること：〇〇（具体的に1行で）"
+        )
+        try:
+            analysis_resp = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=150,
+                messages=[{"role": "user", "content": analysis_prompt}]
+            )
+            analysis_text = analysis_resp.content[0].text.strip()
+            lines.append(f"\n📌 AI分析\n{analysis_text}")
+        except Exception:
+            pass
 
         line_bot_api.push_message(line_uid, TextSendMessage(text='\n'.join(lines)))
     except Exception as e:
