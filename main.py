@@ -1503,9 +1503,14 @@ def handle_file(event):
     threading.Thread(target=run_transcription, args=(event.source.user_id, audio_data, filename)).start()
 
 
+def _sanitize_text(text: str) -> str:
+    # 孤立サロゲート文字を除去（Anthropic APIのJSON serialization失敗を防ぐ）
+    return text.encode('utf-16', 'surrogatepass').decode('utf-16', errors='replace')
+
+
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    user_message = event.message.text
+    user_message = _sanitize_text(event.message.text)
     user_id = event.source.user_id
 
     # ユーザーIDを確認するコマンド
