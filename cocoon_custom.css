@@ -1,0 +1,276 @@
+/* ========================================
+   foodmakehealth.com カスタムCSS（完全版）
+   WordPress: 外観 → カスタマイズ → 追加CSS に貼り付け
+   ★古い内容を全選択削除してから貼り替えること
+   ======================================== */
+
+/* === Cocoon変数上書き（最優先） === */
+:root {
+  --cocoon-theme-color: #2D6A9F !important;
+  --cocoon-text-color: #333333 !important;
+  --cocoon-default-font: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif !important;
+  /* サイト内で使うカラー変数 */
+  --main: #2D6A9F;
+  --main-light: #F0F7FF;
+  --accent: #4CAF8A;
+  --highlight: #E8F4FD;
+  --text: #333333;
+  --text-light: #666666;
+  --border: #e0e8f0;
+}
+
+/* ========================================
+   1. 全体・フォント
+   ======================================== */
+body {
+  font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
+  font-size: 16px !important;
+  color: var(--text);
+  line-height: 1.9;
+  background: #f5f7fa;
+}
+
+/* ========================================
+   2. ヘッダー
+   ======================================== */
+#header {
+  background-color: #ffffff !important;
+  border-bottom: 3px solid var(--main) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.header-title a,
+#header .site-name-text,
+.site-name-text,
+.site-name a {
+  color: var(--main) !important;
+  font-size: 22px !important;
+}
+
+.header-sub-title {
+  color: var(--text-light) !important;
+  font-size: 13px !important;
+}
+
+/* ========================================
+   3. グローバルナビ
+   ======================================== */
+#navi,
+.navi {
+  background: var(--main) !important;
+}
+
+.navi-in > ul > li > a,
+#navi .navi-in > ul > li > a {
+  color: white !important;
+  font-size: 14px !important;
+  font-weight: 500;
+  padding: 14px 18px !important;
+  transition: background 0.2s;
+}
+
+.navi-in > ul > li > a:hover,
+#navi .navi-in > ul > li > a:hover {
+  background: rgba(255,255,255,0.15) !important;
+  color: white !important;
+}
+
+/* ========================================
+   4. 記事見出し（H2・H3）
+   ======================================== */
+.entry-content h2 {
+  font-size: 20px !important;
+  font-weight: 700;
+  padding: 10px 16px !important;
+  border-left: 4px solid var(--main) !important;
+  border-bottom: none !important;
+  background: var(--main-light) !important;
+  border-radius: 0 4px 4px 0;
+  margin: 32px 0 16px !important;
+  color: var(--text) !important;
+}
+
+.entry-content h3 {
+  font-size: 17px !important;
+  font-weight: 700;
+  color: var(--main) !important;
+  border-left: none !important;
+  border-bottom: 2px solid var(--border) !important;
+  background: transparent !important;
+  padding: 0 0 6px !important;
+  margin: 24px 0 12px !important;
+}
+
+.entry-content h4 {
+  font-size: 16px !important;
+  font-weight: 700;
+  color: var(--text) !important;
+}
+
+/* ========================================
+   5. ハイライトボックス 3種
+   記事内でブロックの「高度な設定 → 追加CSSクラス」に入力して使う
+   ======================================== */
+
+/* 結論ボックス（青）*/
+.box-conclusion {
+  background: var(--highlight);
+  border-left: 4px solid var(--main);
+  border-radius: 0 8px 8px 0;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+
+.box-conclusion::before {
+  content: "\1F4CC  この記事の結論";
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--main);
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+/* 医師コメントボックス（緑）*/
+.box-doctor {
+  background: #EEF7F2;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+
+.box-doctor::before {
+  content: "\1FA7A  医師より";
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+/* 薬膳ボックス（黄）*/
+.box-yakuzen {
+  background: #FFF9EE;
+  border: 1px solid #E8C86A;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin: 24px 0;
+}
+
+.box-yakuzen::before {
+  content: "\1F33F  薬膳アドバイス";
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #B8860B;
+  margin-bottom: 8px;
+}
+
+/* マーカーハイライト（黄色下線風）*/
+.marker {
+  background: linear-gradient(transparent 60%, #FFEB99 60%);
+  font-weight: 500;
+}
+
+/* ========================================
+   6. ウィジェットタイトル
+   ======================================== */
+.widget-title,
+.widget .widgettitle,
+.widgettitle {
+  background: var(--main) !important;
+  color: white !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border: none !important;
+  border-radius: 4px 4px 0 0;
+}
+
+/* ========================================
+   7. フッター
+   ======================================== */
+#footer,
+.footer {
+  background: #1a3a5c !important;
+  color: rgba(255,255,255,0.7) !important;
+}
+
+#footer a,
+.footer a {
+  color: rgba(255,255,255,0.7) !important;
+}
+
+#footer a:hover,
+.footer a:hover {
+  color: var(--accent) !important;
+}
+
+/* ========================================
+   8. CTAボタン（記事末の誘導）
+   ======================================== */
+.cta-btn,
+.btn-cta {
+  display: inline-block;
+  background: var(--accent) !important;
+  color: white !important;
+  padding: 12px 32px;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  text-align: center;
+}
+
+/* ========================================
+   9. 記事カード（トップページ・一覧）
+   ======================================== */
+.card-title {
+  font-size: 15px !important;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.cat-label,
+.entry-cat-label {
+  background: var(--main) !important;
+  color: white !important;
+  font-size: 11px !important;
+}
+
+/* ========================================
+   10. パンくずリスト
+   ======================================== */
+.breadcrumb a {
+  color: var(--main) !important;
+}
+
+/* ========================================
+   11. リンクカラー
+   ======================================== */
+a {
+  color: var(--main);
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+/* ========================================
+   12. スマホ対応
+   ======================================== */
+@media (max-width: 768px) {
+  body {
+    font-size: 15px !important;
+  }
+
+  .entry-content h2 {
+    font-size: 18px !important;
+  }
+
+  .entry-content h3 {
+    font-size: 16px !important;
+  }
+}

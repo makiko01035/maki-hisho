@@ -8,9 +8,10 @@ SECRET = "U16db70df5ef0ed2d73189eee5620669e"
 
 md_path = sys.argv[1] if len(sys.argv) > 1 else None
 slug = sys.argv[2] if len(sys.argv) > 2 else ""
+update_id = sys.argv[3] if len(sys.argv) > 3 else ""  # 既存記事IDを渡すと更新
 
 if not md_path:
-    print("使い方: python post_yakuzen_direct.py <記事.md> [スラッグ]")
+    print("使い方: python post_yakuzen_direct.py <記事.md> [スラッグ] [更新するpost_id]")
     sys.exit(1)
 
 with open(md_path, "r", encoding="utf-8") as f:
@@ -22,6 +23,10 @@ def strip_meta_comments(text):
 
 raw = strip_meta_comments(raw)
 
+# **太字** → <strong>（divの中でmarkdownが効かないので先に変換）
+def convert_bold(text):
+    return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+
 # ボックスコメントマーカーをCSSクラス付きdivに変換
 def convert_boxes(text):
     for box in ['conclusion', 'doctor', 'yakuzen']:
@@ -32,7 +37,7 @@ def convert_boxes(text):
             r'<!-- ▲ box-' + box + r' ここまで -->'
         )
         def wrap(m, b=box):
-            inner = m.group(1).strip()
+            inner = convert_bold(m.group(1).strip())
             return f'<div class="box-{b}">\n{inner}\n</div>'
         text = re.sub(pattern, wrap, text, flags=re.DOTALL)
     # 残ったコメントマーカーを除去
@@ -51,7 +56,8 @@ if not slug:
     slug = "pillow-mattress-ranking"
 
 payload = json.dumps(
-    {"title": title, "content_md": body, "slug": slug},
+    {"title": title, "content_md": body, "slug": slug,
+     "update_id": update_id},
     ensure_ascii=False
 )
 headers = {

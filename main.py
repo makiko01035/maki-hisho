@@ -489,7 +489,9 @@ def post_yakuzen_direct():
         return {'error': 'title and content_md required'}, 400
     try:
         from blog_yakuzen import post_to_yakuzen_wp
-        post_id, post_url = post_to_yakuzen_wp(title, content_md, status='publish')
+        update_id = data.get('update_id', '')
+        pid = int(update_id) if update_id else None
+        post_id, post_url = post_to_yakuzen_wp(title, content_md, post_id=pid, status='publish')
         if slug:
             wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
             wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
