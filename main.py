@@ -485,8 +485,8 @@ def post_yakuzen_direct():
     title = data.get('title', '')
     content_md = data.get('content_md', '')
     slug = data.get('slug', '')
-    if not title or not content_md:
-        return {'error': 'title and content_md required'}, 400
+    if not title or (not content_md and not data.get('content_html', '')):
+        return {'error': 'title and content required'}, 400
     try:
         update_id = data.get('update_id', '')
         pid = int(update_id) if update_id else None
