@@ -533,6 +533,28 @@ def post_yakuzen_direct():
             post_data = {'title': title, 'content': content_html, 'status': 'publish'}
             if slug:
                 post_data['slug'] = slug
+            # カテゴリー・タグのサポート
+            categories = data.get('categories', [])
+            if categories:
+                post_data['categories'] = categories
+            tag_names = data.get('tags', [])
+            if tag_names:
+                # タグ名→IDに変換（なければ作成）
+                tag_ids = []
+                for tag_name in tag_names:
+                    tr = requests.get(f'{wp_url}/wp-json/wp/v2/tags',
+                                      params={'search': tag_name}, auth=(wp_user, wp_pass), timeout=15)
+                    hits = tr.json() if tr.status_code == 200 else []
+                    exact = next((t for t in hits if t['name'] == tag_name), None)
+                    if exact:
+                        tag_ids.append(exact['id'])
+                    else:
+                        cr = requests.post(f'{wp_url}/wp-json/wp/v2/tags',
+                                           auth=(wp_user, wp_pass), json={'name': tag_name}, timeout=15)
+                        if cr.status_code == 201:
+                            tag_ids.append(cr.json()['id'])
+                if tag_ids:
+                    post_data['tags'] = tag_ids
             if pid:
                 res = requests.post(f'{wp_url}/wp-json/wp/v2/posts/{pid}',
                                     auth=(wp_user, wp_pass), json=post_data, timeout=30)
@@ -555,6 +577,49 @@ def post_yakuzen_direct():
         return {'status': 'ok', 'post_id': post_id, 'url': post_url}, 201
     except Exception as e:
         return {'error': str(e)}, 500
+
+
+@app.route('/update-yakuzen-meta', methods=['POST'])
+def update_yakuzen_meta():
+    """既存記事のカテゴリー・タグ・スラッグを更新する（コンテンツ変更なし）"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('LINE_USER_ID', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    post_ids = data.get('post_ids', [])
+    if not post_ids:
+        return {'error': 'post_ids required'}, 400
+    wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+    wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+    wp_pass = os.environ['YAKUZEN_WP_APP_PASSWORD']
+    update_data = {}
+    if 'categories' in data:
+        update_data['categories'] = data['categories']
+    tag_names = data.get('tags', [])
+    if tag_names:
+        tag_ids = []
+        for tag_name in tag_names:
+            tr = requests.get(f'{wp_url}/wp-json/wp/v2/tags',
+                              params={'search': tag_name}, auth=(wp_user, wp_pass), timeout=15)
+            hits = tr.json() if tr.status_code == 200 else []
+            exact = next((t for t in hits if t['name'] == tag_name), None)
+            if exact:
+                tag_ids.append(exact['id'])
+            else:
+                cr = requests.post(f'{wp_url}/wp-json/wp/v2/tags',
+                                   auth=(wp_user, wp_pass), json={'name': tag_name}, timeout=15)
+                if cr.status_code == 201:
+                    tag_ids.append(cr.json()['id'])
+        update_data['tags'] = tag_ids
+    results = []
+    for pid in post_ids:
+        try:
+            res = requests.post(f'{wp_url}/wp-json/wp/v2/posts/{pid}',
+                                auth=(wp_user, wp_pass), json=update_data, timeout=30)
+            results.append({'post_id': pid, 'status': res.status_code})
+        except Exception as e:
+            results.append({'post_id': pid, 'error': str(e)})
+    return {'results': results}, 200
 
 
 @app.route('/debug-image')
