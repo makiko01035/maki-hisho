@@ -498,7 +498,26 @@ def _build_rakuten_section(title, content_md=''):
 </div>'''
 
 
-def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured_media_id=None):
+SLEEP_KEYWORDS = ['睡眠', '不眠', '眠れ', '眠り', '熟睡', '入眠', '夜勤', '快眠', '睡眠外来', '起きられ', '朝起き', '目が覚め', 'いびき', '無呼吸', 'メラトニン', 'セロトニン']
+KIDS_SLEEP_KEYWORDS = ['子ども', 'こども', '子供', '小学生', '赤ちゃん', '乳幼児']
+
+
+def detect_category_id(title, content=''):
+    """タイトル・内容から適切なWPカテゴリーIDを判定する"""
+    text = title + content
+    # 子ども睡眠（215）：子ども系キーワード＋睡眠系キーワードが両方あるとき
+    has_kids = any(kw in text for kw in KIDS_SLEEP_KEYWORDS)
+    has_sleep = any(kw in text for kw in SLEEP_KEYWORDS)
+    if has_kids and has_sleep:
+        return 215
+    # 睡眠の悩み（219）：睡眠系キーワードがあるとき
+    if has_sleep:
+        return 219
+    # デフォルト：普段使いの薬膳レシピ（9）
+    return 9
+
+
+def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured_media_id=None, categories=None, tags=None):
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
     html = html.replace('<!-- yakuzen-affiliate-cta -->', _build_affiliate_cta(title, content_md))
@@ -511,6 +530,26 @@ def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured
     data = {'title': title, 'content': html, 'status': status}
     if featured_media_id:
         data['featured_media'] = featured_media_id
+    # カテゴリー：指定がなければタイトルから自動判定
+    cat_id = categories if categories else [detect_category_id(title, content_md)]
+    data['categories'] = cat_id
+    # タグ：渡された場合はID変換して設定
+    if tags:
+        tag_ids = []
+        for tag_name in tags:
+            tr = requests.get(f'{wp_url}/wp-json/wp/v2/tags',
+                              params={'search': tag_name}, auth=(wp_user, wp_pass), timeout=15)
+            hits = tr.json() if tr.status_code == 200 else []
+            exact = next((t for t in hits if t['name'] == tag_name), None)
+            if exact:
+                tag_ids.append(exact['id'])
+            else:
+                cr = requests.post(f'{wp_url}/wp-json/wp/v2/tags',
+                                   auth=(wp_user, wp_pass), json={'name': tag_name}, timeout=15)
+                if cr.status_code == 201:
+                    tag_ids.append(cr.json()['id'])
+        if tag_ids:
+            data['tags'] = tag_ids
     if post_id:
         res = requests.post(
             f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
