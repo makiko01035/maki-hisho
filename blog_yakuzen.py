@@ -142,7 +142,10 @@ def auto_rewrite_yakuzen(user_id):
         keyword = generate_pexels_keyword(new_title)
         image_url = fetch_pexels_image_url(keyword)
         media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
-        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish', featured_media_id=media_id)
+        # リライト後のタイトルからカテゴリーを自動判定（薬膳→睡眠系に移動）
+        new_cat_id = detect_category_id(new_title, new_content)
+        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
+                                     featured_media_id=media_id, categories=[new_cat_id])
         try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
         sns_msg = build_sns_message(new_title, link, image_url, new_content)
         msg = f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
@@ -339,7 +342,7 @@ def generate_yakuzen_rewrite(title, original_html, instruction=''):
         max_tokens=4000,
         messages=[{
             'role': 'user',
-            'content': f"""あなたは薬膳料理研究家です。以下の薬膳ブログ記事をリライトしてください。
+            'content': f"""あなたは内科医であり薬膳の専門家です。以下のブログ記事を「睡眠・健康改善×東洋医学・薬膳」の視点でリライトしてください。
 
 元のタイトル：{title}
 元の記事内容：
@@ -347,28 +350,26 @@ def generate_yakuzen_rewrite(title, original_html, instruction=''):
 {extra}
 
 【ライター設定】
-- 薬膳料理研究家として、日常の食事で体を整える方法を伝える専門家
-- 難しい理論より「今日から使える」実践的な知識を重視
-- 読者の悩みに共感し、寄り添うトーン
+- 内科医・睡眠外来担当医として、医学的根拠のある情報を提供する専門家
+- 薬膳・東洋医学の知識も持ち、西洋医学と組み合わせた実践的アドバイスが強み
+- 読者の悩みに共感し、「今日から試せる」具体策を伝える
 
 【ターゲット】
-- 20〜40代女性（働く女性・子育て中のお母さん）
-- 「病院に行くほどじゃないけど何となくつらい」症状に悩んでいる
-- 健康意識はあるが忙しいので手軽さを求めている
+- 30〜50代女性（睡眠の悩み・更年期・疲れが取れないなどを抱えている）
+- 「病院に行くほどじゃないけど眠れない・だるい」と感じている
+- 薬に頼らず食事・生活習慣から改善したいと思っている
 
-【SEO・リライト要件】
-- タイトル：症状キーワード＋食材＋「薬膳」を含む32字以内に改善
-- 冒頭100字：症状への共感＋この記事で解決できることを明示
-- 見出し（##）：3〜4個、各見出しにも検索キーワードを含める
-- 古い表現・読みにくい文章は全面的に書き直す
-- 文中に症状・食材・効能ワードを自然に散りばめる
+【リライト方針】
+- 元の薬膳・食材の知識を活かしながら、睡眠・疲労回復・更年期などの健康テーマに結びつける
+- 「この食材を食べると眠りやすくなる」「更年期の不調を和らげる」など読者の悩み解決につなげる
+- 医師としての専門知識（box-doctorコメント）を盛り込み信頼性を高める
+- タイトルは「睡眠・更年期・疲れ・体調」などの悩みキーワード＋解決策を含む32字以内
 
-【文章スタイル】
-- 1文は40字以内を目安に短く
-- 箇条書きを積極的に使う
-- 「〜してみてください」など親しみやすい語尾
-- 2000〜2500文字（元記事より充実させる）
-- Markdown形式、最初の行は「# タイトル」
+【SEO要件】
+- 冒頭100字：悩みへの共感＋この記事で何がわかるかを明示
+- 見出し（##）：3〜5個、各見出しに検索キーワードを含める
+- 箇条書き・表を積極的に使う
+- 2000〜2500文字、Markdown形式、最初の行は「# タイトル」
 - 記事末尾に「<!-- yakuzen-affiliate-cta -->」を1行追加"""
         }]
     )
@@ -498,22 +499,30 @@ def _build_rakuten_section(title, content_md=''):
 </div>'''
 
 
-SLEEP_KEYWORDS = ['睡眠', '不眠', '眠れ', '眠り', '熟睡', '入眠', '夜勤', '快眠', '睡眠外来', '起きられ', '朝起き', '目が覚め', 'いびき', '無呼吸', 'メラトニン', 'セロトニン']
-KIDS_SLEEP_KEYWORDS = ['子ども', 'こども', '子供', '小学生', '赤ちゃん', '乳幼児']
+SLEEP_KEYWORDS = ['睡眠', '不眠', '眠れ', '眠り', '熟睡', '入眠', '夜勤', '快眠', '睡眠外来', '起きられ', '朝起き', '目が覚め', 'いびき', '無呼吸', 'メラトニン', 'セロトニン', '睡眠の質', '寝つき', '中途覚醒', '早朝覚醒']
+KIDS_SLEEP_KEYWORDS = ['子ども', 'こども', '子供', '小学生', '赤ちゃん', '乳幼児', '中学生', '高校生']
+MENOPAUSE_KEYWORDS = ['更年期', '閉経', 'ホットフラッシュ', 'ほてり', 'のぼせ', 'エストロゲン', 'HRT', '女性ホルモン', 'PMS', '生理前', '月経前']
+ORIENTAL_KEYWORDS = ['東洋医学', '漢方', '中医学', '気血水', '陰陽', '五臓', '経絡', '鍼灸', '生薬', '薬膳', '陰虚', '気虚', '血虚', '瘀血', '湿熱']
 
 
 def detect_category_id(title, content=''):
-    """タイトル・内容から適切なWPカテゴリーIDを判定する"""
+    """タイトル・内容から適切なWPカテゴリーIDを判定する（優先順位順）"""
     text = title + content
-    # 子ども睡眠（215）：子ども系キーワード＋睡眠系キーワードが両方あるとき
     has_kids = any(kw in text for kw in KIDS_SLEEP_KEYWORDS)
     has_sleep = any(kw in text for kw in SLEEP_KEYWORDS)
+    # 更年期ケア（216）：更年期系キーワードがあるとき（睡眠との組み合わせも含む）
+    if any(kw in text for kw in MENOPAUSE_KEYWORDS):
+        return 216
+    # 子どもの睡眠（215）：子ども系＋睡眠系が両方あるとき
     if has_kids and has_sleep:
         return 215
     # 睡眠の悩み（219）：睡眠系キーワードがあるとき
     if has_sleep:
         return 219
-    # デフォルト：普段使いの薬膳レシピ（9）
+    # 東洋医学（217）：東洋医学・漢方系キーワードがあるとき
+    if any(kw in text for kw in ORIENTAL_KEYWORDS):
+        return 217
+    # デフォルト：普段使いの薬膳レシピ（9）—新記事は原則増やさない
     return 9
 
 
@@ -636,7 +645,9 @@ def process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruct
         keyword = generate_pexels_keyword(new_title)
         image_url = fetch_pexels_image_url(keyword)
         media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
-        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish', featured_media_id=media_id)
+        new_cat_id = detect_category_id(new_title, new_content)
+        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
+                                     featured_media_id=media_id, categories=[new_cat_id])
         try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
         sns_msg = build_sns_message(new_title, link, image_url, new_content)
         msg = f"✅ 薬膳記事をリライト・更新しました！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
