@@ -505,11 +505,27 @@ def _extract_rakuten_keyword(title, content_md):
         return title.replace('薬膳', '').strip()[:20] or title
 
 
+def _build_rakuten_natural_intro(title, content_md, keyword):
+    """3パターンの自然な導入文をタイトルの特徴で切り替える"""
+    text = title + content_md
+    # パターンC：忙しさ・手軽さキーワードがあるとき
+    if any(kw in text for kw in ['忙しい', '簡単', '手軽', '時間がない', '夜勤', '育児']):
+        return f'''<p>「食材を揃えて調理する余裕はない…」という方には、すでにブレンドされたお茶タイプが便利です。</p>
+<p>なつめ・百合根・蓮の実など、東洋医学で「心を落ち着かせる」とされる食材が入ったものを選ぶのがポイント。寝る前の「儀式」にすると、体だけでなく気持ちもオフになりやすいです。</p>'''
+    # パターンB：薬膳食材が具体的に挙がっているとき
+    elif any(kw in text for kw in ['なつめ', 'クコ', '白きくらげ', '百合根', '蓮の実', '酸棗仁']):
+        return f'''<p>「{keyword}ってどこで買えるの？」と思った方へ。スーパーで見かけない場合は楽天で探すと個包装タイプや飲みやすいお茶タイプが見つかります。無農薬・国産のものを選ぶと安心です。</p>'''
+    # パターンA：デフォルト（改善方法の流れに乗せる）
+    else:
+        return f'''<p>就寝前のひとときを変えるだけで、眠りの深さが変わることがあります。体を内側から落ち着かせる薬膳食材を、まずは飲み物から試してみませんか。特別な調理も不要なので忙しい夜でも続けやすいです。</p>'''
+
+
 def _build_rakuten_section(title, content_md=''):
     keyword = _extract_rakuten_keyword(title, content_md)
     items = search_rakuten_items(keyword)
     if not items:
         return ''
+    intro = _build_rakuten_natural_intro(title, content_md, keyword)
     cards = ''
     for item in items:
         name = item['name'][:50] + ('...' if len(item['name']) > 50 else '')
@@ -522,7 +538,8 @@ def _build_rakuten_section(title, content_md=''):
   </div>
 </div>'''
     return f'''<div style="background:#fff5f5;border-left:4px solid #bf0000;padding:20px;margin:30px 0;border-radius:4px;">
-<p style="font-weight:bold;margin:0 0 16px;">🛒 楽天市場で探す（{keyword}）</p>
+{intro}
+<p style="font-weight:bold;margin:12px 0 16px;">🛒 楽天市場で探す（{keyword}）</p>
 {cards}
 </div>'''
 
