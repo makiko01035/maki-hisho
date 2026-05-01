@@ -456,6 +456,40 @@ def rewrite_yakuzen_direct():
     return {'status': 'accepted', 'message': 'リライト開始。完了はLINEに通知します'}, 202
 
 
+@app.route('/set-yakuzen-image', methods=['POST'])
+def set_yakuzen_image():
+    """既存の薬膳記事にPexelsアイキャッチ画像を設定する"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('LINE_USER_ID', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    post_id = data.get('post_id')
+    keyword = data.get('keyword', 'pillow mattress sleep bedroom')
+    title = data.get('title', keyword)
+    if not post_id:
+        return {'error': 'post_id required'}, 400
+    try:
+        from blog_yakuzen import fetch_pexels_image_url, upload_image_to_yakuzen_wp
+        image_url = fetch_pexels_image_url(keyword)
+        if not image_url:
+            return {'error': 'Pexels画像が見つかりませんでした'}, 404
+        media_id = upload_image_to_yakuzen_wp(image_url, title)
+        wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+        wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+        wp_pass = os.environ['YAKUZEN_WP_APP_PASSWORD']
+        res = requests.post(
+            f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+            auth=(wp_user, wp_pass),
+            json={'featured_media': media_id},
+            timeout=30
+        )
+        if res.status_code in (200, 201):
+            return {'status': 'ok', 'media_id': media_id, 'image_url': image_url}
+        return {'error': res.text[:200]}, 500
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/post-sekisui-direct', methods=['POST'])
 def post_sekisui_direct():
     """Claude Codeから直接セキスイ記事を投稿するエンドポイント"""
