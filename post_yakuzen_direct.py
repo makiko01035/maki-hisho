@@ -2,6 +2,7 @@ import requests
 import json
 import sys
 import re
+import markdown as md_lib
 
 RENDER_URL = "https://maki-hisho.onrender.com/post-yakuzen-direct"
 SECRET = "U16db70df5ef0ed2d73189eee5620669e"
@@ -23,26 +24,40 @@ def strip_meta_comments(text):
 
 raw = strip_meta_comments(raw)
 
-# **太字** → <strong>（divの中でmarkdownが効かないので先に変換）
+# **太字** → <strong>
 def convert_bold(text):
     return re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
 
-# ボックスコメントマーカーをCSSクラス付きdivに変換
+# ボックスコメントマーカーをCSSクラス付きdivに変換（行単位で処理）
 def convert_boxes(text):
-    for box in ['conclusion', 'doctor', 'yakuzen']:
-        pattern = (
-            r'<!-- ▼ box-' + box + r' クラスのブロックに追加 -->\n'
-            r'\*\*.*?\*\*\n\n'  # 太字タイトル行（CSSのbeforeで表示するので除去）
-            r'(.*?)'
-            r'<!-- ▲ box-' + box + r' ここまで -->'
-        )
-        def wrap(m, b=box):
-            inner = convert_bold(m.group(1).strip())
-            return f'<div class="box-{b}">\n{inner}\n</div>'
-        text = re.sub(pattern, wrap, text, flags=re.DOTALL)
-    # 残ったコメントマーカーを除去
-    text = re.sub(r'<!-- [▼▲][^>]*-->\n?', '', text)
-    return text
+    lines = text.split('\n')
+    result = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = re.match(r'<!-- ▼ box-(\w+)', line)
+        if m:
+            box_type = m.group(1)
+            end_marker = f'<!-- ▲ box-{box_type}'
+            i += 1
+            # タイトル行(**...**)をスキップ
+            if i < len(lines) and lines[i].strip().startswith('**'):
+                i += 1
+            # タイトル後の空行をスキップ
+            if i < len(lines) and lines[i].strip() == '':
+                i += 1
+            # 内容を収集
+            content_lines = []
+            while i < len(lines) and not lines[i].startswith(end_marker):
+                content_lines.append(lines[i])
+                i += 1
+            i += 1  # 閉じマーカーをスキップ
+            inner = convert_bold('\n'.join(content_lines).strip())
+            result.append(f'<div class="box-{box_type}">\n{inner}\n</div>')
+        else:
+            result.append(line)
+            i += 1
+    return '\n'.join(result)
 
 raw = convert_boxes(raw)
 
@@ -55,8 +70,11 @@ body = "\n".join(lines[1:]).lstrip("\n")
 if not slug:
     slug = "pillow-mattress-ranking"
 
+# ローカルでMarkdown→HTML変換（divクラスが消えないように）
+final_html = md_lib.markdown(body, extensions=['tables', 'nl2br'])
+
 payload = json.dumps(
-    {"title": title, "content_md": body, "slug": slug,
+    {"title": title, "content_html": final_html, "slug": slug,
      "update_id": update_id},
     ensure_ascii=False
 )

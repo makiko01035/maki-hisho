@@ -488,9 +488,28 @@ def post_yakuzen_direct():
     if not title or not content_md:
         return {'error': 'title and content_md required'}, 400
     try:
-        from blog_yakuzen import post_to_yakuzen_wp
         update_id = data.get('update_id', '')
         pid = int(update_id) if update_id else None
+        content_html = data.get('content_html', '')
+        if content_html:
+            # ローカルで変換済みHTMLをそのままWPに投稿
+            wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+            wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+            wp_pass = os.environ['YAKUZEN_WP_APP_PASSWORD']
+            post_data = {'title': title, 'content': content_html, 'status': 'publish'}
+            if slug:
+                post_data['slug'] = slug
+            if pid:
+                res = requests.post(f'{wp_url}/wp-json/wp/v2/posts/{pid}',
+                                    auth=(wp_user, wp_pass), json=post_data, timeout=30)
+            else:
+                res = requests.post(f'{wp_url}/wp-json/wp/v2/posts',
+                                    auth=(wp_user, wp_pass), json=post_data, timeout=30)
+            if res.status_code in (200, 201):
+                post = res.json()
+                return {'status': 'ok', 'post_id': post['id'], 'url': post['link']}, res.status_code
+            return {'error': res.text[:200]}, 500
+        from blog_yakuzen import post_to_yakuzen_wp
         post_id, post_url = post_to_yakuzen_wp(title, content_md, post_id=pid, status='publish')
         if slug:
             wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
