@@ -475,6 +475,33 @@ def post_sekisui_direct():
         return {'error': str(e)}, 500
 
 
+@app.route('/post-yakuzen-direct', methods=['POST'])
+def post_yakuzen_direct():
+    """Claude Codeから直接薬膳記事を投稿するエンドポイント"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('LINE_USER_ID', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    title = data.get('title', '')
+    content_md = data.get('content_md', '')
+    slug = data.get('slug', '')
+    if not title or not content_md:
+        return {'error': 'title and content_md required'}, 400
+    try:
+        from blog_yakuzen import post_to_yakuzen_wp
+        post_id, post_url = post_to_yakuzen_wp(title, content_md, status='publish')
+        if slug:
+            wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+            wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+            wp_pass = os.environ.get('YAKUZEN_WP_APP_PASSWORD', '')
+            import requests as req
+            req.post(f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+                     auth=(wp_user, wp_pass), json={'slug': slug}, timeout=15)
+        return {'status': 'ok', 'post_id': post_id, 'url': post_url}, 201
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/debug-image')
 def debug_image():
     """画像URLの取得状態をデバッグするエンドポイント"""
