@@ -7,7 +7,8 @@ import markdown as md_lib
 from linebot.models import TextSendMessage
 from clients import line_bot_api, anthropic_client
 
-RAKUTEN_APP_ID = os.environ.get('RAKUTEN_ACCESS_KEY') or os.environ.get('RAKUTEN_APP_ID', '')
+RAKUTEN_APP_ID = os.environ.get('RAKUTEN_APP_ID', '')
+RAKUTEN_ACCESS_KEY = os.environ.get('RAKUTEN_ACCESS_KEY', '')
 RAKUTEN_AFFILIATE_ID = os.environ.get('RAKUTEN_AFFILIATE_ID', '')
 
 YAKUZEN_BOARD_RULES = {
@@ -456,16 +457,19 @@ def search_rakuten_items(keyword, hits=3):
     if not RAKUTEN_APP_ID or not RAKUTEN_AFFILIATE_ID:
         return []
     try:
+        params = {
+            'applicationId': RAKUTEN_APP_ID,
+            'affiliateId': RAKUTEN_AFFILIATE_ID,
+            'keyword': keyword,
+            'hits': hits,
+            'sort': '-reviewCount',
+            'format': 'json',
+        }
+        if RAKUTEN_ACCESS_KEY:
+            params['accessKey'] = RAKUTEN_ACCESS_KEY
         res = requests.get(
             'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
-            params={
-                'applicationId': RAKUTEN_APP_ID,
-                'affiliateId': RAKUTEN_AFFILIATE_ID,
-                'keyword': keyword,
-                'hits': hits,
-                'sort': '-reviewCount',
-                'format': 'json',
-            },
+            params=params,
             timeout=10
         )
         data = res.json()

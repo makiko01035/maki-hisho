@@ -253,27 +253,29 @@ def test_x_post():
 
 @app.route('/test-rakuten')
 def test_rakuten():
-    from blog_yakuzen import RAKUTEN_APP_ID, RAKUTEN_AFFILIATE_ID
+    from blog_yakuzen import RAKUTEN_APP_ID, RAKUTEN_ACCESS_KEY, RAKUTEN_AFFILIATE_ID
     keyword = request.args.get('keyword') or 'なつめ'
     result = {
         'app_id_set': bool(RAKUTEN_APP_ID),
+        'access_key_set': bool(RAKUTEN_ACCESS_KEY),
         'affiliate_id_set': bool(RAKUTEN_AFFILIATE_ID),
-        'app_id_length': len(RAKUTEN_APP_ID),
-        'app_id_has_space': ' ' in RAKUTEN_APP_ID or '\n' in RAKUTEN_APP_ID or '\r' in RAKUTEN_APP_ID,
         'app_id_preview': RAKUTEN_APP_ID[:4] + '...' + RAKUTEN_APP_ID[-4:] if len(RAKUTEN_APP_ID) > 8 else RAKUTEN_APP_ID,
         'keyword': keyword,
     }
     try:
+        params = {
+            'applicationId': RAKUTEN_APP_ID,
+            'affiliateId': RAKUTEN_AFFILIATE_ID,
+            'keyword': keyword,
+            'hits': 3,
+            'sort': '-reviewCount',
+            'format': 'json',
+        }
+        if RAKUTEN_ACCESS_KEY:
+            params['accessKey'] = RAKUTEN_ACCESS_KEY
         res = requests.get(
             'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
-            params={
-                'applicationId': RAKUTEN_APP_ID,
-                'affiliateId': RAKUTEN_AFFILIATE_ID,
-                'keyword': keyword,
-                'hits': 3,
-                'sort': '-reviewCount',
-                'format': 'json',
-            },
+            params=params,
             timeout=10
         )
         result['status_code'] = res.status_code
