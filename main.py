@@ -258,6 +258,9 @@ def test_rakuten():
     result = {
         'app_id_set': bool(RAKUTEN_APP_ID),
         'affiliate_id_set': bool(RAKUTEN_AFFILIATE_ID),
+        'app_id_length': len(RAKUTEN_APP_ID),
+        'app_id_has_space': ' ' in RAKUTEN_APP_ID or '\n' in RAKUTEN_APP_ID or '\r' in RAKUTEN_APP_ID,
+        'app_id_preview': RAKUTEN_APP_ID[:4] + '...' + RAKUTEN_APP_ID[-4:] if len(RAKUTEN_APP_ID) > 8 else RAKUTEN_APP_ID,
         'keyword': keyword,
     }
     try:
