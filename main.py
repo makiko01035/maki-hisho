@@ -253,17 +253,37 @@ def test_x_post():
 
 @app.route('/test-rakuten')
 def test_rakuten():
-    from blog_yakuzen import search_rakuten_items, RAKUTEN_APP_ID, RAKUTEN_AFFILIATE_ID
-    keyword = request.args.get('keyword', 'なつめ')
+    from blog_yakuzen import RAKUTEN_APP_ID, RAKUTEN_AFFILIATE_ID
+    keyword = request.args.get('keyword') or 'なつめ'
     result = {
         'app_id_set': bool(RAKUTEN_APP_ID),
         'affiliate_id_set': bool(RAKUTEN_AFFILIATE_ID),
         'keyword': keyword,
     }
     try:
-        items = search_rakuten_items(keyword)
-        result['items_count'] = len(items)
-        result['items'] = items[:2]
+        res = requests.get(
+            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
+            params={
+                'applicationId': RAKUTEN_APP_ID,
+                'affiliateId': RAKUTEN_AFFILIATE_ID,
+                'keyword': keyword,
+                'hits': 3,
+                'sort': '-reviewCount',
+                'format': 'json',
+            },
+            timeout=10
+        )
+        result['status_code'] = res.status_code
+        data = res.json()
+        result['raw_keys'] = list(data.keys())
+        result['items_count'] = len(data.get('Items', []))
+        if 'error' in data:
+            result['api_error'] = data['error']
+            result['api_error_description'] = data.get('error_description', '')
+        if data.get('Items'):
+            first = data['Items'][0].get('Item', data['Items'][0])
+            result['sample_item_name'] = first.get('itemName', '')
+            result['sample_affiliate_url'] = first.get('affiliateUrl', '')
     except Exception as e:
         result['error'] = f'{type(e).__name__}: {e}'
     return result
