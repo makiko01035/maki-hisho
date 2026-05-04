@@ -473,7 +473,10 @@ def search_rakuten_items(keyword, hits=3):
             headers={'Referer': 'http://foodmakehealth.com'},
             timeout=10
         )
+        print(f"[楽天API] status={res.status_code} keys={list(res.json().keys())}")
         data = res.json()
+        if 'errors' in data:
+            print(f"[楽天API] errors={data['errors']}")
         items = []
         for item_wrap in data.get('Items', []):
             i = item_wrap.get('Item', item_wrap)
