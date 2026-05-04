@@ -276,7 +276,7 @@ def test_rakuten():
         res = requests.get(
             'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
             params=params,
-            headers={'Referer': 'https://maki-hisho.onrender.com'},
+            headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
             timeout=10
         )
         result['status_code'] = res.status_code
