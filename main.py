@@ -251,6 +251,24 @@ def test_x_post():
         return f'Error ({type(e).__name__}): {e}', 500
 
 
+@app.route('/test-rakuten')
+def test_rakuten():
+    from blog_yakuzen import search_rakuten_items, RAKUTEN_APP_ID, RAKUTEN_AFFILIATE_ID
+    keyword = request.args.get('keyword', 'なつめ')
+    result = {
+        'app_id_set': bool(RAKUTEN_APP_ID),
+        'affiliate_id_set': bool(RAKUTEN_AFFILIATE_ID),
+        'keyword': keyword,
+    }
+    try:
+        items = search_rakuten_items(keyword)
+        result['items_count'] = len(items)
+        result['items'] = items[:2]
+    except Exception as e:
+        result['error'] = f'{type(e).__name__}: {e}'
+    return result
+
+
 @app.route('/debug-x-auth')
 def debug_x_auth():
     import requests
