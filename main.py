@@ -25,6 +25,9 @@ YAKUZEN_SESSION_FILE = '/tmp/yakuzen_sessions.json'
 PRINTS_FILE = '/tmp/school_prints.json'
 PRINT_SESSION_FILE = '/tmp/print_sessions.json'
 
+_morning_sent_date = None
+_morning_sent_lock = threading.Lock()
+
 
 def load_pending_events():
     try:
@@ -2113,6 +2116,13 @@ def handle_message(event):
 
 
 def send_morning_message():
+    global _morning_sent_date
+    with _morning_sent_lock:
+        today = datetime.datetime.now(JST).date()
+        if _morning_sent_date == today:
+            print("Morning message already sent today, skipping.")
+            return
+        _morning_sent_date = today
     try:
         service = get_calendar_service()
         now = datetime.datetime.now(JST)
