@@ -274,7 +274,7 @@ def test_rakuten():
         if RAKUTEN_ACCESS_KEY:
             params['accessKey'] = RAKUTEN_ACCESS_KEY
         res = requests.get(
-            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
+            'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
             params=params,
             timeout=10
         )
