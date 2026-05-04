@@ -285,6 +285,8 @@ def test_rakuten():
         if 'error' in data:
             result['api_error'] = data['error']
             result['api_error_description'] = data.get('error_description', '')
+        if 'errors' in data:
+            result['api_errors'] = data['errors']
         if data.get('Items'):
             first = data['Items'][0].get('Item', data['Items'][0])
             result['sample_item_name'] = first.get('itemName', '')
