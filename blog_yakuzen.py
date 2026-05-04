@@ -7,7 +7,7 @@ import markdown as md_lib
 from linebot.models import TextSendMessage
 from clients import line_bot_api, anthropic_client
 
-RAKUTEN_APP_ID = os.environ.get('RAKUTEN_APP_ID', '')
+RAKUTEN_APP_ID = os.environ.get('RAKUTEN_ACCESS_KEY') or os.environ.get('RAKUTEN_APP_ID', '')
 RAKUTEN_AFFILIATE_ID = os.environ.get('RAKUTEN_AFFILIATE_ID', '')
 
 YAKUZEN_BOARD_RULES = {
