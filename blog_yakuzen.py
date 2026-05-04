@@ -158,6 +158,88 @@ def auto_rewrite_yakuzen(user_id):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
 
 
+def check_old_yakuzen_post(user_id, skip_ids=None):
+    """古い順に記事を1件取得してClaude に方針適合を判断させLINEに報告"""
+    skip_ids = skip_ids or []
+    try:
+        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+        res = requests.get(
+            f'{wp_url}/wp-json/wp/v2/posts',
+            auth=(wp_user, wp_pass),
+            params={'per_page': 100, 'orderby': 'date', 'order': 'asc',
+                    '_fields': 'id,title,date,content'},
+            timeout=15
+        )
+        posts = [p for p in res.json() if p['id'] not in skip_ids]
+        if not posts:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text="✅ チェックできる記事がなくなりました！お疲れ様でした。"
+            ))
+            return None
+
+        post = posts[0]
+        post_id = post['id']
+        post_title = post['title']['rendered']
+        post_date = post['date'][:10]
+        raw_content = post['content']['rendered']
+        import re as _re
+        plain = _re.sub(r'<[^>]+>', '', raw_content)[:600]
+
+        prompt = f"""以下の薬膳ブログ記事を評価してください。
+
+ブログの現在の方針：「睡眠×医療×薬膳」軸。内科医が書く、眠れない悩みを薬膳・東洋医学・医療知識で解決するブログ。ターゲット：更年期・睡眠障害・疲労で悩む30〜50代女性。
+
+記事タイトル：{post_title}
+投稿日：{post_date}
+内容（先頭600文字）：{plain}
+
+3点で評価してください：
+1. 方針適合度：「合う」「修正でいける」「ズレてる」のどれか
+2. 判定理由（1行）
+3. 推奨アクション：「リライト推奨」「軽いリライトでOK」「削除推奨」のどれか
+
+返答は以下の形式で：
+【適合度】〇〇
+【理由】〇〇
+【推奨】〇〇"""
+
+        response = anthropic_client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=300,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        judgement = response.content[0].text.strip()
+
+        msg = (f"📋 古い記事チェック\n\n"
+               f"📝 {post_title}\n"
+               f"📅 投稿日：{post_date}\n\n"
+               f"{judgement}\n\n"
+               f"どうしますか？\n"
+               f"1️⃣ リライトして\n"
+               f"2️⃣ スキップ（次の記事へ）\n"
+               f"3️⃣ 削除して\n"
+               f"4️⃣ やめる")
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+        return post_id
+
+    except Exception as e:
+        print(f"check_old_yakuzen_post error: {e}")
+        import traceback; traceback.print_exc()
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
+        return None
+
+
+def delete_yakuzen_post(post_id):
+    """薬膳記事を削除（WP REST API）"""
+    wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+    requests.delete(
+        f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+        auth=(wp_user, wp_pass),
+        params={'force': True},
+        timeout=15
+    )
+
+
 def _get_recent_yakuzen_titles(n=5):
     """直近n件のWP投稿タイトルを返す"""
     try:

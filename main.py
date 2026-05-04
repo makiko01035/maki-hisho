@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research
-from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token
+from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
 app = Flask(__name__)
@@ -75,6 +75,53 @@ def save_yakuzen_sessions(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"yakuzen_sessions save error: {e}")
+
+
+def _start_old_check(user_id, skip_ids):
+    """古い記事チェックを開始してセッションにpost_idを保存"""
+    yakuzen_sessions = load_yakuzen_sessions()
+    post_id = check_old_yakuzen_post(user_id, skip_ids)
+    if post_id:
+        yakuzen_sessions[user_id] = {
+            'state': 'waiting_for_old_rewrite_confirm',
+            'post_id': post_id,
+            'skip_ids': skip_ids
+        }
+        save_yakuzen_sessions(yakuzen_sessions)
+
+
+def rewrite_yakuzen_by_post_id(user_id, post_id):
+    """post_idを指定して記事をリライト"""
+    from blog_yakuzen import (get_yakuzen_wp_creds, generate_yakuzen_rewrite,
+                               generate_pexels_keyword, fetch_pexels_image_url,
+                               upload_image_to_yakuzen_wp, detect_category_id,
+                               post_to_yakuzen_wp, try_post_to_pinterest, build_sns_message)
+    try:
+        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+        res = requests.get(f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+                           auth=(wp_user, wp_pass),
+                           params={'_fields': 'id,title,content'}, timeout=15)
+        post = res.json()
+        post_title = post['title']['rendered']
+        post_content = post['content']['rendered']
+        article_md = generate_yakuzen_rewrite(post_title, post_content)
+        lines = article_md.split('\n')
+        new_title = lines[0].lstrip('# ').strip()
+        new_content = '\n'.join(lines[1:]).lstrip('\n')
+        keyword = generate_pexels_keyword(new_title)
+        image_url = fetch_pexels_image_url(keyword)
+        media_id = upload_image_to_yakuzen_wp(image_url, new_title) if image_url else None
+        new_cat_id = detect_category_id(new_title, new_content)
+        _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
+                                     featured_media_id=media_id, categories=[new_cat_id])
+        try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
+        sns_msg = build_sns_message(new_title, link, new_content, image_url)
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"✅ リライト完了！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
+        ))
+    except Exception as e:
+        print(f"rewrite_yakuzen_by_post_id error: {e}")
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
 
 
 def load_prints():
@@ -2077,9 +2124,16 @@ def handle_message(event):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
                     text="✍️ テーマを入力してください！\n例：「更年期のほてりに薬膳」「子どもの風邪予防レシピ」"
                 ))
+            elif any(kw in normalized for kw in ['古い', '4', '④', '古い記事']):
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="🔍 一番古い記事を確認しています...少しお待ちください！"
+                ))
+                threading.Thread(target=_start_old_check, args=(user_id, [])).start()
             else:
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！\n（テーマを自分で決めたい場合は「3」）"
+                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！\n（テーマを自分で決めたい場合は「3」、古い記事チェックは「4」）"
                 ))
             return
 
@@ -2114,13 +2168,59 @@ def handle_message(event):
             threading.Thread(target=process_yakuzen_new_article, args=(user_id, user_message)).start()
             return
 
+        elif state == 'waiting_for_old_rewrite_confirm':
+            import unicodedata
+            normalized = unicodedata.normalize('NFKC', user_message)
+            post_id = session.get('post_id')
+            skip_ids = session.get('skip_ids', [])
+
+            if any(kw in normalized for kw in ['リライト', '1', '①']):
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="✍️ リライト中です...少しお待ちください！"
+                ))
+                threading.Thread(target=rewrite_yakuzen_by_post_id, args=(user_id, post_id)).start()
+
+            elif any(kw in normalized for kw in ['スキップ', '次', '2', '②']):
+                new_skip = skip_ids + [post_id]
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="⏭ スキップして次の記事を確認します..."
+                ))
+                threading.Thread(target=_start_old_check, args=(user_id, new_skip)).start()
+
+            elif any(kw in normalized for kw in ['削除', '3', '③']):
+                from blog_yakuzen import delete_yakuzen_post
+                delete_yakuzen_post(post_id)
+                new_skip = skip_ids
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="🗑 削除しました。次の記事を確認します..."
+                ))
+                threading.Thread(target=_start_old_check, args=(user_id, new_skip)).start()
+
+            elif any(kw in normalized for kw in ['やめる', '終わり', '4', '④', 'やめ', '終了']):
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="✅ 古い記事チェックを終了しました！お疲れ様でした。"
+                ))
+            else:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="1️⃣ リライト / 2️⃣ スキップ / 3️⃣ 削除 / 4️⃣ やめる\nで返答してください！"
+                ))
+            return
+
 
     # 薬膳ブログ：キーワード検出
     yakuzen_keywords = ['薬膳記事', '薬膳ブログ', '薬膳 記事', '薬膳リライト', 'foodmakehealth', '薬膳の記事']
     if any(kw in user_message for kw in yakuzen_keywords):
         yakuzen_sessions[user_id] = {'state': 'waiting_for_mode'}
         save_yakuzen_sessions(yakuzen_sessions)
-        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n\n番号か言葉で教えてください！"
+        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n4️⃣ 古い記事チェック＆リライト\n\n番号か言葉で教えてください！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 
@@ -2488,6 +2588,9 @@ TWEET_STOCK = [
     "【穴場の条件】競合が少ない×価格が高い×ウォッチャーが多い＝需要はあるのに出品者が少ない穴場商品。この判定ロジックをeBayリサーチに組み込んだ。勘で仕入れてたのが、数字で判断できるようになった。データで動ける副業は強い。 #AI副業 #eBay #物販",
     "eBay仕入れの判断3ステップ↓ ①AIリサーチで候補を出す②Sold Listingsで絞る③30日の売れ数を確認。AIを信頼しながらも、最後の判断は自分でする。この一手間が仕入れ精度を上げる。自動化と人間判断の最適な分担が大事。 #AI副業 #eBay #物販",
     "以前：1キーワードずつ順番に検索→全部終わるまで待ってた。今：全キーワードを同時に検索→同じ結果が数分の1の時間で届く。「待ち時間を減らす」のも自動化。速くなるだけで使いたい頻度が上がる。 #AI副業 #eBay #ClaudeCode",
+    # ── Playwright MCP・WP自動修正 ──
+    "サイトの表示崩れを「確認して」一言で全部直してもらえた。メニューが空のページを指してた→正しい記事URLに修正→不要ページ2つを削除。WP管理画面を一度も開かずAPIで全部完結。自分の作業：0秒。 #AI副業 #ClaudeCode #WordPress",
+    "スクリーンショットを自分で撮って貼る作業がゼロになった。Playwright MCPを設定しておくと「サイトを見て」の一言でClaude Codeがブラウザを起動→スクリーンショット→確認まで全部やってくれる。以前：画像を撮って貼って説明して→が必要だった。 #AI副業 #ClaudeCode #自動化",
     # ── Webマーケティング系 ──
     "以前：LP競合分析を手動でまとめてスプレッドシートに貼ってた。今：Sheets APIで全自動。データ取得→整形→シート書き込みまで全自動。「手作業→自動化」の達成感は何度やっても慣れない。なぜなら毎回「自分の時間が増えた」を実感するから。 #AI副業 #ClaudeCode #自動化",
     "【衝撃】「勉強するための作業」をAIに任せたら、勉強自体に集中できるようになった。LP競合分析→Claudeが3社分のデータ取得→整形→スプレッドシート書き込みまで全部やってくれた。インプットの質を上げるために、インプットの作業を自動化する時代。 #AI副業 #ClaudeCode #Webマーケティング",

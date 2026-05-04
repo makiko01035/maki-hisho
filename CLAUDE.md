@@ -52,6 +52,12 @@
 |---------|------|------|
 | Google Drive | 連携済み | claude.ai経由 |
 | Notion | 連携済み（2026-04-15） | `C:/Users/nyank/.claude/.mcp.json` に設定済み |
+| Playwright | 連携済み（2026-05-05） | `C:/Users/nyank/.claude/.mcp.json` に設定済み |
+
+### Playwright MCPの使い方
+- **サイトの表示確認・レイアウト確認は必ずPlaywright MCPを使う**
+- スクリーンショットを撮って実際の見た目を確認できる（まきさんが画像を貼る手間ゼロ）
+- 「サイトを見て」「表示がおかしい」「確認して」という依頼で自動的に使う
 
 ### Notion連携の注意点
 - NotionのAPIキーは `.mcp.json` に設定済み
@@ -96,7 +102,7 @@ git push origin main
 - `PEXELS_API_KEY`: アイキャッチ画像取得用
 - `YAKUZEN_WP_URL`: https://foodmakehealth.com（デフォルト値あり）
 - `YAKUZEN_WP_USER`: 薬膳WPユーザー名（デフォルト: makiko01035）
-- `YAKUZEN_WP_APP_PASSWORD`: 薬膳WP用アプリパスワード（**設定済み**）
+- `YAKUZEN_WP_APP_PASSWORD`: 薬膳WP用アプリパスワード（**設定済み**・ローカルは `C:/Users/nyank/blog-automation/.env` に記載）
 - `PINTEREST_APP_ID`: 1553666（MAKOYAKUZEN）
 - `PINTEREST_APP_SECRET`: 未設定（Trial拒否のため保留）
 - `PINTEREST_REFRESH_TOKEN`: 未設定（同上）
