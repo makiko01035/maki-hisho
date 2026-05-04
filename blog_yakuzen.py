@@ -527,7 +527,9 @@ def _build_rakuten_natural_intro(title, content_md, keyword):
 
 def _build_rakuten_section(title, content_md=''):
     keyword = _extract_rakuten_keyword(title, content_md)
+    print(f"[楽天] キーワード: {keyword}")
     items = search_rakuten_items(keyword)
+    print(f"[楽天] 取得件数: {len(items)}")
     if not items:
         return ''
     intro = _build_rakuten_natural_intro(title, content_md, keyword)
