@@ -553,7 +553,7 @@ def search_rakuten_items(keyword, hits=3):
         res = requests.get(
             'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
             params=params,
-            headers={'Referer': 'http://foodmakehealth.com'},
+            headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
             timeout=10
         )
         data = res.json()
