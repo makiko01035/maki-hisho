@@ -177,9 +177,10 @@ def check_old_yakuzen_post(user_id, skip_ids=None):
             ))
             return None
 
+        import html as html_lib
         post = posts[0]
         post_id = post['id']
-        post_title = post['title']['rendered']
+        post_title = html_lib.unescape(post['title']['rendered'])
         post_date = post['date'][:10]
         raw_content = post['content']['rendered']
         import re as _re

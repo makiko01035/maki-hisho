@@ -92,6 +92,7 @@ def _start_old_check(user_id, skip_ids):
 
 def rewrite_yakuzen_by_post_id(user_id, post_id):
     """post_idを指定して記事をリライト"""
+    import html as html_lib
     from blog_yakuzen import (get_yakuzen_wp_creds, generate_yakuzen_rewrite,
                                generate_pexels_keyword, fetch_pexels_image_url,
                                upload_image_to_yakuzen_wp, detect_category_id,
@@ -102,7 +103,7 @@ def rewrite_yakuzen_by_post_id(user_id, post_id):
                            auth=(wp_user, wp_pass),
                            params={'_fields': 'id,title,content'}, timeout=15)
         post = res.json()
-        post_title = post['title']['rendered']
+        post_title = html_lib.unescape(post['title']['rendered'])
         post_content = post['content']['rendered']
         article_md = generate_yakuzen_rewrite(post_title, post_content)
         lines = article_md.split('\n')
@@ -115,10 +116,11 @@ def rewrite_yakuzen_by_post_id(user_id, post_id):
         _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
                                      featured_media_id=media_id, categories=[new_cat_id])
         try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
-        sns_msg = build_sns_message(new_title, link, new_content, image_url)
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text=f"✅ リライト完了！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
-        ))
+        sns_msg = build_sns_message(new_title, link, image_url, new_content)
+        completion_msg = f"✅ リライト完了！\n\n📝 {new_title}\n🔗 {link}"
+        line_bot_api.push_message(user_id, TextSendMessage(text=completion_msg))
+        if sns_msg:
+            line_bot_api.push_message(user_id, TextSendMessage(text=sns_msg[:4900]))
     except Exception as e:
         print(f"rewrite_yakuzen_by_post_id error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
