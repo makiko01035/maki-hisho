@@ -277,6 +277,9 @@ YAKUZEN_CATEGORY_ROTATION = [
     "睡眠サプリ（グリシン・メラトニン）",
     "不眠×ツボ・生活習慣",
     "中学生・小学生の睡眠トラブル",
+    "睡眠時無呼吸症候群・いびきの対策",
+    "不眠症の診断・何科に行くべきか（医師が解説）",
+    "睡眠薬への依存・自然にやめる方法",
 ]
 
 # 各カテゴリに紐づくキーワード（直近記事タイトルと照合用）
@@ -1106,6 +1109,217 @@ def get_pinterest_board_id(board_name):
     }
     env_key = board_env.get(board_name, 'PINTEREST_BOARD_BASICS')
     return os.environ.get(env_key, '')
+
+
+_SLEEP_KW_PRIORITY = [
+    '不眠', '睡眠', '眠れ', '眠り', '熟睡', '入眠', '寝つき', '中途覚醒',
+    '早朝覚醒', '睡眠の質', '更年期', 'ほてり', '夜中に目', '朝起き',
+    'メラトニン', 'セロトニン', '寝ても疲れ', '睡眠外来',
+]
+
+
+def _fetch_sleep_kw_data(creds, days=90, limit=100):
+    """Search Consoleから睡眠系優先でKWデータを取得（睡眠系を先頭に並べる）"""
+    from googleapiclient.discovery import build
+    service = build('searchconsole', 'v1', credentials=creds)
+    end_date = datetime.date.today()
+    start_date = end_date - datetime.timedelta(days=days)
+    result = service.searchanalytics().query(
+        siteUrl='https://foodmakehealth.com/',
+        body={
+            'startDate': start_date.isoformat(),
+            'endDate': end_date.isoformat(),
+            'dimensions': ['query'],
+            'rowLimit': limit,
+            'orderBy': [{'fieldName': 'impressions', 'sortOrder': 'DESCENDING'}],
+        }
+    ).execute()
+    rows = result.get('rows', [])
+    sleep_rows = [r for r in rows if any(kw in r['keys'][0] for kw in _SLEEP_KW_PRIORITY)]
+    other_rows = [r for r in rows if r not in sleep_rows]
+    return sleep_rows + other_rows
+
+
+def kw_auto_rewrite(user_id, creds):
+    """KW選定→リライト全自動：Search Consoleで睡眠系11〜30位の伸びしろ記事を選んでリライト"""
+    try:
+        if not creds:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text="😢 Google認証情報が取得できませんでした。"
+            ))
+            return
+
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="🔍 Search Consoleで睡眠系KWを分析中...\nリライト対象を自動選定します！"
+        ))
+
+        rows = _fetch_sleep_kw_data(creds)
+        if not rows:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text="😢 Search Consoleのデータが取得できませんでした。"
+            ))
+            return
+
+        fall_zone = [r for r in rows if 11 <= r.get('position', 0) <= 30]
+        fall_zone.sort(key=lambda x: x.get('impressions', 0), reverse=True)
+        if not fall_zone:
+            fall_zone = sorted(rows, key=lambda x: x.get('impressions', 0), reverse=True)[:15]
+
+        top_kws = [r['keys'][0] for r in fall_zone[:10]]
+
+        posts = get_all_yakuzen_posts()
+        if not posts:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の取得に失敗しました。"))
+            return
+
+        post_list_text = '\n'.join([
+            f"ID:{p['id']} タイトル:{p['title']['rendered']}"
+            for p in posts[:80]
+        ])
+
+        response = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=200,
+            messages=[{
+                'role': 'user',
+                'content': f"""Search Consoleで伸びしろがある睡眠系キーワードと記事一覧から、
+リライトで最も順位が上がりそうな記事を1本選んでください。
+
+伸びしろKW（表示多い・順位11〜30位）：
+{chr(10).join(top_kws)}
+
+記事一覧：
+{post_list_text}
+
+以下のJSON形式のみで回答（説明不要）：
+{{"id": 記事ID, "keyword": "狙うキーワード", "reason": "選んだ理由（1文）"}}"""
+            }]
+        )
+
+        raw = response.content[0].text.strip()
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事選定に失敗しました。"))
+            return
+
+        selected = json.loads(match.group())
+        post_id = selected['id']
+        keyword = selected.get('keyword', '')
+        reason = selected.get('reason', '')
+
+        wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
+        res = requests.get(
+            f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+            auth=(wp_user, wp_pass),
+            params={'_fields': 'id,title,content'},
+            timeout=15
+        )
+        if res.status_code != 200:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の取得に失敗しました。"))
+            return
+
+        post = res.json()
+        post_title = post['title']['rendered']
+        post_content = post['content']['rendered']
+
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"🎯 狙うKW：「{keyword}」\n📄 「{post_title}」をリライト開始！\n理由：{reason}\n\n少しお待ちください！"
+        ))
+
+        instruction = f"「{keyword}」で検索上位を狙うようにリライトしてください。"
+        process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruction)
+
+    except Exception as e:
+        print(f"kw_auto_rewrite error: {e}")
+        import traceback; traceback.print_exc()
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"😢 KW選定中にエラーが発生しました。\n{str(e)[:150]}"
+        ))
+
+
+def kw_auto_new_article(user_id, creds):
+    """KW選定→新規記事全自動：Search Consoleで未開拓の睡眠系KWを選んで新規作成"""
+    try:
+        if not creds:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text="😢 Google認証情報が取得できませんでした。"
+            ))
+            return
+
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="🔍 Search Consoleで未開拓の睡眠系KWを分析中...\n新規記事テーマを自動選定します！"
+        ))
+
+        rows = _fetch_sleep_kw_data(creds)
+        if not rows:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text="😢 Search Consoleのデータが取得できませんでした。"
+            ))
+            return
+
+        untapped = [r for r in rows if r.get('impressions', 0) >= 100 and r.get('clicks', 0) <= 3]
+        untapped.sort(key=lambda x: x.get('impressions', 0), reverse=True)
+        if not untapped:
+            untapped = rows[:20]
+
+        top_kws = [r['keys'][0] for r in untapped[:15]]
+        recent_titles = _get_recent_yakuzen_titles(20)
+        existing_text = '\n'.join(recent_titles) if recent_titles else ''
+
+        today = datetime.date.today()
+        month = today.month
+        seasonal_hint = {
+            1: "冬・冷え", 2: "春の準備・花粉", 3: "春・自律神経",
+            4: "新生活ストレス", 5: "五月病・疲れ", 6: "梅雨・だるさ",
+            7: "熱帯夜・睡眠浅い", 8: "残暑・夏疲れ", 9: "秋・乾燥",
+            10: "秋冬の移行期", 11: "冬・冷え×不眠", 12: "年末ストレス",
+        }.get(month, "季節の変わり目")
+
+        response = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=150,
+            messages=[{
+                'role': 'user',
+                'content': f"""Search Consoleの検索KWから新規記事テーマを1つ選んでください。
+
+検索されているKW（表示多い・クリック少ない＝記事が弱い）：
+{chr(10).join(top_kws)}
+
+今の季節：{month}月（{seasonal_hint}）
+既存記事（重複禁止）：
+{existing_text[:500]}
+
+条件：
+- 「睡眠×医療×薬膳」視点・30〜50代女性ターゲット
+- 「医師監修」or「内科医が解説」を含む32字以内のSEOタイトル
+
+以下のJSON形式のみで回答（説明不要）：
+{{"keyword": "狙うキーワード", "title": "記事タイトル"}}"""
+            }]
+        )
+
+        raw = response.content[0].text.strip()
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            line_bot_api.push_message(user_id, TextSendMessage(text="😢 テーマ選定に失敗しました。"))
+            return
+
+        selected = json.loads(match.group())
+        keyword = selected.get('keyword', '')
+        title = selected.get('title', '')
+
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"🎯 狙うKW：「{keyword}」\n📝 テーマ：「{title}」\n\n記事作成中...少しお待ちください！（1〜2分かかります）"
+        ))
+
+        process_yakuzen_new_article(user_id, topic=title)
+
+    except Exception as e:
+        print(f"kw_auto_new_article error: {e}")
+        import traceback; traceback.print_exc()
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"😢 KW分析中にエラーが発生しました。\n{str(e)[:150]}"
+        ))
 
 
 def get_pinterest_access_token():
