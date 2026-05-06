@@ -24,6 +24,7 @@ SEKISUI_SESSION_FILE = '/tmp/sekisui_sessions.json'
 YAKUZEN_SESSION_FILE = '/tmp/yakuzen_sessions.json'
 PRINTS_FILE = '/tmp/school_prints.json'
 PRINT_SESSION_FILE = '/tmp/print_sessions.json'
+MORNING_SENT_FILE = '/tmp/morning_sent_date.txt'
 
 _morning_sent_date = None
 _morning_sent_lock = threading.Lock()
@@ -298,52 +299,6 @@ def test_x_post():
         return f'403 Forbidden - response: {e.response.text if hasattr(e, "response") else str(e)}', 403
     except Exception as e:
         return f'Error ({type(e).__name__}): {e}', 500
-
-
-@app.route('/test-rakuten')
-def test_rakuten():
-    from blog_yakuzen import RAKUTEN_APP_ID, RAKUTEN_ACCESS_KEY, RAKUTEN_AFFILIATE_ID
-    keyword = request.args.get('keyword') or 'なつめ'
-    result = {
-        'app_id_set': bool(RAKUTEN_APP_ID),
-        'access_key_set': bool(RAKUTEN_ACCESS_KEY),
-        'affiliate_id_set': bool(RAKUTEN_AFFILIATE_ID),
-        'app_id_preview': RAKUTEN_APP_ID[:4] + '...' + RAKUTEN_APP_ID[-4:] if len(RAKUTEN_APP_ID) > 8 else RAKUTEN_APP_ID,
-        'keyword': keyword,
-    }
-    try:
-        params = {
-            'applicationId': RAKUTEN_APP_ID,
-            'affiliateId': RAKUTEN_AFFILIATE_ID,
-            'keyword': keyword,
-            'hits': 3,
-            'sort': '-reviewCount',
-            'format': 'json',
-        }
-        if RAKUTEN_ACCESS_KEY:
-            params['accessKey'] = RAKUTEN_ACCESS_KEY
-        res = requests.get(
-            'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
-            params=params,
-            headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
-            timeout=10
-        )
-        result['status_code'] = res.status_code
-        data = res.json()
-        result['raw_keys'] = list(data.keys())
-        result['items_count'] = len(data.get('Items', []))
-        if 'error' in data:
-            result['api_error'] = data['error']
-            result['api_error_description'] = data.get('error_description', '')
-        if 'errors' in data:
-            result['api_errors'] = data['errors']
-        if data.get('Items'):
-            first = data['Items'][0].get('Item', data['Items'][0])
-            result['sample_item_name'] = first.get('itemName', '')
-            result['sample_affiliate_url'] = first.get('affiliateUrl', '')
-    except Exception as e:
-        result['error'] = f'{type(e).__name__}: {e}'
-    return result
 
 
 @app.route('/debug-x-auth')
@@ -1446,8 +1401,7 @@ def ebay_callback():
 
 @app.route('/trigger/morning', methods=['GET', 'POST'])
 def trigger_morning():
-    threading.Thread(target=send_morning_message).start()
-    return 'OK'
+    return 'Disabled', 410
 
 
 @app.route('/callback', methods=['POST'])
@@ -2265,12 +2219,30 @@ def handle_message(event):
 
 def send_morning_message():
     global _morning_sent_date
+    today = datetime.datetime.now(JST).date()
+    today_str = today.isoformat()
+
     with _morning_sent_lock:
-        today = datetime.datetime.now(JST).date()
         if _morning_sent_date == today:
-            print("Morning message already sent today, skipping.")
+            print(f"Morning: already sent today (memory), skipping.")
             return
+        try:
+            if os.path.exists(MORNING_SENT_FILE):
+                with open(MORNING_SENT_FILE, 'r') as f:
+                    if f.read().strip() == today_str:
+                        _morning_sent_date = today
+                        print(f"Morning: already sent today (file), skipping.")
+                        return
+        except Exception:
+            pass
         _morning_sent_date = today
+        try:
+            with open(MORNING_SENT_FILE, 'w') as f:
+                f.write(today_str)
+        except Exception:
+            pass
+
+    print(f"Morning: sending for {today_str}")
     try:
         service = get_calendar_service()
         now = datetime.datetime.now(JST)
