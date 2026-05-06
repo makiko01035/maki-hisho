@@ -79,10 +79,20 @@ def _title_to_pexels_keyword(title: str) -> str:
             model='claude-haiku-4-5-20251001',
             max_tokens=30,
             messages=[{'role': 'user', 'content':
-                f'次の日本語の住宅ブログ記事タイトルに合う、Pexels画像検索用の英語キーワードを1〜3語で返してください。キーワードのみ回答。\n{title}'}]
+                f'次の日本語の住宅ブログ記事タイトルに合う、Pexels画像検索用の英語キーワードを1〜3語で返してください。'
+                f'必ず「家のインテリア・外観・部屋・キッチン・リビング・家族の暮らし」など住宅・家に関するポジティブなシーンを表すキーワードにしてください。'
+                f'記事の感情的な内容（失敗・後悔・注意など）は無視して、写真のシーン（部屋・外観・庭など）を表すキーワードを選ぶこと。'
+                f'キーワードのみ回答。\n{title}'}]
         )
         kw = resp.content[0].text.strip().lower()
-        return kw if kw else 'japanese house interior'
+        # 住宅と無関係なキーワードが返ってきた場合はデフォルトを使う
+        housing_words = ['house', 'home', 'room', 'kitchen', 'living', 'interior', 'garden',
+                         'family', 'bedroom', 'bathroom', 'floor', 'window', 'modern', 'japanese']
+        if kw and any(w in kw for w in housing_words):
+            return kw
+        import hashlib
+        idx = int(hashlib.md5(title.encode()).hexdigest(), 16) % len(SEKISUI_PEXELS_KEYWORDS)
+        return SEKISUI_PEXELS_KEYWORDS[idx]
     except Exception:
         import hashlib
         idx = int(hashlib.md5(title.encode()).hexdigest(), 16) % len(SEKISUI_PEXELS_KEYWORDS)
@@ -166,6 +176,7 @@ def post_to_sekisui_wp(title, content_md):
             img = Image.alpha_composite(img, ov)
             draw = ImageDraw.Draw(img)
             font_path = _os.path.join(_os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.otf')
+            print(f"Font path: {font_path}, exists: {_os.path.exists(font_path)}")
             with open(font_path, 'rb') as _ff:
                 font = ImageFont.truetype(BytesIO(_ff.read()), 60)
             lines_t, t = [], title
