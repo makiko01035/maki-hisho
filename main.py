@@ -14,7 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research
-from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post
+from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
 app = Flask(__name__)
@@ -284,7 +284,9 @@ def rakuten_room_rss():
     import re
     from flask import Response
     try:
-        feed = feedparser.parse('https://room.rakuten.co.jp/makiko01035/items/feed/rss')
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'}
+        raw = requests.get('https://room.rakuten.co.jp/makiko01035/items/feed/rss', headers=headers, timeout=10)
+        feed = feedparser.parse(raw.text)
         items_xml = ''
         for entry in feed.entries:
             title = entry.get('title', '')
@@ -2121,9 +2123,25 @@ def handle_message(event):
                     text="🔍 一番古い記事を確認しています...少しお待ちください！"
                 ))
                 threading.Thread(target=_start_old_check, args=(user_id, [])).start()
+            elif any(kw in normalized for kw in ['KW選定', 'KWリライト', 'kw選定', '5', '⑤']):
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="🔍 Search ConsoleでKW分析→リライト全自動で開始します！\n少しお待ちください！"
+                ))
+                creds = get_google_creds()
+                threading.Thread(target=kw_auto_rewrite, args=(user_id, creds)).start()
+            elif any(kw in normalized for kw in ['KW新規', 'kw新規', '6', '⑥']):
+                del yakuzen_sessions[user_id]
+                save_yakuzen_sessions(yakuzen_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="🔍 Search ConsoleでKW分析→新規記事全自動で開始します！\n少しお待ちください！"
+                ))
+                creds = get_google_creds()
+                threading.Thread(target=kw_auto_new_article, args=(user_id, creds)).start()
             else:
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！\n（テーマを自分で決めたい場合は「3」、古い記事チェックは「4」）"
+                    text="「1」か「新規作成」、または「2」か「リライト」と送ってください！\n（テーマ指定は「3」、古い記事チェックは「4」、KW選定リライトは「5」、KW選定新規は「6」）"
                 ))
             return
 
@@ -2210,7 +2228,7 @@ def handle_message(event):
     if any(kw in user_message for kw in yakuzen_keywords):
         yakuzen_sessions[user_id] = {'state': 'waiting_for_mode'}
         save_yakuzen_sessions(yakuzen_sessions)
-        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n4️⃣ 古い記事チェック＆リライト\n\n番号か言葉で教えてください！"
+        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n4️⃣ 古い記事チェック＆リライト\n5️⃣ KW選定→リライト（Search Console分析→全自動）\n6️⃣ KW選定→新規記事（Search Console分析→全自動）\n\n番号か言葉で教えてください！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 
