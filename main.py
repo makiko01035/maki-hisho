@@ -25,6 +25,7 @@ YAKUZEN_SESSION_FILE = '/tmp/yakuzen_sessions.json'
 PRINTS_FILE = '/tmp/school_prints.json'
 PRINT_SESSION_FILE = '/tmp/print_sessions.json'
 MORNING_SENT_FILE = '/tmp/morning_sent_date.txt'
+NOTE_SESSION_FILE = '/tmp/note_sessions.json'
 
 _morning_sent_date = None
 _morning_sent_lock = threading.Lock()
@@ -76,6 +77,78 @@ def save_yakuzen_sessions(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"yakuzen_sessions save error: {e}")
+
+
+def load_note_sessions():
+    try:
+        with open(NOTE_SESSION_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_note_sessions(data):
+    try:
+        with open(NOTE_SESSION_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"note_sessions save error: {e}")
+
+
+def send_long_message(user_id, text, chunk_size=4000):
+    """長いテキストを分割してLINEにpush送信"""
+    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+    for i, chunk in enumerate(chunks):
+        prefix = f"【{i+1}/{len(chunks)}】\n" if len(chunks) > 1 else ""
+        line_bot_api.push_message(user_id, TextSendMessage(text=prefix + chunk))
+
+
+def generate_note_draft_async(user_id, note_type, theme):
+    """note下書きをClaude APIで生成してLINEに分割送信"""
+    try:
+        type_label = "有料" if note_type == "paid" else "無料"
+        if note_type == "paid":
+            type_instruction = (
+                "有料記事として書いてください。\n"
+                "- 無料部分：導入・共感・この記事でわかること（全体の1/3程度）\n"
+                "- 「ここから有料記事です（300円）」という区切りを入れる\n"
+                "- 有料部分：再現性のある具体的な手順・プロンプト・実例を含める"
+            )
+        else:
+            type_instruction = (
+                "無料記事として書いてください。\n"
+                "- 読みごたえがあり、SNSでシェアされるような内容\n"
+                "- 体験談ベースで共感を呼ぶ構成"
+            )
+
+        response = anthropic_client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=4000,
+            system=(
+                "あなたはAI副業実験中のワーママ「まき」として書きます。\n"
+                "プロフィール：医療職・3人の子育て・プログラミングゼロからClaude Codeで副業ツールを20個以上作った\n"
+                "読者：AI初心者・副業に興味があるワーママ・「自分にもできるかも」と思ってほしい人\n"
+                "文体：ですます調・親しみやすい・体験談ベース・専門用語を使わない\n"
+                + type_instruction
+            ),
+            messages=[{
+                'role': 'user',
+                'content': f'テーマ：{theme}\n\nnoteの{type_label}記事の下書きを書いてください。タイトルも含めて。'
+            }]
+        )
+
+        draft = response.content[0].text
+        send_long_message(
+            user_id,
+            f"📝 note{type_label}記事の下書きができました！\nこのテキストをnoteにコピペしてください👇\n\n" + draft
+        )
+        if note_type == "paid":
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text="✅ コピペ後、noteで「有料ライン」を「ここから有料記事です」の行に設定してから公開してください🎉"
+            ))
+
+    except Exception as e:
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"❌ 下書き生成エラー: {str(e)[:200]}"))
 
 
 def _start_old_check(user_id, skip_ids):
@@ -2080,6 +2153,55 @@ def handle_message(event):
         return
 
     # セキスイブログ：キーワード検出 → テーマ提案
+    # note下書き：セッションチェック
+    note_sessions = load_note_sessions()
+    if user_id in note_sessions:
+        session = note_sessions[user_id]
+        state = session.get('state')
+
+        if state == 'waiting_for_note_type':
+            import unicodedata
+            normalized = unicodedata.normalize('NFKC', user_message)
+            if any(kw in normalized for kw in ['有料', '1', '①']):
+                note_sessions[user_id] = {'state': 'waiting_for_note_theme', 'type': 'paid'}
+                save_note_sessions(note_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="💰 有料記事ですね！\n\nテーマを教えてください。\n（「おまかせ」でもOKです）\n\n例：「Claudeへの依頼の仕方」「壁打ちから始めるAI副業」"
+                ))
+            elif any(kw in normalized for kw in ['無料', '2', '②']):
+                note_sessions[user_id] = {'state': 'waiting_for_note_theme', 'type': 'free'}
+                save_note_sessions(note_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                    text="📖 無料記事ですね！\n\nテーマを教えてください。\n（「おまかせ」でもOKです）\n\n例：「ワーママがAI副業を始めた理由」"
+                ))
+            else:
+                del note_sessions[user_id]
+                save_note_sessions(note_sessions)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="キャンセルしました。"))
+            return
+
+        if state == 'waiting_for_note_theme':
+            note_type = session.get('type', 'paid')
+            theme = user_message if user_message not in ['おまかせ', 'おまかせで'] else 'まきの実体験からAI副業に関するテーマを自由に選んで'
+            del note_sessions[user_id]
+            save_note_sessions(note_sessions)
+            type_label = "有料" if note_type == "paid" else "無料"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"✍️ note{type_label}記事の下書きを作成中です...\n少しお待ちください（1〜2分かかります）"
+            ))
+            threading.Thread(target=generate_note_draft_async, args=(user_id, note_type, theme)).start()
+            return
+
+    # noteキーワード
+    note_keywords = ['note書きたい', 'note下書き', 'note記事', 'note作りたい', 'noteかきたい']
+    if any(kw in user_message for kw in note_keywords):
+        note_sessions[user_id] = {'state': 'waiting_for_note_type'}
+        save_note_sessions(note_sessions)
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(
+            text="📝 note記事を作りましょう！\n\nどちらにしますか？\n\n1️⃣ 有料記事（300〜500円・テクニック系）\n2️⃣ 無料記事（体験談・共感系）\n\n番号か言葉で教えてください！"
+        ))
+        return
+
     sekisui_keywords = ['セキスイ記事', 'セキスイブログ', 'セキスイ 記事', 'order-sekisui']
     if any(kw in user_message for kw in sekisui_keywords):
         themes = suggest_sekisui_themes()
