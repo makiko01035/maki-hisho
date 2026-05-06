@@ -12,11 +12,20 @@ RAKUTEN_ACCESS_KEY = os.environ.get('RAKUTEN_ACCESS_KEY', '')
 RAKUTEN_AFFILIATE_ID = os.environ.get('RAKUTEN_AFFILIATE_ID', '')
 
 YAKUZEN_BOARD_RULES = {
-    '季節': '季節の養生', '養生': '季節の養生', '花粉': '季節の養生',
-    '春': '季節の養生', '夏': '季節の養生', '秋': '季節の養生', '冬': '季節の養生',
-    'レシピ': '薬膳レシピ', '食材': '薬膳レシピ', '効能': '薬膳レシピ',
-    '基礎': '薬膳の基礎知識', '中医': '薬膳の基礎知識', '体質': '薬膳の基礎知識',
-    '資格': '薬膳資格', '講座': '薬膳資格',
+    # 更年期×睡眠
+    '更年期': '更年期×睡眠', 'ほてり': '更年期×睡眠', '50代': '更年期×睡眠', '閉経': '更年期×睡眠',
+    # 子ども・家族の睡眠
+    '子ども': '子ども・家族の睡眠', '夜泣き': '子ども・家族の睡眠', '小学生': '子ども・家族の睡眠',
+    '中学生': '子ども・家族の睡眠', '産後': '子ども・家族の睡眠', '育児': '子ども・家族の睡眠',
+    # 薬膳×睡眠
+    '薬膳': '薬膳×睡眠', '東洋医学': '薬膳×睡眠', '漢方': '薬膳×睡眠',
+    'なつめ': '薬膳×睡眠', '白きくらげ': '薬膳×睡眠', '酸棗仁': '薬膳×睡眠',
+    '陰虚': '薬膳×睡眠', '気虚': '薬膳×睡眠', '食材': '薬膳×睡眠',
+    # 不眠・睡眠改善（デフォルト候補）
+    '不眠': '不眠・睡眠改善', '眠れない': '不眠・睡眠改善', '寝つき': '不眠・睡眠改善',
+    '睡眠薬': '不眠・睡眠改善', '睡眠時無呼吸': '不眠・睡眠改善', 'いびき': '不眠・睡眠改善',
+    'サプリ': '不眠・睡眠改善', 'グリシン': '不眠・睡眠改善', 'メラトニン': '不眠・睡眠改善',
+    '枕': '不眠・睡眠改善', 'マットレス': '不眠・睡眠改善', 'ツボ': '不眠・睡眠改善',
 }
 
 
@@ -1064,7 +1073,7 @@ def guess_yakuzen_board(title):
     for keyword, board in YAKUZEN_BOARD_RULES.items():
         if keyword in title:
             return board
-    return '薬膳の基礎知識'
+    return '不眠・睡眠改善'
 
 
 def generate_yakuzen_pin_text(title, url, content_md):
@@ -1102,12 +1111,12 @@ def generate_yakuzen_pin_text(title, url, content_md):
 
 def get_pinterest_board_id(board_name):
     board_env = {
-        '季節の養生': 'PINTEREST_BOARD_SEASONAL',
-        '薬膳レシピ': 'PINTEREST_BOARD_RECIPE',
-        '薬膳の基礎知識': 'PINTEREST_BOARD_BASICS',
-        '薬膳資格': 'PINTEREST_BOARD_QUALIF',
+        '不眠・睡眠改善': 'PINTEREST_BOARD_SLEEP',
+        '更年期×睡眠': 'PINTEREST_BOARD_MENOPAUSE',
+        '薬膳×睡眠': 'PINTEREST_BOARD_YAKUZEN_SLEEP',
+        '子ども・家族の睡眠': 'PINTEREST_BOARD_KIDS_SLEEP',
     }
-    env_key = board_env.get(board_name, 'PINTEREST_BOARD_BASICS')
+    env_key = board_env.get(board_name, 'PINTEREST_BOARD_SLEEP')
     return os.environ.get(env_key, '')
 
 
@@ -1402,3 +1411,4 @@ def try_post_to_pinterest(title, article_url, content_md, image_url=None):
     except Exception as e:
         print(f"Pinterest error: {e}")
         return ''
+
