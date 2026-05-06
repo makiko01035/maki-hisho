@@ -317,9 +317,12 @@ def rakuten_room_rss():
 @app.route('/rakuten-room-debug')
 def rakuten_room_debug():
     from flask import Response
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'}
-    raw = requests.get('https://room.rakuten.co.jp/makiko01035/items/feed/rss', headers=headers, timeout=10)
-    return Response(raw.text, mimetype='text/plain; charset=utf-8')
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'}
+        raw = requests.get('https://room.rakuten.co.jp/makiko01035/items/feed/rss', headers=headers, timeout=15)
+        return Response(f"STATUS: {raw.status_code}\n\n{raw.text}", mimetype='text/plain; charset=utf-8')
+    except Exception as e:
+        return Response(f"ERROR: {type(e).__name__}: {e}", mimetype='text/plain; charset=utf-8')
 
 
 @app.route('/ping')
