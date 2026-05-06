@@ -278,6 +278,40 @@ def check_deadline_reminders():
         print(f"Deadline reminder error: {e}")
 
 
+@app.route('/rakuten-room-rss')
+def rakuten_room_rss():
+    import feedparser
+    import re
+    from flask import Response
+    try:
+        feed = feedparser.parse('https://room.rakuten.co.jp/makiko01035/items/feed/rss')
+        items_xml = ''
+        for entry in feed.entries:
+            title = entry.get('title', '')
+            link = entry.get('link', '')
+            summary = entry.get('summary', entry.get('description', ''))
+            img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', summary)
+            img_url = img_match.group(1) if img_match else ''
+            summary_clean = re.sub(r'<[^>]+>', '', summary).strip()
+            items_xml += f'''  <item>
+    <title><![CDATA[{title}]]></title>
+    <link>{link}</link>
+    <description><![CDATA[{summary_clean}]]></description>
+    <enclosure url="{img_url}" type="image/jpeg" length="0"/>
+  </item>\n'''
+        rss_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>まきの楽天room</title>
+    <link>https://room.rakuten.co.jp/makiko01035/items</link>
+    <description>まきの楽天roomコレクション</description>
+{items_xml}  </channel>
+</rss>'''
+        return Response(rss_xml, mimetype='application/rss+xml; charset=utf-8')
+    except Exception as e:
+        return str(e), 500
+
+
 @app.route('/ping')
 def ping():
     return 'OK'
