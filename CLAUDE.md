@@ -108,6 +108,9 @@ git push origin main
 - `PINTEREST_REFRESH_TOKEN`: 未設定（同上）
 - `PINTEREST_BOARD_SEASONAL` / `PINTEREST_BOARD_RECIPE` / `PINTEREST_BOARD_BASICS` / `PINTEREST_BOARD_QUALIF`: 未設定
 - `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET`: 広報部X自動投稿用（設定状況は広報部CLAUDE.md参照）
+- `RAKUTEN_APP_ID`: 楽天Web ServiceのアプリID（**設定済み**）
+- `RAKUTEN_ACCESS_KEY`: 楽天Web Serviceのアクセスキー（**設定済み**）
+- `RAKUTEN_AFFILIATE_ID`: 楽天アフィリエイトID（**設定済み**）
 
 ---
 
@@ -190,6 +193,14 @@ python post_sekisui_direct.py "C:\path\to\記事.md"
   → それでも同じエラーが出る場合は制御文字混入の可能性あり
     → Claude Codeに「google_creds_clean.txt を再生成して」と依頼
     → 生成された `google_creds_clean.txt` の内容をRenderに貼り直す
+
+---
+
+### 楽天アフィリエイトAPI（薬膳ブログ自動挿入）
+- 実装場所：`blog_yakuzen.py`の`search_rakuten_items()`
+- エンドポイント：`https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401`（新仕様）
+- 必須ヘッダー：`Referer: http://foodmakehealth.com` と `Origin: https://maki-hisho.onrender.com`（両方ないと403エラー）
+- 動作：記事リライト・新規作成後にAIがキーワードを抽出→楽天APIで商品3件取得→記事末尾にカード形式で自動挿入
 
 ---
 
