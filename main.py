@@ -1425,6 +1425,69 @@ def auth_pinterest_boards():
     return f'エラー: {res.status_code} {res.text}', 400
 
 
+@app.route('/auth/threads')
+def auth_threads():
+    app_id = os.environ.get('THREADS_APP_ID', '')
+    if not app_id:
+        return 'THREADS_APP_ID が設定されていません。Renderに設定してください。', 400
+    redirect_uri = 'https://maki-hisho.onrender.com/auth/threads/callback'
+    auth_url = (
+        f"https://www.threads.net/oauth/authorize"
+        f"?client_id={app_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=threads_basic,threads_content_publish"
+        f"&response_type=code"
+    )
+    return f'''<html><body>
+<h2>Threads認証</h2>
+<p><a href="{auth_url}" style="font-size:20px;padding:10px;background:#000;color:#fff;text-decoration:none;border-radius:6px;">
+Threadsで認証する</a></p>
+</body></html>'''
+
+
+@app.route('/auth/threads/callback')
+def auth_threads_callback():
+    code = request.args.get('code')
+    if not code:
+        return f'エラー: codeが取得できませんでした。{request.args}', 400
+    app_id = os.environ.get('THREADS_APP_ID')
+    app_secret = os.environ.get('THREADS_APP_SECRET')
+    redirect_uri = 'https://maki-hisho.onrender.com/auth/threads/callback'
+    res = requests.post(
+        'https://graph.threads.net/oauth/access_token',
+        data={
+            'client_id': app_id,
+            'client_secret': app_secret,
+            'grant_type': 'authorization_code',
+            'redirect_uri': redirect_uri,
+            'code': code,
+        },
+        timeout=15
+    )
+    if res.status_code != 200:
+        return f'短期トークン取得エラー: {res.status_code} {res.text}', 400
+    short_token = res.json().get('access_token')
+    long_res = requests.get(
+        'https://graph.threads.net/access_token',
+        params={
+            'grant_type': 'th_exchange_token',
+            'client_secret': app_secret,
+            'access_token': short_token,
+        },
+        timeout=15
+    )
+    if long_res.status_code != 200:
+        return f'長期トークン取得エラー: {long_res.status_code} {long_res.text}', 400
+    long_token = long_res.json().get('access_token')
+    return f'''<html><body>
+<h2>✅ Threads認証成功！</h2>
+<p>以下をRenderの環境変数にコピペしてください：</p>
+<p><b>THREADS_ACCESS_TOKEN:</b><br>
+<textarea rows="4" cols="80">{long_token}</textarea></p>
+<p><small>このトークンは60日間有効です。期限が切れたら再度 /auth/threads にアクセスしてください。</small></p>
+</body></html>'''
+
+
 def create_rich_menu_image():
     img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'richmenu.png')
     with open(img_path, 'rb') as f:
