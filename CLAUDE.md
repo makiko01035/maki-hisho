@@ -53,6 +53,7 @@
 | Google Drive | 連携済み | claude.ai経由 |
 | Notion | 連携済み（2026-04-15） | `C:/Users/nyank/.claude/.mcp.json` に設定済み |
 | Playwright | 連携済み（2026-05-05） | `C:/Users/nyank/.claude/.mcp.json` に設定済み |
+| Higgsfield | 連携済み（2026-05-07） | `C:/Users/nyank/.claude.json` に設定済み・画像生成用 |
 
 ### Playwright MCPの使い方
 - **サイトの表示確認・レイアウト確認は必ずPlaywright MCPを使う**
