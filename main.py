@@ -3575,6 +3575,26 @@ ROOM_GENRES = [
     {'name': '節約日用品', 'keyword': '日用品 コスパ 節約 まとめ買い'},
 ]
 
+LINK_PHRASES = [
+    # 権威・社会的証明型
+    "楽天1位、納得🙂‍↕️\n",
+    "SNSでバズってた理由が分かる...\n",
+    "美容マニアの友達に激プッシュされたやつ\n",
+    # 価格型
+    "値段バグなんよ...\n",
+    "価格見て二度見した\n",
+    "マラソンで価格おかしいことになってる\n",
+    # 口コミ型
+    "口コミ見たら泣いた\n",
+    "★4.8の理由、見ればわかる\n",
+    "口コミに『もっと早く買えば』多すぎ\n",
+    "低評価レビューが参考になる...\n",
+    # 緊急性型
+    "前回は3日で売り切れてた😭\n",
+    "再販待ってた人、今出てる\n",
+    "在庫残りわずかって出てる\n",
+]
+
 HOOKS = [
     # 驚き・発見系
     "正直ノーマークだった。",
@@ -3741,7 +3761,9 @@ def send_room_suggestion_slot(slot_index):
         if post_id:
             import time
             time.sleep(3)
-            reply_to_threads(post_id, f"🛒 コチラ！\n{url}\n#PR")
+            import random as _random
+            phrase = _random.choice(LINK_PHRASES)
+            reply_to_threads(post_id, f"{phrase}{url}\n#PR")
     except Exception as e:
         print(f"send_room_suggestion_slot({slot_index}) error: {e}")
 
