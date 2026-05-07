@@ -2670,6 +2670,16 @@ def send_ebay_reset_reminder():
         print(f"send_ebay_reset_reminder error: {e}")
 
 
+def send_threads_api_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="🧵 【Threadsリマインド】\nブログ→Threads自動投稿の実装をやる予定でした！\n\n準備できたらClaudeに「Threads API実装して」と声かけしてね✅"
+        ))
+    except Exception as e:
+        print(f"Threads API reminder error: {e}")
+
+
 def send_hsbc_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -3505,13 +3515,54 @@ def post_to_x_evening():
         print(f"X post error (evening): {e}")
 
 
-# --- 楽天Room投稿案：毎日3回 3ジャンル送信 ---
+# --- 楽天アフィ：Threads自動投稿（毎日3回 × 3ジャンル = 9本/日）---
 
 ROOM_GENRES = [
     {'name': '育児', 'keyword': 'ベビー 育児グッズ おすすめ'},
     {'name': '美容', 'keyword': 'スキンケア コスメ 美容 おすすめ'},
     {'name': '収納家具', 'keyword': '収納 整理 家具 おしゃれ'},
 ]
+
+
+def post_to_threads(text):
+    """Threads APIに投稿する（テキストのみ）"""
+    access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
+    user_id = os.environ.get('THREADS_USER_ID', '')
+    if not access_token or not user_id:
+        print("Threads credentials not set")
+        return False
+    try:
+        # Step1: メディアコンテナ作成
+        container_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads',
+            params={
+                'media_type': 'TEXT',
+                'text': text,
+                'access_token': access_token,
+            },
+            timeout=15
+        )
+        if container_res.status_code != 200:
+            print(f"Threads container error: {container_res.status_code} {container_res.text}")
+            return False
+        creation_id = container_res.json().get('id')
+        # Step2: 公開
+        publish_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads_publish',
+            params={
+                'creation_id': creation_id,
+                'access_token': access_token,
+            },
+            timeout=15
+        )
+        if publish_res.status_code != 200:
+            print(f"Threads publish error: {publish_res.status_code} {publish_res.text}")
+            return False
+        print(f"Threads posted: {creation_id}")
+        return True
+    except Exception as e:
+        print(f"post_to_threads error: {e}")
+        return False
 
 
 def _fetch_room_suggestion(genre):
@@ -3527,7 +3578,7 @@ def _fetch_room_suggestion(genre):
     url = item['url']
     prompt = (
         f"商品名：{name}\n価格：{price}円\n\n"
-        f"この楽天商品のThreads/楽天Room投稿文を書いてください。\n"
+        f"この楽天商品のThreads投稿文を書いてください。\n"
         f"ジャンル：{genre['name']}\n\n"
         "出力形式（この順番で）：\n"
         "1行目〜2行目：商品の魅力・使い道を自然に伝えるコメント（感嘆符OK・140字以内）\n"
@@ -3545,29 +3596,18 @@ def _fetch_room_suggestion(genre):
     except Exception as e:
         print(f"room suggestion generate error ({genre['name']}): {e}")
         body = name
-    return f"【{genre['name']}】\n{body}\n\n楽天で見る→ {url}"
+    return f"{body}\n\n楽天で見る→ {url}"
 
 
 def send_room_suggestions():
-    """楽天Room投稿案を3ジャンル分生成してLINEに送信（毎日5:00/11:00/15:30）"""
-    user_id = os.environ.get('LINE_USER_ID', '')
-    if not user_id:
-        return
-    try:
-        now = datetime.datetime.now(JST)
-        time_label = now.strftime('%H:%M')
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text=f"🛍️ 楽天Room投稿案（{time_label}）\n育児・美容・収納家具の3本です👇"
-        ))
-        for genre in ROOM_GENRES:
-            try:
-                post = _fetch_room_suggestion(genre)
-                if post:
-                    line_bot_api.push_message(user_id, TextSendMessage(text=post))
-            except Exception as e:
-                print(f"room suggestion error ({genre['name']}): {e}")
-    except Exception as e:
-        print(f"send_room_suggestions error: {e}")
+    """楽天アフィ投稿を3ジャンル分生成してThreadsに直接投稿（毎日5:00/11:00/15:30）"""
+    for genre in ROOM_GENRES:
+        try:
+            post = _fetch_room_suggestion(genre)
+            if post:
+                post_to_threads(post)
+        except Exception as e:
+            print(f"send_room_suggestions error ({genre['name']}): {e}")
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
@@ -3607,7 +3647,7 @@ scheduler.add_job(send_note_weekly_reminder, 'cron', day_of_week='thu', hour=9, 
 scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
 # 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
 scheduler.add_job(send_daily_work_log, 'cron', hour=18, minute=0)
-# 毎日5:00/11:00/15:30：楽天Room投稿案（育児・美容・収納家具 各1本）
+# 毎日5:00/11:00/15:30：楽天アフィ→Threads自動投稿（育児・美容・収納家具 各1本 計9本/日）
 scheduler.add_job(send_room_suggestions, 'cron', hour=5, minute=0)
 scheduler.add_job(send_room_suggestions, 'cron', hour=11, minute=0)
 scheduler.add_job(send_room_suggestions, 'cron', hour=15, minute=30)
