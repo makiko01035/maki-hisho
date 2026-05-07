@@ -157,9 +157,8 @@ def auto_rewrite_yakuzen(user_id):
         _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
                                      featured_media_id=media_id, categories=[new_cat_id])
         try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
-        sns_msg = build_sns_message(new_title, link, image_url, new_content)
-        msg = f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"✅ リライト・更新完了！\n\n📝 {new_title}\n🔗 {link}"))
+        send_sns_messages(user_id, new_title, link, image_url, new_content)
 
     except Exception as e:
         print(f"Auto rewrite error: {e}")
@@ -735,9 +734,8 @@ def process_yakuzen_new_article(user_id, topic=None):
         media_id = upload_image_to_yakuzen_wp(image_url, title) if image_url else None
         post_id, link = post_to_yakuzen_wp(title, content, status='publish', featured_media_id=media_id)
         try_post_to_pinterest(title, link, content, image_url=image_url)
-        sns_msg = build_sns_message(title, link, image_url, content)
-        msg = f"✅ 薬膳記事を公開しました！\n\n📝 {title}\n🔗 {link}\n\n{sns_msg}"
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"✅ 睡眠記事を公開しました！\n\n📝 {title}\n🔗 {link}"))
+        send_sns_messages(user_id, title, link, image_url, content)
     except Exception as e:
         print(f"Yakuzen new article error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 記事作成中にエラーが発生しました。\n{str(e)[:150]}"))
@@ -792,9 +790,8 @@ def process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruct
         _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
                                      featured_media_id=media_id, categories=[new_cat_id])
         try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
-        sns_msg = build_sns_message(new_title, link, image_url, new_content)
-        msg = f"✅ 薬膳記事をリライト・更新しました！\n\n📝 {new_title}\n🔗 {link}\n\n{sns_msg}"
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"✅ 睡眠記事をリライト・更新しました！\n\n📝 {new_title}\n🔗 {link}"))
+        send_sns_messages(user_id, new_title, link, image_url, new_content)
     except Exception as e:
         print(f"Yakuzen rewrite error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 リライト中にエラーが発生しました。\n{str(e)[:150]}"))
@@ -1047,33 +1044,37 @@ def build_carousel_images(title, content_md, slide1_url):
 
 
 def build_sns_message(title, link, image_url, content_md):
-    """Instagram・Pinterest用の投稿セットをまとめてLINEメッセージ化"""
+    """後方互換用：send_sns_messagesに移行済み。文字列を返すだけにする"""
+    ig_caption = generate_instagram_caption(title, content_md, link)
+    pin = generate_yakuzen_pin_text(title, link, content_md)
+    return f"キャプション：{ig_caption}\nPinterestタイトル：{pin.get('pin_title', '')}"
+
+
+def send_sns_messages(user_id, title, link, image_url, content_md):
+    """Instagram・Pinterest用のコピペパーツをメッセージ分割して送信"""
+    from clients import line_bot_api
+    from linebot.models import TextSendMessage
+
     ig_caption = generate_instagram_caption(title, content_md, link)
     pin = generate_yakuzen_pin_text(title, link, content_md)
     carousel_urls, carousel_errors = build_carousel_images(title, content_md, image_url)
 
-    img_lines = ""
-    for i, url in enumerate(carousel_urls, 1):
-        img_lines += f"📸 {i}枚目：{url}\n"
-
-    error_note = ""
+    # 画像URL（保存用・コピペ不要なのでまとめて1通）
+    img_lines = "\n".join([f"📸 {i}枚目：{url}" for i, url in enumerate(carousel_urls, 1)])
     if carousel_errors:
-        error_note = f"\n⚠️ スライドエラー：\n" + "\n".join(carousel_errors[:2]) + "\n"
+        img_lines += "\n⚠️ " + "・".join(carousel_errors[:2])
+    line_bot_api.push_message(user_id, TextSendMessage(
+        text=f"📸 Instagramカルーセル画像（3枚保存）\nボード：{pin.get('board', '')}\n\n{img_lines if img_lines else '（画像なし）'}"
+    ))
 
-    return (
-        f"━━━━━━━━━━━━━━\n"
-        f"【Instagram @foodmakehealth】\n"
-        f"↓3枚保存してカルーセル投稿\n\n"
-        f"{img_lines}{error_note}\n"
-        f"【キャプション】\n"
-        f"{ig_caption}\n\n"
-        f"━━━━━━━━━━━━━━\n"
-        f"【Pinterest】\n"
-        f"ボード：{pin['board']}\n"
-        f"タイトル：{pin['pin_title']}\n"
-        f"説明：{pin['description']}\n"
-        f"画像：{carousel_urls[0] if carousel_urls else 'なし'}"
-    )
+    # Instagramキャプション（コピペ用・単独メッセージ）
+    line_bot_api.push_message(user_id, TextSendMessage(text=ig_caption))
+
+    # Pinterestタイトル（コピペ用・単独メッセージ）
+    line_bot_api.push_message(user_id, TextSendMessage(text=pin.get('pin_title', '')))
+
+    # Pinterest説明文（コピペ用・単独メッセージ）
+    line_bot_api.push_message(user_id, TextSendMessage(text=pin.get('description', '')))
 
 
 # ========== Pinterest連携 ==========

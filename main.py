@@ -183,10 +183,10 @@ def generate_note_draft_async(user_id, note_type, theme):
         )
 
         draft = response.content[0].text
-        send_long_message(
-            user_id,
-            f"📝 note{type_label}記事の下書きができました！\nこのテキストをnoteにコピペしてください👇\n\n" + draft
-        )
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"📝 note{type_label}記事の下書きができました！\n↓をそのままnoteにコピペしてください👇"
+        ))
+        send_long_message(user_id, draft)
         if note_type == "paid":
             line_bot_api.push_message(user_id, TextSendMessage(
                 text="✅ コピペ後、noteで「有料ライン」を「ここから有料記事です」の行に設定してから公開してください🎉"
@@ -215,7 +215,7 @@ def rewrite_yakuzen_by_post_id(user_id, post_id):
     from blog_yakuzen import (get_yakuzen_wp_creds, generate_yakuzen_rewrite,
                                generate_pexels_keyword, fetch_pexels_image_url,
                                upload_image_to_yakuzen_wp, detect_category_id,
-                               post_to_yakuzen_wp, try_post_to_pinterest, build_sns_message)
+                               post_to_yakuzen_wp, try_post_to_pinterest, send_sns_messages)
     try:
         wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
         res = requests.get(f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
@@ -235,11 +235,8 @@ def rewrite_yakuzen_by_post_id(user_id, post_id):
         _, link = post_to_yakuzen_wp(new_title, new_content, post_id=post_id, status='publish',
                                      featured_media_id=media_id, categories=[new_cat_id])
         try_post_to_pinterest(new_title, link, new_content, image_url=image_url)
-        sns_msg = build_sns_message(new_title, link, image_url, new_content)
-        completion_msg = f"✅ リライト完了！\n\n📝 {new_title}\n🔗 {link}"
-        line_bot_api.push_message(user_id, TextSendMessage(text=completion_msg))
-        if sns_msg:
-            line_bot_api.push_message(user_id, TextSendMessage(text=sns_msg[:4900]))
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"✅ リライト完了！\n\n📝 {new_title}\n🔗 {link}"))
+        send_sns_messages(user_id, new_title, link, image_url, new_content)
     except Exception as e:
         print(f"rewrite_yakuzen_by_post_id error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
@@ -1334,8 +1331,8 @@ def company_dashboard():
     <p class="section-title">LINE Functions — @296wjwwj</p>
     <div class="line-grid">
       <div class="line-item">
-        <span class="line-keyword">薬膳記事</span>
-        <span class="line-desc">薬膳ブログメニュー表示（新規作成 / リライト）</span>
+        <span class="line-keyword">睡眠記事</span>
+        <span class="line-desc">睡眠ブログメニュー表示（新規作成 / リライト）</span>
       </div>
       <div class="line-item">
         <span class="line-keyword">セキスイ記事</span>
@@ -1596,7 +1593,7 @@ def setup_rich_menu():
             {"bounds": {"x": 1667, "y": 0,   "width": 833, "height": 421},
              "action": {"type": "uri", "uri": "https://maki-hisho.onrender.com/ebay-calc"}},
             {"bounds": {"x": 0,    "y": 421, "width": 833, "height": 422},
-             "action": {"type": "message", "text": "薬膳記事"}},
+             "action": {"type": "message", "text": "睡眠記事"}},
             {"bounds": {"x": 833,  "y": 421, "width": 834, "height": 422},
              "action": {"type": "message", "text": "セキスイ記事"}},
             {"bounds": {"x": 1667, "y": 421, "width": 833, "height": 422},
@@ -2513,7 +2510,7 @@ def handle_message(event):
         elif state == 'waiting_for_new_topic':
             del yakuzen_sessions[user_id]
             save_yakuzen_sessions(yakuzen_sessions)
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✍️ 薬膳記事を作成中です...少しお待ちください！（1〜2分かかります）"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✍️ 睡眠記事を作成中です...少しお待ちください！（1〜2分かかります）"))
             threading.Thread(target=process_yakuzen_new_article, args=(user_id, user_message)).start()
             return
 
@@ -2564,12 +2561,12 @@ def handle_message(event):
             return
 
 
-    # 薬膳ブログ：キーワード検出
-    yakuzen_keywords = ['薬膳記事', '薬膳ブログ', '薬膳 記事', '薬膳リライト', 'foodmakehealth', '薬膳の記事']
+    # 睡眠記事（薬膳ブログ）：キーワード検出
+    yakuzen_keywords = ['睡眠記事', '薬膳記事', '薬膳ブログ', '薬膳 記事', '薬膳リライト', 'foodmakehealth', '薬膳の記事']
     if any(kw in user_message for kw in yakuzen_keywords):
         yakuzen_sessions[user_id] = {'state': 'waiting_for_mode'}
         save_yakuzen_sessions(yakuzen_sessions)
-        msg = "🌿 薬膳ブログ、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n4️⃣ 古い記事チェック＆リライト\n5️⃣ KW選定→リライト（Search Console分析→全自動）\n6️⃣ KW選定→新規記事（Search Console分析→全自動）\n\n番号か言葉で教えてください！"
+        msg = "🌙 睡眠記事、何をしますか？\n\n1️⃣ 新規作成（季節・人気ワードからテーマ自動決定）\n2️⃣ リライト（既存記事を更新）\n3️⃣ テーマ指定で新規作成\n4️⃣ 古い記事チェック＆リライト\n5️⃣ KW選定→リライト（Search Console分析→全自動）\n6️⃣ KW選定→新規記事（Search Console分析→全自動）\n\n番号か言葉で教えてください！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 
