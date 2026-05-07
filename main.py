@@ -2263,6 +2263,35 @@ def handle_message(event):
             threading.Thread(target=_add_memo).start()
         return
 
+    # Threadsネタ生成
+    if any(kw in user_message for kw in ['スレッズネタ', 'threadsネタ', 'Threadsネタ', 'スレッドネタ']):
+        try:
+            import random
+            genre = random.choice(['育児・子育て', '美容・スキンケア', '収納・暮らし', '睡眠・健康', '節約・お買い物'])
+            prompt = (
+                f"あなたは3人の子どもを育てるワーママ（医療職・副業中）です。\n"
+                f"今日のThreadsネタジャンル：{genre}\n\n"
+                "以下の3パターンのThreads投稿文を作ってください。\n"
+                "それぞれ120字以内・ですます調NG・体言止めや口語OK・ハッシュタグなし・リアルな体験談ベースで。\n\n"
+                "①【共感型】育児・生活のあるあるや気づき（共感を呼ぶ）\n"
+                "②【レビュー型】買って使ってみた正直な感想（購買意欲を高める）\n"
+                "③【日常型】今日あったこと・思ったこと（親しみやすさ・フォロワー獲得）\n\n"
+                "出力形式：\n"
+                "①（共感型）\n投稿文\n\n②（レビュー型）\n投稿文\n\n③（日常型）\n投稿文\n\n"
+                "余計な説明不要。投稿文だけ出力。"
+            )
+            resp = anthropic_client.messages.create(
+                model='claude-haiku-4-5-20251001',
+                max_tokens=600,
+                messages=[{'role': 'user', 'content': prompt}]
+            )
+            ideas = resp.content[0].text.strip()
+            reply = f"🧵 今日のThreadsネタ（{genre}）\n\n{ideas}\n\n👆コピペして投稿してみて！\nいいね・コメントきたら教えてね📊"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"ネタ生成エラー: {str(e)[:100]}"))
+        return
+
     # 楽天Roomタグ生成
     room_tag_sessions = load_room_tag_sessions()
     if any(kw in user_message for kw in ['roomタグ', 'Roomタグ', 'ルームタグ', 'roomハッシュ']):
