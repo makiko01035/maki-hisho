@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Threads×楽天アフィ 攻略ガイド</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #f5f0eb; color: #333; font-size: 15px; }
+  header { background: linear-gradient(135deg, #1a1a1a, #3a3a3a); color: white; padding: 24px 16px; text-align: center; }
+  header h1 { font-size: 20px; font-weight: bold; }
+  header p { font-size: 13px; color: #aaa; margin-top: 6px; }
+  .container { max-width: 640px; margin: 0 auto; padding: 16px; }
+  .card { background: white; border-radius: 12px; padding: 18px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .card h2 { font-size: 16px; font-weight: bold; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .badge { display: inline-block; background: #1a1a1a; color: white; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+  .badge.red { background: #e74c3c; }
+  .badge.green { background: #27ae60; }
+  .badge.blue { background: #2980b9; }
+  .badge.orange { background: #e67e22; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  th { background: #f8f8f8; font-weight: bold; font-size: 13px; }
+  td:first-child { white-space: nowrap; font-weight: bold; color: #555; }
+  .row { display: flex; gap: 8px; margin-bottom: 8px; align-items: flex-start; }
+  .row .icon { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
+  .row .text { flex: 1; }
+  .row .text strong { display: block; font-size: 14px; }
+  .row .text span { font-size: 13px; color: #666; }
+  .ng { color: #e74c3c; }
+  .ok { color: #27ae60; }
+  .hook-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hook-item { background: #f8f8f8; border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  .hook-cat { font-size: 11px; color: #999; margin-bottom: 4px; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; }
+  .compare .box { padding: 10px; border-radius: 8px; font-size: 13px; }
+  .compare .box.bad { background: #ffeaea; }
+  .compare .box.good { background: #eafaf1; }
+  .compare .box .label { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+  .compare .box.bad .label { color: #e74c3c; }
+  .compare .box.good .label { color: #27ae60; }
+  .time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .time-box { background: #f8f8f8; border-radius: 8px; padding: 10px; text-align: center; }
+  .time-box.gold { background: #fff3cd; }
+  .time-box .time { font-size: 16px; font-weight: bold; }
+  .time-box .desc { font-size: 11px; color: #666; margin-top: 4px; }
+  .nums { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .num-item { background: #f8f8f8; border-radius: 8px; padding: 10px; }
+  .num-item .num { font-size: 22px; font-weight: bold; color: #1a1a1a; }
+  .num-item .unit { font-size: 12px; color: #666; }
+  .num-item .label { font-size: 12px; color: #888; margin-top: 2px; }
+  .algo { background: #f0f8ff; border-radius: 10px; padding: 14px; text-align: center; }
+  .algo-steps { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .algo-step { background: white; border-radius: 8px; padding: 8px 12px; font-size: 13px; font-weight: bold; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  .algo-arrow { color: #999; font-size: 18px; }
+  .tag { display: inline-block; background: #eee; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin: 2px; }
+  .sale-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sale-item { border-radius: 8px; padding: 10px; font-size: 13px; }
+  .sale-item .name { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+  .sale-item .timing { color: #666; font-size: 12px; }
+  .sale-item.s1 { background: #ffeaea; }
+  .sale-item.s2 { background: #fff3cd; }
+  .sale-item.s3 { background: #eafaf1; }
+  .sale-item.s4 { background: #e8f4fd; }
+  .tip { background: #fff9e6; border-left: 4px solid #f39c12; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13px; margin-bottom: 8px; }
+  .updated { text-align: center; color: #aaa; font-size: 12px; padding: 16px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧵 Threads × 楽天アフィ 攻略ガイド</h1>
+  <p>@oji_to_moji の知識をまとめました｜2026.05.08更新</p>
+</header>
+
+<div class="container">
+
+  <!-- Threadsの特徴 -->
+  <div class="card">
+    <h2>📊 Threadsの特徴</h2>
+
+    <div class="row">
+      <div class="icon">👩</div>
+      <div class="text">
+        <strong>ユーザー層</strong>
+        <span>女性が約70%・30〜40代がボリュームゾーン。育児・美容・健康・ファッションが刺さりやすい。</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="icon">🚀</div>
+      <div class="text">
+        <strong>拡散の仕組み</strong>
+        <span>フォロワー数はほぼ関係なし。投稿単体で評価される。フォロワー0でも今日始めて明日バズる。</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="icon">⏱️</div>
+      <div class="text">
+        <strong>投稿の賞味期限</strong>
+        <span>現在は約24時間で落ち着く（以前は2〜3日）。ただし後から伸びるケースもあるので<strong>すぐ削除はNG</strong>。</span>
+      </div>
+    </div>
+
+    <div class="algo" style="margin-top:12px;">
+      <div style="font-size:13px; font-weight:bold; margin-bottom:10px;">🔑 アルゴリズムの動き（「タップ」が最重要）</div>
+      <div class="algo-steps">
+        <div class="algo-step">①指を止める</div>
+        <div class="algo-arrow">→</div>
+        <div class="algo-step">②タップ</div>
+        <div class="algo-arrow">→</div>
+        <div class="algo-step">③コメント欄</div>
+        <div class="algo-arrow">→</div>
+        <div class="algo-step">④プロフへ</div>
+      </div>
+      <div style="font-size:12px; color:#666; margin-top:8px;">この流れが評価される。「いいね」より「タップ」が大事。</div>
+    </div>
+  </div>
+
+  <!-- やったらNG -->
+  <div class="card">
+    <h2>🚫 やったらNG <span class="badge red">絶対ダメ</span></h2>
+    <table>
+      <tr><td class="ng">本文にリンク</td><td>露出が一気に落ちる。URLはコメント欄へ</td></tr>
+      <tr><td class="ng">本文にメンション</td><td>伸びにくくなる</td></tr>
+      <tr><td class="ng">ハッシュタグ</td><td>見づらくて離脱される・リーチが下がる</td></tr>
+      <tr><td class="ng">トピック設定</td><td>リーチが狭まる・基本なしでOK</td></tr>
+      <tr><td class="ng">引用投稿</td><td>基本伸びにくい</td></tr>
+      <tr><td class="ng">すぐ削除</td><td>後から伸びることがある。しばらく様子見</td></tr>
+    </table>
+  </div>
+
+  <!-- 神数字 -->
+  <div class="card">
+    <h2>🔢 神数字 <span class="badge orange">守れば稼げる</span></h2>
+    <div class="nums">
+      <div class="num-item"><div class="num">5<span class="unit">本</span></div><div class="label">1日の最低投稿数</div></div>
+      <div class="num-item"><div class="num">3<span class="unit">行</span></div><div class="label">文章の長さ上限</div></div>
+      <div class="num-item"><div class="num">1〜2<span class="unit">時間</span></div><div class="label">投稿と投稿の間隔</div></div>
+      <div class="num-item"><div class="num">10<span class="unit">%以上</span></div><div class="label">狙う報酬料率</div></div>
+      <div class="num-item"><div class="num">3<span class="unit">日後</span></div><div class="label">バズ投稿の再投稿タイミング</div></div>
+      <div class="num-item"><div class="num">89<span class="unit">日間</span></div><div class="label">クリックの有効期間</div></div>
+      <div class="num-item"><div class="num">3<span class="unit">ヶ月</span></div><div class="label">収益化の実感が出る目安</div></div>
+      <div class="num-item"><div class="num">週1<span class="unit">回</span></div><div class="label">報酬画面を見る頻度</div></div>
+    </div>
+    <div class="tip" style="margin-top:12px;">投稿配分：朝1・昼1・夕1・<strong>夜2（20時と22時）</strong>が基本</div>
+  </div>
+
+  <!-- 投稿時間 -->
+  <div class="card">
+    <h2>⏰ おすすめ投稿時間</h2>
+    <div class="time-grid">
+      <div class="time-box"><div class="time">7:30</div><div class="desc">通勤・朝の支度中</div></div>
+      <div class="time-box"><div class="time">12:30</div><div class="desc">昼休みのスマホ</div></div>
+      <div class="time-box"><div class="time">17:30</div><div class="desc">退勤〜帰宅タイム</div></div>
+      <div class="time-box gold"><div class="time">20:00</div><div class="desc">🏆 ゴールデンタイム<br>渾身の投稿はここ</div></div>
+      <div class="time-box"><div class="time">22:00</div><div class="desc">寝る前スマホタイム</div></div>
+      <div class="time-box"><div class="time">9:00</div><div class="desc">休日はこの枠も追加</div></div>
+    </div>
+    <div class="tip" style="margin-top:12px;">Threadsは<strong>後伸び</strong>する。18時の投稿が20時にバズることも。</div>
+  </div>
+
+  <!-- 冒頭フック -->
+  <div class="card">
+    <h2>🎣 冒頭フック集 <span class="badge blue">1行目が9割</span></h2>
+    <div class="tip">主語を「私」から「あなた」に変えるだけで反応が変わる。<br>機能じゃなく「使った後の未来」を伝える。</div>
+
+    <p style="font-size:12px;color:#999;margin-bottom:8px;">▼ 驚き・発見系</p>
+    <div class="hook-grid">
+      <div class="hook-item">正直ノーマークだった。</div>
+      <div class="hook-item">完全ノーマークだった、</div>
+      <div class="hook-item">事件です。</div>
+      <div class="hook-item">天才やん...</div>
+      <div class="hook-item">信じられないんですが、</div>
+      <div class="hook-item">大変なことが起こりました</div>
+      <div class="hook-item">センスいい人しかきづいてないけど、</div>
+    </div>
+
+    <p style="font-size:12px;color:#999;margin:10px 0 8px;">▼ 共感・呼びかけ系</p>
+    <div class="hook-grid">
+      <div class="hook-item">出産前に知りたかった...</div>
+      <div class="hook-item">男の子ママ...聞こえますか......</div>
+      <div class="hook-item">3年悩んだアレ、1日で解決した。</div>
+      <div class="hook-item">寝かしつけ1時間かかってる人へ。</div>
+      <div class="hook-item">夫へ。</div>
+      <div class="hook-item">今すぐやめて！！</div>
+      <div class="hook-item">勘違いしている人が多いですが、</div>
+      <div class="hook-item">100回以上言ってるけど、</div>
+    </div>
+
+    <p style="font-size:12px;color:#999;margin:10px 0 8px;">▼ 愛用・推し系</p>
+    <div class="hook-grid">
+      <div class="hook-item">私が愛してやまない、</div>
+      <div class="hook-item">私の推しの、</div>
+      <div class="hook-item">浮気します...</div>
+      <div class="hook-item">これ内緒にして欲しいのですが、</div>
+      <div class="hook-item">批判されそうですが...</div>
+      <div class="hook-item">ずっと我慢してたけど買った。</div>
+    </div>
+
+    <p style="font-size:12px;color:#999;margin:10px 0 8px;">▼ 価格・お得系</p>
+    <div class="hook-grid">
+      <div class="hook-item">値段バグなんよ...</div>
+      <div class="hook-item">これで1,000円台？</div>
+      <div class="hook-item">価格見て二度見した</div>
+      <div class="hook-item">マラソンで価格おかしいことになってる</div>
+    </div>
+
+    <p style="font-size:12px;color:#999;margin:10px 0 8px;">▼ 口コミ・実績系</p>
+    <div class="hook-grid">
+      <div class="hook-item">楽天1位、納得🙂‍↕️</div>
+      <div class="hook-item">SNSでバズってた理由が分かる...</div>
+      <div class="hook-item">口コミ見たら泣いた</div>
+      <div class="hook-item">★4.8の理由、見ればわかる</div>
+      <div class="hook-item">口コミに『もっと早く買えば』多すぎ</div>
+      <div class="hook-item">低評価レビューが参考になる...</div>
+    </div>
+
+    <p style="font-size:12px;color:#999;margin:10px 0 8px;">▼ 緊急性系</p>
+    <div class="hook-grid">
+      <div class="hook-item">前回は3日で売り切れてた😭</div>
+      <div class="hook-item">再販待ってた人、今出てる</div>
+      <div class="hook-item">在庫残りわずかって出てる</div>
+      <div class="hook-item">クーポン今日まで！！</div>
+    </div>
+  </div>
+
+  <!-- 機能じゃなく未来を売れ -->
+  <div class="card">
+    <h2>✨ 機能じゃなく「未来」を売れ</h2>
+    <div class="compare">
+      <div class="box bad"><div class="label">❌ 0点</div>保温機能付き</div>
+      <div class="box good"><div class="label">✅ 95点</div>朝淹れたコーヒー昼でも温かい</div>
+    </div>
+    <div class="compare">
+      <div class="box bad"><div class="label">❌ 0点</div>軽量コンパクト</div>
+      <div class="box good"><div class="label">✅ 98点</div>カバンに入れっぱでも重くない</div>
+    </div>
+    <div class="compare">
+      <div class="box bad"><div class="label">❌ 0点</div>防水仕様</div>
+      <div class="box good"><div class="label">✅ 93点</div>子どもとのお風呂時間が快適に</div>
+    </div>
+    <div class="compare">
+      <div class="box bad"><div class="label">❌ 0点</div>速乾素材</div>
+      <div class="box good"><div class="label">✅ 97点</div>部屋干しでも次の日に間に合う</div>
+    </div>
+    <div class="compare">
+      <div class="box bad"><div class="label">❌ 0点</div>大容量収納</div>
+      <div class="box good"><div class="label">✅ 99点</div>タンス開けてため息がなくなった</div>
+    </div>
+  </div>
+
+  <!-- リンク誘導フレーズ -->
+  <div class="card">
+    <h2>🔗 コメント欄の誘導フレーズ <span class="badge green">「こちら」はNG</span></h2>
+    <div class="tip">「こちらです」「ここから↓」は弱い。以下から選んで使う。</div>
+    <table>
+      <tr><th>カテゴリ</th><th>フレーズ</th></tr>
+      <tr><td>権威・実績</td><td>楽天1位、納得🙂‍↕️<br>SNSでバズってた理由が分かる...<br>美容マニアの友達に激プッシュされたやつ</td></tr>
+      <tr><td>価格</td><td>値段バグなんよ...<br>価格見て二度見した<br>マラソンで価格おかしいことになってる</td></tr>
+      <tr><td>口コミ</td><td>口コミ見たら泣いた<br>★4.8の理由、見ればわかる<br>口コミに『もっと早く買えば』多すぎ</td></tr>
+      <tr><td>緊急性</td><td>前回は3日で売り切れてた😭<br>再販待ってた人、今出てる<br>在庫残りわずかって出てる</td></tr>
+    </table>
+  </div>
+
+  <!-- 今買う理由 -->
+  <div class="card">
+    <h2>🛒 「今買う理由」の作り方</h2>
+    <table>
+      <tr><td class="ng">「セール中です」</td><td class="ok">「マラソン中に買わないと損するやつ」</td></tr>
+      <tr><td class="ng">「お得です」</td><td class="ok">「2000円オムツ代浮くやん...」</td></tr>
+      <tr><td class="ng">「ポイント還元あり」</td><td class="ok">「今日ポイント5倍だから今のうち」</td></tr>
+      <tr><td class="ng">「安くなってます」</td><td class="ok">「前回これで買い逃して後悔した」</td></tr>
+      <tr><td class="ng">「クーポン出てます」</td><td class="ok">「クーポン今日23:59まで、急げ」</td></tr>
+    </table>
+  </div>
+
+  <!-- セールカレンダー -->
+  <div class="card">
+    <h2>📅 楽天セールカレンダー</h2>
+    <div class="sale-grid">
+      <div class="sale-item s1"><div class="name">🔥 スーパーセール</div><div class="timing">年4回（3・6・9・12月）</div><div style="font-size:12px;margin-top:4px;">3日前から仕込む</div></div>
+      <div class="sale-item s2"><div class="name">🛍️ お買い物マラソン</div><div class="timing">月1〜2回</div><div style="font-size:12px;margin-top:4px;">前日から準備</div></div>
+      <div class="sale-item s3"><div class="name">5️⃣ 5と0のつく日</div><div class="timing">毎月（5・10・15・20・25・30日）</div><div style="font-size:12px;margin-top:4px;">前日から投稿数増やす</div></div>
+      <div class="sale-item s4"><div class="name">💝 ワンダフルデー</div><div class="timing">毎月1日</div><div style="font-size:12px;margin-top:4px;">会員限定ポイントUP</div></div>
+    </div>
+    <div class="tip" style="margin-top:12px;">最強の組み合わせ：<strong>スーパーセール × 5と0のつく日</strong><br>季節ネタは1〜2ヶ月前から仕込む（冷感寝具は5月中など）</div>
+  </div>
+
+  <!-- 伸びない時20選 -->
+  <div class="card">
+    <h2>📈 伸びない時にやること20選</h2>
+    <table>
+      <tr><td>①</td><td>1日の投稿を5本以上に増やす</td></tr>
+      <tr><td>②</td><td>冒頭1行目で手を止めさせる工夫</td></tr>
+      <tr><td>③</td><td>文章を3行以内に削る</td></tr>
+      <tr><td>④</td><td>紹介商品の報酬率を確認する</td></tr>
+      <tr><td>⑤</td><td>レビュー件数100以上の商品を選ぶ</td></tr>
+      <tr><td>⑥</td><td>季節に合った商品を優先する</td></tr>
+      <tr><td>⑦</td><td>アイコンを顔か動物に変える</td></tr>
+      <tr><td>⑧</td><td>IDを見ただけで発信内容が伝わるか確認</td></tr>
+      <tr><td>⑨</td><td>プロフィールにフォローする理由を書く</td></tr>
+      <tr><td>⑩</td><td>固定投稿を売れ筋商品に差し替える</td></tr>
+      <tr><td>⑪</td><td>過去にバズった投稿を文章変えて再投稿</td></tr>
+      <tr><td>⑫</td><td>アフィ以外の役立つ情報も発信する</td></tr>
+      <tr><td>⑬</td><td><strong>20時〜21時に渾身の投稿をぶつける</strong></td></tr>
+      <tr><td>⑭</td><td>コメント欄まで読ませる文末を意識する</td></tr>
+      <tr><td>⑮</td><td>商品の機能より「使った後の未来」を書く</td></tr>
+      <tr><td>⑯</td><td>5と0のつく日は前日から投稿数を増やす</td></tr>
+      <tr><td>⑰</td><td>伸びてるアカウントを5つ観察する</td></tr>
+      <tr><td>⑱</td><td>クリック数を見て反応の良い商品を分析</td></tr>
+      <tr><td>⑲</td><td>日常のつぶやきで人柄を見せる</td></tr>
+      <tr><td>⑳</td><td>トレンドワードを投稿に取り入れる</td></tr>
+    </table>
+  </div>
+
+  <div class="updated">参考：@oji_to_moji（フォロワー1万・月収20万達成）</div>
+
+</div>
+</body>
+</html>

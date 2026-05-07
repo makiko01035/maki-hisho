@@ -1387,6 +1387,10 @@ def company_office():
 def instagram_roadmap():
     return send_from_directory('.', 'instagram_roadmap.html')
 
+@app.route('/threads-guide')
+def threads_guide():
+    return send_from_directory('.', 'threads_guide.html')
+
 @app.route('/x-study-note')
 def x_study_note():
     return send_from_directory('.', 'x_study_note.html')
