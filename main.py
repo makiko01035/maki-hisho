@@ -3505,6 +3505,71 @@ def post_to_x_evening():
         print(f"X post error (evening): {e}")
 
 
+# --- 楽天Room投稿案：毎日3回 3ジャンル送信 ---
+
+ROOM_GENRES = [
+    {'name': '育児', 'keyword': 'ベビー 育児グッズ おすすめ'},
+    {'name': '美容', 'keyword': 'スキンケア コスメ 美容 おすすめ'},
+    {'name': '収納家具', 'keyword': '収納 整理 家具 おしゃれ'},
+]
+
+
+def _fetch_room_suggestion(genre):
+    """楽天APIで商品1件取得 → Claude投稿文+ハッシュタグ生成"""
+    import random
+    from blog_yakuzen import search_rakuten_items
+    items = search_rakuten_items(genre['keyword'], hits=5)
+    if not items:
+        return None
+    item = random.choice(items)
+    name = item['name'][:40]
+    price = item['price']
+    url = item['url']
+    prompt = (
+        f"商品名：{name}\n価格：{price}円\n\n"
+        f"この楽天商品のThreads/楽天Room投稿文を書いてください。\n"
+        f"ジャンル：{genre['name']}\n\n"
+        "出力形式（この順番で）：\n"
+        "1行目〜2行目：商品の魅力・使い道を自然に伝えるコメント（感嘆符OK・140字以内）\n"
+        "空行\n"
+        "ハッシュタグ10個（#日本語、スペース区切り）\n\n"
+        "余計な説明・前置きは不要。コメントとハッシュタグだけ出力。"
+    )
+    try:
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=300,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        body = resp.content[0].text.strip()
+    except Exception as e:
+        print(f"room suggestion generate error ({genre['name']}): {e}")
+        body = name
+    return f"【{genre['name']}】\n{body}\n\n楽天で見る→ {url}"
+
+
+def send_room_suggestions():
+    """楽天Room投稿案を3ジャンル分生成してLINEに送信（毎日5:00/11:00/15:30）"""
+    user_id = os.environ.get('LINE_USER_ID', '')
+    if not user_id:
+        return
+    try:
+        now = datetime.datetime.now(JST)
+        time_label = now.strftime('%H:%M')
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"🛍️ 楽天Room投稿案（{time_label}）\n育児・美容・収納家具の3本です👇"
+        ))
+        for genre in ROOM_GENRES:
+            try:
+                post = _fetch_room_suggestion(genre)
+                if post:
+                    line_bot_api.push_message(user_id, TextSendMessage(text=post))
+            except Exception as e:
+                print(f"room suggestion error ({genre['name']}): {e}")
+    except Exception as e:
+        print(f"send_room_suggestions error: {e}")
+
+
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
@@ -3542,6 +3607,10 @@ scheduler.add_job(send_note_weekly_reminder, 'cron', day_of_week='thu', hour=9, 
 scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
 # 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
 scheduler.add_job(send_daily_work_log, 'cron', hour=18, minute=0)
+# 毎日5:00/11:00/15:30：楽天Room投稿案（育児・美容・収納家具 各1本）
+scheduler.add_job(send_room_suggestions, 'cron', hour=5, minute=0)
+scheduler.add_job(send_room_suggestions, 'cron', hour=11, minute=0)
+scheduler.add_job(send_room_suggestions, 'cron', hour=15, minute=30)
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 scheduler.start()
