@@ -3628,6 +3628,15 @@ def send_room_suggestions():
             print(f"send_room_suggestions error ({genre['name']}): {e}")
 
 
+def send_threads_token_reminder():
+    try:
+        line_bot_api.push_message(os.environ['LINE_USER_ID'], TextSendMessage(
+            text="🧵【Threadsトークン期限切れ注意】\nThreads自動投稿のトークンが期限切れになる時期です！\n\nMeta開発者ダッシュボード→Graph APIエクスプローラーで新しいトークンを取得して、RenderのTHREADS_ACCESS_TOKENを更新してね✅"
+        ))
+    except Exception as e:
+        print(f"send_threads_token_reminder error: {e}")
+
+
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
@@ -3671,6 +3680,8 @@ scheduler.add_job(send_room_suggestions, 'cron', hour=11, minute=0)
 scheduler.add_job(send_room_suggestions, 'cron', hour=15, minute=30)
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
+# 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
+scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:00:00', timezone='Asia/Tokyo')
 scheduler.start()
 
 if __name__ == '__main__':
