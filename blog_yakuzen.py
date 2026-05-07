@@ -880,6 +880,61 @@ def _resolve_font_path():
         return None
 
 
+def build_slide1_image(title: str, img_url: str) -> bytes:
+    """1枚目スライド：Pexels画像にタイトルオーバーレイを合成してJPEGバイト列を返す"""
+    from PIL import Image, ImageDraw, ImageFont
+    from io import BytesIO
+
+    r = requests.get(img_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'}, allow_redirects=True)
+    r.raise_for_status()
+    img = Image.open(BytesIO(r.content)).convert('RGBA')
+    img = img.resize((1080, 1080), Image.LANCZOS)
+
+    overlay = Image.new('RGBA', (1080, 1080), (0, 0, 0, 0))
+    draw_ov = ImageDraw.Draw(overlay)
+    for y in range(1080):
+        alpha = int(180 * (y / 1080))
+        draw_ov.line([(0, y), (1080, y)], fill=(0, 0, 0, alpha))
+    img = Image.alpha_composite(img, overlay)
+
+    draw = ImageDraw.Draw(img)
+    font_path = _resolve_font_path()
+    if not font_path:
+        raise RuntimeError("Font not available")
+
+    with open(font_path, 'rb') as f:
+        font_data = f.read()
+    font_title = ImageFont.truetype(BytesIO(font_data), 60)
+    font_footer = ImageFont.truetype(BytesIO(font_data), 34)
+
+    max_chars = 14
+    lines = []
+    t = title
+    while len(t) > max_chars:
+        lines.append(t[:max_chars])
+        t = t[max_chars:]
+    lines.append(t)
+
+    line_height = 72
+    y_start = 1080 - line_height * len(lines) - 120
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font_title)
+        x = (1080 - (bbox[2] - bbox[0])) // 2
+        draw.text((x + 2, y_start + 2), line, font=font_title, fill=(0, 0, 0, 200))
+        draw.text((x, y_start), line, font=font_title, fill=(255, 255, 255, 255))
+        y_start += line_height
+
+    footer = "@foodmakehealth"
+    bbox_f = draw.textbbox((0, 0), footer, font=font_footer)
+    x_f = (1080 - (bbox_f[2] - bbox_f[0])) // 2
+    draw.text((x_f + 1, 1080 - 55 + 1), footer, font=font_footer, fill=(0, 0, 0, 180))
+    draw.text((x_f, 1080 - 55), footer, font=font_footer, fill=(255, 255, 255, 200))
+
+    buf = BytesIO()
+    img.convert('RGB').save(buf, format='JPEG', quality=90)
+    return buf.getvalue()
+
+
 def build_slide_image(header, items, accent_color=(139, 105, 20)):
     """テキストリスト画像を生成してJPEGバイト列を返す"""
     from PIL import Image, ImageDraw, ImageFont
@@ -945,13 +1000,31 @@ def upload_bytes_to_yakuzen_wp(img_bytes, filename):
 
 
 def build_carousel_images(title, content_md, slide1_url):
-    """2枚目・3枚目のスライド画像を生成してURLリストを返す。エラー文字列も返す"""
+    """1〜3枚目スライド画像を生成してURLリストを返す。エラー文字列も返す"""
     import traceback
     errors = []
-    urls = [slide1_url] if slide1_url else []
+    urls = []
+    slug = re.sub(r'[^a-z0-9-]', '-', title[:20].encode('ascii', 'ignore').decode())[:20] or 'yakuzen'
+
+    # 1枚目：タイトルオーバーレイ画像
+    if slide1_url:
+        try:
+            img1 = build_slide1_image(title, slide1_url)
+            url1 = upload_bytes_to_yakuzen_wp(img1, f"slide1-{slug}.jpg")
+            urls.append(url1 if url1 else slide1_url)
+            if not url1:
+                errors.append("slide1: WPアップロード失敗（元画像を使用）")
+            else:
+                print(f"[Carousel] slide1 url: {url1}")
+        except Exception as e:
+            tb = traceback.format_exc()
+            urls.append(slide1_url)
+            errors.append(f"slide1: {e}")
+            print(f"[Carousel] slide1 error: {e}\n{tb}")
+
+    # 2・3枚目：食材・効能スライド
     try:
         data = extract_slide_content(title, content_md)
-        slug = re.sub(r'[^a-z0-9-]', '-', title[:20].encode('ascii', 'ignore').decode())[:20] or 'yakuzen'
     except Exception as e:
         errors.append(f"extract: {e}")
         return urls, errors
