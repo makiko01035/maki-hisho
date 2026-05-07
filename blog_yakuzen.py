@@ -809,16 +809,16 @@ def generate_instagram_caption(title, content_md, article_url):
         max_tokens=300,
         messages=[{
             'role': 'user',
-            'content': f"""薬膳料理研究家のInstagram（@foodmakehealth）用キャプションを作成してください。
+            'content': f"""睡眠・健康情報を発信するInstagram（@foodmakehealth）用キャプションを作成してください。
 
 記事タイトル：{title}
 記事冒頭：{content_md[:300]}
 
 条件：
-- 1行目：共感を呼ぶ一言（絵文字1個＋症状への共感）
-- 2〜4行目：レシピのポイントを箇条書き（絵文字付き）
-- 最後：「詳しいレシピはプロフのリンクから🔗」
-- ハッシュタグ5〜8個（#薬膳 #スーパーで買える #女性の健康 など）
+- 1行目：共感を呼ぶ一言（絵文字1個＋睡眠の悩みへの共感）
+- 2〜4行目：今日から使える睡眠改善のポイントを箇条書き（絵文字付き）
+- 最後：「詳しくはプロフのリンクから🔗」
+- ハッシュタグ5〜8個（#睡眠 #不眠 #睡眠改善 #女性の健康 #更年期 など記事に合ったもの）
 - 全体150文字以内
 - キャプションのみ出力"""
         }]
@@ -827,33 +827,33 @@ def generate_instagram_caption(title, content_md, article_url):
 
 
 def extract_slide_content(title, content_md):
-    """記事から2枚目（材料）・3枚目（効能）用テキストを抽出"""
+    """記事から2枚目（悩み）・3枚目（改善tips）用テキストを抽出"""
     response = anthropic_client.messages.create(
         model='claude-haiku-4-5-20251001',
         max_tokens=400,
         messages=[{
             'role': 'user',
-            'content': f"""薬膳ブログ記事から以下を抽出してください。
+            'content': f"""睡眠・健康ブログ記事から以下を抽出してください。
 
 タイトル：{title}
 本文：{content_md[:2000]}
 
 以下のJSON形式のみで回答（説明不要）：
 {{
-  "ingredients": ["食材1（効能一言）", "食材2（効能一言）", "食材3（効能一言）"],
-  "effects": ["効能まとめ1", "効能まとめ2", "効能まとめ3"]
+  "concerns": ["悩み1", "悩み2", "悩み3"],
+  "tips": ["改善策1", "改善策2", "改善策3"]
 }}
 
 条件：
-- ingredients：3〜4個、「生姜（体を温める）」のような形式
-- effects：3個、「〜を改善する」「〜に効く」などシンプルに"""
+- concerns：3〜4個、記事が対象とする睡眠の悩み（例：「なかなか寝つけない」「夜中に目が覚める」）
+- tips：3〜4個、今日から実践できる具体的な改善策（例：「就寝90分前に入浴する」）、10文字以内で簡潔に"""
         }]
     )
     raw = response.content[0].text.strip()
     match = re.search(r'\{.*\}', raw, re.DOTALL)
     if match:
         return json.loads(match.group())
-    return {'ingredients': [], 'effects': []}
+    return {'concerns': [], 'tips': []}
 
 
 def _resolve_font_path():
@@ -1022,16 +1022,16 @@ def build_carousel_images(title, content_md, slide1_url):
             errors.append(f"slide1: {e}")
             print(f"[Carousel] slide1 error: {e}\n{tb}")
 
-    # 2・3枚目：食材・効能スライド
+    # 2・3枚目：悩み・改善tipsスライド
     try:
         data = extract_slide_content(title, content_md)
     except Exception as e:
         errors.append(f"extract: {e}")
         return urls, errors
 
-    for label, filename_prefix in [("使う食材", "slide2"), ("体への効能", "slide3")]:
+    for label, key, filename_prefix in [("こんな悩みに", "concerns", "slide2"), ("今夜から試せること", "tips", "slide3")]:
         try:
-            img = build_slide_image(label, data.get('ingredients' if label == "使う食材" else 'effects', []))
+            img = build_slide_image(label, data.get(key, []))
             url = upload_bytes_to_yakuzen_wp(img, f"{filename_prefix}-{slug}.jpg")
             if url:
                 urls.append(url)
