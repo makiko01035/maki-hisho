@@ -114,6 +114,8 @@ git push origin main
 - `RAKUTEN_APP_ID`: 楽天Web ServiceのアプリID（**設定済み**）
 - `RAKUTEN_ACCESS_KEY`: 楽天Web Serviceのアクセスキー（**設定済み**）
 - `RAKUTEN_AFFILIATE_ID`: 楽天アフィリエイトID（**設定済み**）
+- `THREADS_ACCESS_TOKEN`: makikosroomアカウントの長期アクセストークン（**設定済み**・**期限2026-07-07**）
+- `THREADS_USER_ID`: 26747493744902592（makikosroomのThreadsユーザーID）
 
 ---
 
@@ -121,6 +123,7 @@ git push origin main
 
 | 送るキーワード | 動作 |
 |-------------|------|
+| `スレッズネタ` | Threads投稿案3パターン生成（共感型・レビュー型・日常型）ランダムジャンル |
 | `薬膳記事` | 薬膳ブログメニュー表示（新規/リライト選択） |
 | → `1` または `新規作成` | テーマを聞いてきて記事作成→即公開 |
 | → `2` または `リライト` | 季節に合った記事を自動選択→リライト→即公開 |
@@ -165,6 +168,18 @@ python post_sekisui_direct.py "C:\path\to\記事.md"
 
 ## 広報部
 
+### Threads自動投稿（makikosroom / 楽天アフィ）
+- アカウント：makikosroom（楽天Room連動）
+- 毎日5本自動投稿：7:30 / 12:30 / 17:30 / 20:00 / 22:00
+- ジャンル：UV・冷感寝具・父の日・虫除け・美容サプリ・育児・スキンケア（5月特化）
+- 投稿形式：本文（フック＋3行以内・ハッシュタグなし）→コメントにURL＋[楽天PR]
+- 商品画像（楽天API）を自動添付
+- トークン取得方法：Meta開発者ダッシュボード→Graph APIエクスプローラー（OAuthフロー不要）
+- **トークン期限：2026-07-07**（期限前にLINEリマインドあり）
+- 手動投稿URL：`https://maki-hisho.onrender.com/post-threads-now`
+- 攻略ガイド：`https://maki-hisho.onrender.com/threads-guide`
+
+### X（@maki_claude_lab）
 - Xアカウント：@maki_claude_lab
 - 表示名：まき｜3児ワーママ×AI副業奮闘中（2026-05-06更新）
 - Bio：小学生３児の母×医療職×ワンオペ / Claude Codeで秘書ボット・ブログ自動化・eBayを仕組み化 / プログラミング歴ゼロからスタート / 0→1に奮闘中。リアルな過程を毎日投稿中 / noteも書いてます👇
