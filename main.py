@@ -5,7 +5,7 @@ import datetime
 import threading
 import time
 import requests
-from flask import Flask, request, abort, send_from_directory
+from flask import Flask, request, abort, send_from_directory, jsonify
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageMessage, AudioMessage, FileMessage
 from google.oauth2.credentials import Credentials
@@ -1398,6 +1398,61 @@ def post_threads_now():
         return f'✅ Threads投稿完了！ジャンル：{ROOM_GENRES[slot]["name"]}　Threadsアプリで確認してください。'
     except Exception as e:
         return f'❌ エラー: {e}', 500
+
+@app.route('/add-task', methods=['POST'])
+def add_task():
+    """Power Automateからメール検知時に呼ばれる：LINE通知 + Notionにタスク追加"""
+    data = request.json or {}
+    secret = data.get('secret')
+    if secret != os.environ.get('NOTIFY_SECRET', ''):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    line_message = data.get('message', '')
+    task_title = data.get('task', '')
+    results = {}
+
+    # LINEに通知
+    if line_message:
+        try:
+            line_bot_api.push_message(
+                os.environ.get('LINE_USER_ID'),
+                TextSendMessage(text=line_message)
+            )
+            results['line'] = 'sent'
+        except Exception as e:
+            results['line_error'] = str(e)
+
+    # Notionの「今週やること」にto_doを追加
+    if task_title:
+        try:
+            notion_token = os.environ.get('NOTION_TOKEN', '')
+            notion_headers = {
+                "Authorization": f"Bearer {notion_token}",
+                "Notion-Version": "2022-06-28",
+                "Content-Type": "application/json"
+            }
+            body = {
+                "after": "323f8d6d-41de-809d-9e98-f9a5da8556a8",  # 「今週やること」heading直後
+                "children": [{
+                    "object": "block",
+                    "type": "to_do",
+                    "to_do": {
+                        "rich_text": [{"type": "text", "text": {"content": task_title}}],
+                        "checked": False
+                    }
+                }]
+            }
+            r = requests.patch(
+                "https://api.notion.com/v1/blocks/323f8d6d41de80dea66efad500806f69/children",
+                headers=notion_headers,
+                json=body
+            )
+            results['notion'] = r.status_code
+        except Exception as e:
+            results['notion_error'] = str(e)
+
+    return jsonify(results)
+
 
 @app.route('/x-study-note')
 def x_study_note():
