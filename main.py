@@ -3583,11 +3583,14 @@ def post_to_x_evening():
 # 投稿ルール：本文にURLなし・URLはコメント欄・PR表記必須・1時間以上間隔
 
 ROOM_GENRES = [
-    {'name': '育児', 'keyword': 'ベビー 育児グッズ おすすめ'},
-    {'name': '美容', 'keyword': 'スキンケア コスメ 美容 おすすめ'},
-    {'name': '収納家具', 'keyword': '収納 整理 家具 おしゃれ'},
-    {'name': '睡眠', 'keyword': '睡眠 枕 布団 快眠 おすすめ'},
-    {'name': '節約日用品', 'keyword': '日用品 コスパ 節約 まとめ買い'},
+    # 5月〜夏向け高料率ジャンル優先
+    {'name': 'UV・日焼け止め', 'keyword': '日焼け止め UV SPF ママ 子ども おすすめ'},
+    {'name': '冷感寝具', 'keyword': '冷感 敷きパッド 枕パッド 夏 快眠'},
+    {'name': '父の日ギフト', 'keyword': '父の日 ギフト プレゼント おすすめ 人気'},
+    {'name': '虫除け', 'keyword': '虫除け 虫よけ 子ども アウトドア スプレー'},
+    {'name': '美容サプリ', 'keyword': 'サプリ コラーゲン 美容 飲む 女性 おすすめ'},
+    {'name': '育児', 'keyword': 'ベビー 育児グッズ ママ おすすめ 人気'},
+    {'name': 'スキンケア', 'keyword': 'スキンケア 化粧水 美容液 夏 毛穴 おすすめ'},
 ]
 
 LINK_PHRASES = [
@@ -3830,12 +3833,12 @@ scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minut
 # 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
 scheduler.add_job(send_daily_work_log, 'cron', hour=18, minute=0)
 # 毎日5本：楽天アフィ→Threads自動投稿（朝1・昼1・夕1・夜2、1時間以上間隔）
-# スロット0=育児 1=美容 2=収納 3=睡眠 4=節約
-scheduler.add_job(send_room_suggestion_slot, 'cron', hour=7, minute=30, args=[0])
-scheduler.add_job(send_room_suggestion_slot, 'cron', hour=12, minute=30, args=[1])
-scheduler.add_job(send_room_suggestion_slot, 'cron', hour=17, minute=30, args=[2])
-scheduler.add_job(send_room_suggestion_slot, 'cron', hour=20, minute=0, args=[3])
-scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[4])
+# ジャンルは7種ローテーション（slot % 7）
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=7, minute=30, args=[0])   # UV・日焼け止め
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=12, minute=30, args=[1])  # 冷感寝具
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=17, minute=30, args=[2])  # 父の日ギフト
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=20, minute=0, args=[4])   # 美容サプリ（ゴールデンタイム）
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[6])   # スキンケア
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 # 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
