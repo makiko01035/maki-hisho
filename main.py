@@ -456,6 +456,24 @@ def test_x_post():
         return f'Error ({type(e).__name__}): {e}', 500
 
 
+@app.route('/test-threads')
+def test_threads():
+    """Threads接続テスト＆テスト投稿"""
+    access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
+    user_id = os.environ.get('THREADS_USER_ID', '')
+    if not access_token or not user_id:
+        missing = []
+        if not access_token:
+            missing.append('THREADS_ACCESS_TOKEN')
+        if not user_id:
+            missing.append('THREADS_USER_ID')
+        return f'❌ Render環境変数が未設定です: {", ".join(missing)}', 400
+    ok = post_to_threads('【テスト投稿】まきの秘書ボットからThreads連携テスト中🧵')
+    if ok:
+        return '✅ Threads投稿成功！Threadsアプリで確認してください。'
+    return '❌ 投稿失敗。Renderのログを確認してください。', 500
+
+
 @app.route('/debug-x-auth')
 def debug_x_auth():
     import requests
