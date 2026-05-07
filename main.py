@@ -468,9 +468,11 @@ def test_threads():
         if not user_id:
             missing.append('THREADS_USER_ID')
         return f'❌ Render環境変数が未設定です: {", ".join(missing)}', 400
-    ok = post_to_threads('【テスト投稿】まきの秘書ボットからThreads連携テスト中🧵')
-    if ok:
-        return '✅ Threads投稿成功！Threadsアプリで確認してください。'
+    post_id = post_to_threads('【テスト投稿】まきの秘書ボットからThreads連携テスト中🧵')
+    if post_id:
+        import time; time.sleep(3)
+        reply_to_threads(post_id, '🛒 コチラ！\nhttps://room.rakuten.co.jp/makiko01035\n#PR')
+        return '✅ Threads投稿成功！（本文＋コメントURLの2段構え）Threadsアプリで確認してください。'
     return '❌ 投稿失敗。Renderのログを確認してください。', 500
 
 
@@ -3562,76 +3564,118 @@ def post_to_x_evening():
         print(f"X post error (evening): {e}")
 
 
-# --- 楽天アフィ：Threads自動投稿（毎日3回 × 3ジャンル = 9本/日）---
+# --- 楽天アフィ：Threads自動投稿（毎日5本 朝1・昼1・夕1・夜2）---
+# 投稿ルール：本文にURLなし・URLはコメント欄・PR表記必須・1時間以上間隔
 
 ROOM_GENRES = [
     {'name': '育児', 'keyword': 'ベビー 育児グッズ おすすめ'},
     {'name': '美容', 'keyword': 'スキンケア コスメ 美容 おすすめ'},
     {'name': '収納家具', 'keyword': '収納 整理 家具 おしゃれ'},
+    {'name': '睡眠', 'keyword': '睡眠 枕 布団 快眠 おすすめ'},
+    {'name': '節約日用品', 'keyword': '日用品 コスパ 節約 まとめ買い'},
+]
+
+HOOKS = [
+    "正直ノーマークだった。",
+    "私が愛してやまない、",
+    "事件です。",
+    "出産前に知りたかった...",
+    "完全ノーマークだった、",
+    "浮気します...",
+    "これ知らないの損すぎる。",
+    "3人育てて気づいたこと。",
+    "買って1ヶ月経った正直な感想。",
+    "ずっと我慢してたけど買った。",
 ]
 
 
 def post_to_threads(text):
-    """Threads APIに投稿する（テキストのみ）"""
+    """Threads APIに投稿する。成功時は投稿IDを返す、失敗時はNone"""
     access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
     user_id = os.environ.get('THREADS_USER_ID', '')
     if not access_token or not user_id:
         print("Threads credentials not set")
+        return None
+    try:
+        container_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads',
+            params={'media_type': 'TEXT', 'text': text, 'access_token': access_token},
+            timeout=15
+        )
+        if container_res.status_code != 200:
+            print(f"Threads container error: {container_res.status_code} {container_res.text}")
+            return None
+        creation_id = container_res.json().get('id')
+        publish_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads_publish',
+            params={'creation_id': creation_id, 'access_token': access_token},
+            timeout=15
+        )
+        if publish_res.status_code != 200:
+            print(f"Threads publish error: {publish_res.status_code} {publish_res.text}")
+            return None
+        post_id = publish_res.json().get('id')
+        print(f"Threads posted: {post_id}")
+        return post_id
+    except Exception as e:
+        print(f"post_to_threads error: {e}")
+        return None
+
+
+def reply_to_threads(post_id, text):
+    """Threads投稿にリプライ（URLをコメント欄に貼る用）"""
+    access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
+    user_id = os.environ.get('THREADS_USER_ID', '')
+    if not access_token or not user_id:
         return False
     try:
-        # Step1: メディアコンテナ作成
         container_res = requests.post(
             f'https://graph.threads.net/v1.0/{user_id}/threads',
             params={
                 'media_type': 'TEXT',
                 'text': text,
+                'reply_to_id': post_id,
                 'access_token': access_token,
             },
             timeout=15
         )
         if container_res.status_code != 200:
-            print(f"Threads container error: {container_res.status_code} {container_res.text}")
+            print(f"Threads reply container error: {container_res.status_code} {container_res.text}")
             return False
         creation_id = container_res.json().get('id')
-        # Step2: 公開
         publish_res = requests.post(
             f'https://graph.threads.net/v1.0/{user_id}/threads_publish',
-            params={
-                'creation_id': creation_id,
-                'access_token': access_token,
-            },
+            params={'creation_id': creation_id, 'access_token': access_token},
             timeout=15
         )
-        if publish_res.status_code != 200:
-            print(f"Threads publish error: {publish_res.status_code} {publish_res.text}")
-            return False
-        print(f"Threads posted: {creation_id}")
-        return True
+        return publish_res.status_code == 200
     except Exception as e:
-        print(f"post_to_threads error: {e}")
+        print(f"reply_to_threads error: {e}")
         return False
 
 
 def _fetch_room_suggestion(genre):
-    """楽天APIで商品1件取得 → Claude投稿文+ハッシュタグ生成"""
+    """楽天APIで商品1件取得 → Claude投稿文生成。(本文, url) のタプルを返す"""
     import random
     from blog_yakuzen import search_rakuten_items
     items = search_rakuten_items(genre['keyword'], hits=5)
     if not items:
-        return None
+        return None, None
     item = random.choice(items)
     name = item['name'][:40]
     price = item['price']
     url = item['url']
+    hook = random.choice(HOOKS)
     prompt = (
-        f"商品名：{name}\n価格：{price}円\n\n"
-        f"この楽天商品のThreads投稿文を書いてください。\n"
-        f"ジャンル：{genre['name']}\n\n"
-        "出力形式（この順番で）：\n"
-        "1行目〜2行目：商品の魅力・使い道を自然に伝えるコメント（感嘆符OK・140字以内）\n"
-        "空行\n"
-        "ハッシュタグ10個（#日本語、スペース区切り）\n\n"
-        "余計な説明・前置きは不要。コメントとハッシュタグだけ出力。"
+        f"商品名：{name}\n価格：{price}円\nジャンル：{genre['name']}\n\n"
+        f"Threads投稿文を作ってください。\n"
+        f"冒頭は必ず「{hook}」で始める。\n"
+        "ルール：\n"
+        "・全体3行以内\n"
+        "・URLは含めない（別途コメント欄に貼る）\n"
+        "・ですます調NG・口語・体言止めOK\n"
+        "・最後にハッシュタグ5個（#日本語）\n\n"
+        "余計な説明不要。投稿文だけ出力。"
     )
     try:
         resp = anthropic_client.messages.create(
@@ -3642,19 +3686,24 @@ def _fetch_room_suggestion(genre):
         body = resp.content[0].text.strip()
     except Exception as e:
         print(f"room suggestion generate error ({genre['name']}): {e}")
-        body = name
-    return f"{body}\n\n楽天で見る→ {url}"
+        body = f"{hook}\n{name}"
+    return body, url
 
 
-def send_room_suggestions():
-    """楽天アフィ投稿を3ジャンル分生成してThreadsに直接投稿（毎日5:00/11:00/15:30）"""
-    for genre in ROOM_GENRES:
-        try:
-            post = _fetch_room_suggestion(genre)
-            if post:
-                post_to_threads(post)
-        except Exception as e:
-            print(f"send_room_suggestions error ({genre['name']}): {e}")
+def send_room_suggestion_slot(slot_index):
+    """指定スロットのジャンルをThreadsに投稿（本文→コメントにURL+PR）"""
+    genre = ROOM_GENRES[slot_index % len(ROOM_GENRES)]
+    try:
+        body, url = _fetch_room_suggestion(genre)
+        if not body or not url:
+            return
+        post_id = post_to_threads(body)
+        if post_id:
+            import time
+            time.sleep(3)
+            reply_to_threads(post_id, f"🛒 コチラ！\n{url}\n#PR")
+    except Exception as e:
+        print(f"send_room_suggestion_slot({slot_index}) error: {e}")
 
 
 def send_threads_token_reminder():
@@ -3703,10 +3752,13 @@ scheduler.add_job(send_note_weekly_reminder, 'cron', day_of_week='thu', hour=9, 
 scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
 # 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
 scheduler.add_job(send_daily_work_log, 'cron', hour=18, minute=0)
-# 毎日5:00/11:00/15:30：楽天アフィ→Threads自動投稿（育児・美容・収納家具 各1本 計9本/日）
-scheduler.add_job(send_room_suggestions, 'cron', hour=5, minute=0)
-scheduler.add_job(send_room_suggestions, 'cron', hour=11, minute=0)
-scheduler.add_job(send_room_suggestions, 'cron', hour=15, minute=30)
+# 毎日5本：楽天アフィ→Threads自動投稿（朝1・昼1・夕1・夜2、1時間以上間隔）
+# スロット0=育児 1=美容 2=収納 3=睡眠 4=節約
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=7, minute=30, args=[0])
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=12, minute=30, args=[1])
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=17, minute=30, args=[2])
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=20, minute=0, args=[3])
+scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[4])
 # 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 # 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
