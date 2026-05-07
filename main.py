@@ -471,7 +471,7 @@ def test_threads():
     post_id = post_to_threads('【テスト投稿】まきの秘書ボットからThreads連携テスト中🧵')
     if post_id:
         import time; time.sleep(3)
-        reply_to_threads(post_id, '🛒 コチラ！\nhttps://room.rakuten.co.jp/makiko01035\n#PR')
+        reply_to_threads(post_id, '🛒 コチラ！\nhttps://room.rakuten.co.jp/makiko01035\n[楽天PR]')
         return '✅ Threads投稿成功！（本文＋コメントURLの2段構え）Threadsアプリで確認してください。'
     return '❌ 投稿失敗。Renderのログを確認してください。', 500
 
@@ -3778,7 +3778,7 @@ def send_room_suggestion_slot(slot_index):
             time.sleep(3)
             import random as _random
             phrase = _random.choice(LINK_PHRASES)
-            reply_to_threads(post_id, f"{phrase}{url}\n#PR")
+            reply_to_threads(post_id, f"{phrase}{url}\n[楽天PR]")
     except Exception as e:
         print(f"send_room_suggestion_slot({slot_index}) error: {e}")
 
