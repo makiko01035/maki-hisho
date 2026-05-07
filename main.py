@@ -3589,17 +3589,23 @@ HOOKS = [
 ]
 
 
-def post_to_threads(text):
-    """Threads APIに投稿する。成功時は投稿IDを返す、失敗時はNone"""
+def post_to_threads(text, image_url=None):
+    """Threads APIに投稿する。image_urlがあれば画像付き投稿。成功時は投稿IDを返す、失敗時はNone"""
     access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
     user_id = os.environ.get('THREADS_USER_ID', '')
     if not access_token or not user_id:
         print("Threads credentials not set")
         return None
     try:
+        params = {'text': text, 'access_token': access_token}
+        if image_url:
+            params['media_type'] = 'IMAGE'
+            params['image_url'] = image_url
+        else:
+            params['media_type'] = 'TEXT'
         container_res = requests.post(
             f'https://graph.threads.net/v1.0/{user_id}/threads',
-            params={'media_type': 'TEXT', 'text': text, 'access_token': access_token},
+            params=params,
             timeout=15
         )
         if container_res.status_code != 200:
@@ -3655,16 +3661,17 @@ def reply_to_threads(post_id, text):
 
 
 def _fetch_room_suggestion(genre):
-    """楽天APIで商品1件取得 → Claude投稿文生成。(本文, url) のタプルを返す"""
+    """楽天APIで商品1件取得 → Claude投稿文生成。(本文, url, image_url) のタプルを返す"""
     import random
     from blog_yakuzen import search_rakuten_items
     items = search_rakuten_items(genre['keyword'], hits=5)
     if not items:
-        return None, None
+        return None, None, None
     item = random.choice(items)
     name = item['name'][:40]
     price = item['price']
     url = item['url']
+    image_url = item.get('image', '')
     hook = random.choice(HOOKS)
     prompt = (
         f"商品名：{name}\n価格：{price}円\nジャンル：{genre['name']}\n\n"
@@ -3687,17 +3694,17 @@ def _fetch_room_suggestion(genre):
     except Exception as e:
         print(f"room suggestion generate error ({genre['name']}): {e}")
         body = f"{hook}\n{name}"
-    return body, url
+    return body, url, image_url
 
 
 def send_room_suggestion_slot(slot_index):
-    """指定スロットのジャンルをThreadsに投稿（本文→コメントにURL+PR）"""
+    """指定スロットのジャンルをThreadsに投稿（商品画像付き本文→コメントにURL+PR）"""
     genre = ROOM_GENRES[slot_index % len(ROOM_GENRES)]
     try:
-        body, url = _fetch_room_suggestion(genre)
+        body, url, image_url = _fetch_room_suggestion(genre)
         if not body or not url:
             return
-        post_id = post_to_threads(body)
+        post_id = post_to_threads(body, image_url=image_url if image_url else None)
         if post_id:
             import time
             time.sleep(3)
