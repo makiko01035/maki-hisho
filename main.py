@@ -1391,6 +1391,17 @@ def instagram_roadmap():
 def threads_guide():
     return send_from_directory('.', 'threads_guide.html')
 
+@app.route('/post-threads-now')
+def post_threads_now():
+    """今すぐThreadsに楽天アフィ投稿を1本送る（手動トリガー）"""
+    import random
+    slot = random.randint(0, len(ROOM_GENRES) - 1)
+    try:
+        send_room_suggestion_slot(slot)
+        return f'✅ Threads投稿完了！ジャンル：{ROOM_GENRES[slot]["name"]}　Threadsアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
 @app.route('/x-study-note')
 def x_study_note():
     return send_from_directory('.', 'x_study_note.html')
