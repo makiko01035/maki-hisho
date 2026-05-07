@@ -26,6 +26,7 @@ PRINTS_FILE = '/tmp/school_prints.json'
 PRINT_SESSION_FILE = '/tmp/print_sessions.json'
 MORNING_SENT_FILE = '/tmp/morning_sent_date.txt'
 NOTE_SESSION_FILE = '/tmp/note_sessions.json'
+ROOM_TAG_SESSION_FILE = '/tmp/room_tag_sessions.json'
 
 _morning_sent_date = None
 _morning_sent_lock = threading.Lock()
@@ -93,6 +94,50 @@ def save_note_sessions(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"note_sessions save error: {e}")
+
+
+def load_room_tag_sessions():
+    try:
+        with open(ROOM_TAG_SESSION_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_room_tag_sessions(data):
+    try:
+        with open(ROOM_TAG_SESSION_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"room_tag_sessions save error: {e}")
+
+
+def generate_room_tags(text=None, image_base64=None, media_type=None):
+    """楽天Room用ハッシュタグを生成する"""
+    content = []
+    if image_base64:
+        content.append({
+            'type': 'image',
+            'source': {'type': 'base64', 'media_type': media_type, 'data': image_base64}
+        })
+    prompt = (
+        f"商品名：{text}\n\n" if text else "この商品画像を見て、\n\n"
+    ) + (
+        "楽天Roomの投稿に使うハッシュタグを15個生成してください。\n"
+        "条件：\n"
+        "- #を先頭につけたハッシュタグ形式\n"
+        "- 日本語で\n"
+        "- 楽天Roomで検索されやすいキーワード（商品カテゴリ・用途・ブランド・特徴など）\n"
+        "- 1行に並べてスペース区切りで出力\n"
+        "- ハッシュタグのみ出力（説明文不要）"
+    )
+    content.append({'type': 'text', 'text': prompt})
+    response = anthropic_client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=300,
+        messages=[{'role': 'user', 'content': content}]
+    )
+    return response.content[0].text.strip()
 
 
 def send_long_message(user_id, text, chunk_size=4000):
@@ -1612,6 +1657,18 @@ def handle_image(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"画像の取得に失敗しました😢\nエラー: {str(e)[:100]}"))
         return
 
+    # 楽天Roomタグセッションチェック
+    room_tag_sessions = load_room_tag_sessions()
+    if user_id in room_tag_sessions and room_tag_sessions[user_id] == 'waiting':
+        del room_tag_sessions[user_id]
+        save_room_tag_sessions(room_tag_sessions)
+        try:
+            tags = generate_room_tags(image_base64=image_base64, media_type=media_type)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🏷️ 楽天Roomタグ\n\n{tags}"))
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"タグ生成エラー: {str(e)[:100]}"))
+        return
+
     # プリントセッションチェック
     print_sessions = load_print_sessions()
     if user_id in print_sessions and print_sessions[user_id] == 'waiting_for_print_image':
@@ -2186,6 +2243,40 @@ def handle_message(event):
                     msg = "✅ 勉強ノートにメモを追加しました！" if ok else "❌ メモ追加に失敗しました"
                     line_bot_api.push_message(uid, TextSendMessage(text=msg))
             threading.Thread(target=_add_memo).start()
+        return
+
+    # 楽天Roomタグ生成
+    room_tag_sessions = load_room_tag_sessions()
+    if any(kw in user_message for kw in ['roomタグ', 'Roomタグ', 'ルームタグ', 'roomハッシュ']):
+        keyword = None
+        for sep in ['roomタグ', 'Roomタグ', 'ルームタグ', 'roomハッシュ']:
+            if sep in user_message:
+                rest = user_message.split(sep, 1)[1].strip()
+                if rest:
+                    keyword = rest
+                break
+        if keyword:
+            try:
+                tags = generate_room_tags(text=keyword)
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🏷️ 楽天Roomタグ\n\n{tags}"))
+            except Exception as e:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"タグ生成エラー: {str(e)[:100]}"))
+        else:
+            room_tag_sessions[user_id] = 'waiting'
+            save_room_tag_sessions(room_tag_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="🏷️ 商品名を送るか、商品の写真を送ってください！\nハッシュタグを作ります📦"
+            ))
+        return
+
+    if user_id in room_tag_sessions and room_tag_sessions[user_id] == 'waiting':
+        del room_tag_sessions[user_id]
+        save_room_tag_sessions(room_tag_sessions)
+        try:
+            tags = generate_room_tags(text=user_message)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🏷️ 楽天Roomタグ\n\n{tags}"))
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"タグ生成エラー: {str(e)[:100]}"))
         return
 
     # eBayリサーチ
@@ -2914,6 +3005,9 @@ QUOTE_TWEET_TEMPLATES = [
     "副業収益ゼロのまま発信していくことにした。0→1はまだこれから。でも「成功した人の話」より「今まさに同じ状況にいる人の話」の方が刺さることもある。リアルな過程を見せることが、今の自分にできる発信だと思ってる。 #AI副業 #ワーママ #note",
     # ── 楽天room→Instagram自動化チャレンジ ──
     "楽天room→Instagram自動化、断念した😅楽天roomはJavaScriptで動くSPAでRSSが商品データを返さない仕様だったでも副産物でInstagramビジネスアカウントの設定・FBページ連携を完全把握壁にぶつかっても必ず何か得るものがある #AI副業 #ワーママ副業",
+    # ── Higgsfield MCP・AI画像生成 ──
+    "Claude CodeからAIイラストを直接作れるようになった🎨 コマンド1行でMCP連携して、チャットで「白衣の女性を描いて」と指示するだけ。note用のアイコン画像が数秒で出てくる。ゼロから始めたAI副業、できることが着実に増えてきてる。 #AI副業 #ClaudeCode #自動化",
+    "AIイラスト、無料でも毎日10枚作れると知った✨ ただし無料プランは透かし入り。「透かしが嫌なら他のツールも出すよ」とClaudeが提案してくれた。ツール名を覚えるより、適切に選んでくれる秘書がいる方が楽。 #AI副業 #ワーママ副業",
 ]
 
 
@@ -3050,10 +3144,21 @@ def send_note_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
         line_bot_api.push_message(user_id, TextSendMessage(
-            text="📝 【noteリマインド】\n今月もX投稿が溜まりました！\n\nそろそろnote記事が書けそうなネタはありますか？\nClaude Codeに「note書きたい」と話しかけてみてね✨"
+            text="📝 【noteリマインド】\n今月もX投稿が溜まりました！\n\nそろそろnote記事が書けそうなネタはありますか？\nLINEに「note書きたい」と送るだけで下書きが作れます✨"
         ))
     except Exception as e:
         print(f"Note reminder error: {e}")
+
+
+def send_note_weekly_reminder():
+    """毎週木曜9:05：note週次リマインダー"""
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text="📝 【note週次リマインド】\n今週のnote記事、書きましたか？\n\n「note書きたい」と送るだけで下書きが作れます✨\n有料・無料どちらでもOK！"
+        ))
+    except Exception as e:
+        print(f"Note weekly reminder error: {e}")
 
 
 def send_x_weekly_report():
@@ -3432,6 +3537,7 @@ scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon,wed,fri', hou
 scheduler.add_job(send_weekly_seo_report, 'cron', day_of_week='mon', hour=9, minute=30)
 # 毎月末日朝9時：noteリマインド
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
+scheduler.add_job(send_note_weekly_reminder, 'cron', day_of_week='thu', hour=9, minute=5)
 # 毎週月曜9時40分：週次Xパフォーマンスレポート（PDCA用）
 scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
 # 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
