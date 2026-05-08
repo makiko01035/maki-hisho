@@ -3831,7 +3831,7 @@ def send_room_suggestion_slot(slot_index):
         body, url, image_url = _fetch_room_suggestion(genre)
         if not body or not url:
             return
-        post_id = post_to_threads(body, image_url=image_url if image_url else None)
+        post_id = post_to_threads(body)
         if post_id:
             import time
             time.sleep(3)
