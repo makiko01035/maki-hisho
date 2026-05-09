@@ -1666,7 +1666,7 @@ def setup_rich_menu():
             {"bounds": {"x": 0,    "y": 0,   "width": 833, "height": 421},
              "action": {"type": "uri", "uri": "https://www.ebay.com/sh/research"}},
             {"bounds": {"x": 833,  "y": 0,   "width": 834, "height": 421},
-             "action": {"type": "uri", "uri": "https://jp.mercari.com"}},
+             "action": {"type": "message", "text": "roomタグ"}},
             {"bounds": {"x": 1667, "y": 0,   "width": 833, "height": 421},
              "action": {"type": "uri", "uri": "https://maki-hisho.onrender.com/ebay-calc"}},
             {"bounds": {"x": 0,    "y": 421, "width": 833, "height": 422},
