@@ -1390,12 +1390,22 @@ def threads_guide():
 
 @app.route('/post-kvision-now')
 def post_kvision_now():
-    """今すぐ@kvision_mに旅行アフィを1本送る（手動テスト用）"""
+    """今すぐ@kvision_mにアフィスレッドを1本送る（手動テスト用）"""
     import random
     slot = random.randint(0, len(TRAVEL_GENRES) - 1)
     try:
         post_kvision_travel_aff(slot)
-        return f'✅ @kvision_m X投稿完了！ジャンル：{TRAVEL_GENRES[slot]["name"]}　Xアプリで確認してください。'
+        return f'✅ @kvision_m スレッド投稿完了！ジャンル：{TRAVEL_GENRES[slot]["name"]}　Xアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@app.route('/post-kvision-morning-now')
+def post_kvision_morning_now():
+    """今すぐ@kvision_mに朝つぶやきを送る（手動テスト用）"""
+    try:
+        post_kvision_morning_tweet()
+        return '✅ @kvision_m 朝つぶやき投稿完了！Xアプリで確認してください。'
     except Exception as e:
         return f'❌ エラー: {e}', 500
 
@@ -3866,13 +3876,13 @@ def send_threads_token_reminder():
 # --- こはるまま：@kvision_m 旅行×楽天アフィ X自動投稿（1日2本）---
 
 TRAVEL_GENRES = [
-    {'name': '旅行バッグ・リュック', 'keyword': '旅行 リュック 軽量 子連れ ママ'},
-    {'name': '旅用スキンケア', 'keyword': '旅行 スキンケア セット 持ち運び ミニサイズ'},
-    {'name': '日焼け止め（旅行用）', 'keyword': '日焼け止め UV 子ども ウォータープルーフ 旅行'},
-    {'name': '子連れ旅グッズ', 'keyword': '子連れ 旅行 便利グッズ 折りたたみ コンパクト'},
-    {'name': '旅行ポーチ', 'keyword': '旅行ポーチ 化粧品 防水 コンパクト トラベル'},
-    {'name': 'スーツケース', 'keyword': 'スーツケース 軽量 家族旅行 機内持ち込み キャリー'},
-    {'name': '日帰りおでかけ', 'keyword': 'お出かけ 子ども 便利グッズ ママ 日帰り'},
+    {'name': 'シアーパーカー・UVカット羽織り', 'keyword': 'シアーパーカー UVカット 羽織り レディース 冷房対策 薄手'},
+    {'name': '折りたたみ日傘', 'keyword': '日傘 折りたたみ 完全遮光 軽量 UVカット レディース'},
+    {'name': 'アウトドアワゴン・キャンプグッズ', 'keyword': 'キャリーワゴン アウトドア キャンプ 折りたたみ 大容量 子連れ'},
+    {'name': 'メッシュトート・おでかけバッグ', 'keyword': 'トートバッグ メッシュ 大容量 アウトドア 軽量 レディース'},
+    {'name': 'ハンディファン・暑さ対策', 'keyword': 'ハンディファン 携帯扇風機 軽量 USB 旅行 暑さ対策'},
+    {'name': 'ブラトップ・機能性インナー', 'keyword': 'ブラトップ 機能性インナー 涼しい 旅行 夏 快適'},
+    {'name': '旅行ポーチ・トラベルコスメ', 'keyword': '旅行ポーチ トラベル コスメ 防水 コンパクト 化粧品'},
 ]
 
 TRAVEL_HOOKS = [
@@ -3886,6 +3896,21 @@ TRAVEL_HOOKS = [
     "旅先で肌がボロボロになってから使い始めたのが",
     "子連れ旅行、荷物減らすために買ったのが",
     "夏の旅行に絶対持っていきたいのが",
+    "キャンプ行くとき絶対持っていくのが",
+    "おでかけバッグに毎回入れてるのが",
+]
+
+TRAVEL_MORNING_TWEETS = [
+    "子連れ旅行の荷物、毎回多すぎて笑う。でもこれが楽しいんだよな",
+    "旅行前夜のパッキングが一番楽しい説、わかる人いる？",
+    "キャンプって準備が9割だと思ってる。道具選びが趣味になってきた",
+    "旅先でお気に入りの日傘壊れたとき、あれは本当に悲しかった",
+    "子どもと旅行するとき「これ荷物になるかな」って毎回悩む",
+    "夏のおでかけは暑さ対策グッズを制した人が勝つ",
+    "家族でBBQ、準備と片付けが大変すぎる問題。でも楽しい",
+    "旅先で日焼けしすぎてヒリヒリしながら「なんで対策しなかったんだ」って毎年思う",
+    "子連れで荷物多いのに、バッグの中がぐちゃぐちゃになるのをなんとかしたい",
+    "旅行中、子どもが「暑い暑い」って言い始めるタイミングが毎回同じ",
 ]
 
 
@@ -3942,8 +3967,24 @@ def _fetch_travel_suggestion(genre):
     return body, url
 
 
+def post_kvision_morning_tweet():
+    """@kvision_m 朝9:00：テキストのみ・旅あるあるつぶやき"""
+    import random
+    try:
+        client = _get_kvision_x_client()
+        if not client:
+            print("KVISION X API keys not configured, skipping")
+            return
+        text = random.choice(TRAVEL_MORNING_TWEETS)
+        client.create_tweet(text=text)
+        print(f"kvision morning tweet successful: {text[:30]}...")
+    except Exception as e:
+        print(f"post_kvision_morning_tweet error: {e}")
+
+
 def post_kvision_travel_aff(slot_index):
-    """@kvision_mに旅行×楽天アフィをXに投稿"""
+    """@kvision_mに旅行×楽天アフィをXにスレッド形式で投稿（本文→リプライにURL）"""
+    import time as _time
     genre = TRAVEL_GENRES[slot_index % len(TRAVEL_GENRES)]
     try:
         body, url = _fetch_travel_suggestion(genre)
@@ -3953,11 +3994,14 @@ def post_kvision_travel_aff(slot_index):
         if not client:
             print("KVISION X API keys not configured, skipping")
             return
-        tweet_text = f"{body}\n\n{url}\n[楽天PR]"
-        if len(tweet_text) > 280:
-            tweet_text = tweet_text[:277] + "..."
-        client.create_tweet(text=tweet_text)
-        print(f"kvision X post ({genre['name']}) successful")
+        resp = client.create_tweet(text=body)
+        tweet_id = resp.data['id']
+        _time.sleep(3)
+        client.create_tweet(
+            text=f"↓ 商品はこちら\n{url}\n[楽天PR]",
+            in_reply_to_tweet_id=tweet_id
+        )
+        print(f"kvision X thread post ({genre['name']}) successful")
     except Exception as e:
         print(f"post_kvision_travel_aff({slot_index}) error: {e}")
 
@@ -4010,9 +4054,10 @@ scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[6]
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 # 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
 scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:00:00', timezone='Asia/Tokyo')
-# @kvision_m（こはるまま）旅行×楽天アフィ：1日2本（朝9時・夜20時半）
-scheduler.add_job(post_kvision_travel_aff, 'cron', hour=9, minute=0, args=[0])
-scheduler.add_job(post_kvision_travel_aff, 'cron', hour=20, minute=30, args=[1])
+# @kvision_m（こはるまま）旅行×楽天アフィ：1日2本
+# 朝9:00 テキストのみ旅あるある、夜20:30 スレッド形式アフィURL
+scheduler.add_job(post_kvision_morning_tweet, 'cron', hour=9, minute=0)
+scheduler.add_job(post_kvision_travel_aff, 'cron', hour=20, minute=30, args=[0])
 scheduler.start()
 
 if __name__ == '__main__':
