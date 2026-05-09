@@ -1388,6 +1388,18 @@ def instagram_roadmap():
 def threads_guide():
     return send_from_directory('.', 'threads_guide.html')
 
+@app.route('/post-kvision-now')
+def post_kvision_now():
+    """今すぐ@kvision_mに旅行アフィを1本送る（手動テスト用）"""
+    import random
+    slot = random.randint(0, len(TRAVEL_GENRES) - 1)
+    try:
+        post_kvision_travel_aff(slot)
+        return f'✅ @kvision_m X投稿完了！ジャンル：{TRAVEL_GENRES[slot]["name"]}　Xアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @app.route('/post-threads-now')
 def post_threads_now():
     """今すぐThreadsに楽天アフィ投稿を1本送る（手動トリガー）"""
@@ -3851,6 +3863,105 @@ def send_threads_token_reminder():
         print(f"send_threads_token_reminder error: {e}")
 
 
+# --- こはるまま：@kvision_m 旅行×楽天アフィ X自動投稿（1日2本）---
+
+TRAVEL_GENRES = [
+    {'name': '旅行バッグ・リュック', 'keyword': '旅行 リュック 軽量 子連れ ママ'},
+    {'name': '旅用スキンケア', 'keyword': '旅行 スキンケア セット 持ち運び ミニサイズ'},
+    {'name': '日焼け止め（旅行用）', 'keyword': '日焼け止め UV 子ども ウォータープルーフ 旅行'},
+    {'name': '子連れ旅グッズ', 'keyword': '子連れ 旅行 便利グッズ 折りたたみ コンパクト'},
+    {'name': '旅行ポーチ', 'keyword': '旅行ポーチ 化粧品 防水 コンパクト トラベル'},
+    {'name': 'スーツケース', 'keyword': 'スーツケース 軽量 家族旅行 機内持ち込み キャリー'},
+    {'name': '日帰りおでかけ', 'keyword': 'お出かけ 子ども 便利グッズ ママ 日帰り'},
+]
+
+TRAVEL_HOOKS = [
+    "先週の旅行で大活躍したのが",
+    "子連れ旅でこれ持ってくよかった",
+    "旅行前日に気づいた神アイテム",
+    "ホテルで「買ってきてよかった」ってなったのが",
+    "子どもがぐずりだしたときに救われたのが",
+    "旅行バッグに必ず入れてるの、これ",
+    "去年の旅行で後悔して今年買ったのが",
+    "旅先で肌がボロボロになってから使い始めたのが",
+    "子連れ旅行、荷物減らすために買ったのが",
+    "夏の旅行に絶対持っていきたいのが",
+]
+
+
+def _get_kvision_x_client():
+    import tweepy
+    api_key = (os.environ.get('KVISION_X_API_KEY') or '').strip()
+    api_secret = (os.environ.get('KVISION_X_API_SECRET') or '').strip()
+    access_token = (os.environ.get('KVISION_X_ACCESS_TOKEN') or '').strip()
+    access_token_secret = (os.environ.get('KVISION_X_ACCESS_TOKEN_SECRET') or '').strip()
+    if not all([api_key, api_secret, access_token, access_token_secret]):
+        return None
+    return tweepy.Client(
+        consumer_key=api_key,
+        consumer_secret=api_secret,
+        access_token=access_token,
+        access_token_secret=access_token_secret
+    )
+
+
+def _fetch_travel_suggestion(genre):
+    """楽天APIで旅行グッズ1件取得 → Claude投稿文生成。(本文, url) のタプルを返す"""
+    import random
+    from blog_yakuzen import search_rakuten_items
+    items = search_rakuten_items(genre['keyword'], hits=5)
+    if not items:
+        return None, None
+    item = random.choice(items)
+    name = item['name'][:40]
+    price = item['price']
+    url = item['url']
+    hook = random.choice(TRAVEL_HOOKS)
+    prompt = (
+        f"商品名：{name}\n価格：{price}円\nジャンル：{genre['name']}\n\n"
+        f"X（旧Twitter）投稿文を作ってください。\n"
+        f"冒頭は必ず「{hook}」で始める。\n"
+        "ルール：\n"
+        "・全体3行以内（改行込み）\n"
+        "・URLもハッシュタグも含めない（どちらも別途対応）\n"
+        "・ですます調NG・口語・体言止めOK\n"
+        "・機能ではなく『使った後の未来・変化』を伝える\n"
+        "・30〜40代子連れ旅行好きワーママに刺さる言葉を使う\n\n"
+        "余計な説明不要。投稿文だけ出力。"
+    )
+    try:
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=300,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        body = resp.content[0].text.strip()
+    except Exception as e:
+        print(f"travel suggestion generate error ({genre['name']}): {e}")
+        body = f"{hook}\n{name}"
+    return body, url
+
+
+def post_kvision_travel_aff(slot_index):
+    """@kvision_mに旅行×楽天アフィをXに投稿"""
+    genre = TRAVEL_GENRES[slot_index % len(TRAVEL_GENRES)]
+    try:
+        body, url = _fetch_travel_suggestion(genre)
+        if not body or not url:
+            return
+        client = _get_kvision_x_client()
+        if not client:
+            print("KVISION X API keys not configured, skipping")
+            return
+        tweet_text = f"{body}\n\n{url}\n[楽天PR]"
+        if len(tweet_text) > 280:
+            tweet_text = tweet_text[:277] + "..."
+        client.create_tweet(text=tweet_text)
+        print(f"kvision X post ({genre['name']}) successful")
+    except Exception as e:
+        print(f"post_kvision_travel_aff({slot_index}) error: {e}")
+
+
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
@@ -3899,6 +4010,9 @@ scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[6]
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 # 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
 scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:00:00', timezone='Asia/Tokyo')
+# @kvision_m（こはるまま）旅行×楽天アフィ：1日2本（朝9時・夜20時半）
+scheduler.add_job(post_kvision_travel_aff, 'cron', hour=9, minute=0, args=[0])
+scheduler.add_job(post_kvision_travel_aff, 'cron', hour=20, minute=30, args=[1])
 scheduler.start()
 
 if __name__ == '__main__':
