@@ -497,40 +497,40 @@ def generate_yakuzen_rewrite(title, original_html, instruction=''):
     return response.content[0].text.strip()
 
 
-AFFILIATE_BOOKS = {
-    'kids': {
-        'url': 'https://amzn.asia/d/07txS5CF',
-        'title': '薬に頼らずのびのび育てる！こども薬膳',
-        'desc': 'お子さんの体質改善・風邪予防・食欲不振など、日常のごはんで対応できる薬膳レシピを紹介。',
-    },
-    'soup': {
-        'url': 'https://amzn.asia/d/09tQHZKL',
-        'title': '薬膳スープジャー弁当 朝10分で作れる',
-        'desc': '忙しい朝でも10分で完成。体を温めて整えるスープジャーレシピが満載。',
-    },
-    'ayurveda': {
-        'raw_html': '<a href="//af.moshimo.com/af/c/click?a_id=5429137&p_id=4140&pc_id=10486&pl_id=56829" rel="nofollow" referrerpolicy="no-referrer-when-downgrade" attributionsrc><img src="//image.moshimo.com/af-img/3597/000000056829.jpg" width="240" height="120" style="border:none;"></a><img src="//i.moshimo.com/af/i/impression?a_id=5429137&p_id=4140&pc_id=10486&pl_id=56829" width="1" height="1" style="border:none;" loading="lazy">',
-    },
-    'default': {
-        'url': 'https://amzn.asia/d/0bkhnDrf',
-        'title': '「まいにちのごはん」で健康になっちゃう！ずぼら薬膳',
-        'desc': '特別な食材は不要。いつものごはんに薬膳の考え方をプラスするだけで体が変わる一冊。',
-    },
+import random as _random
+
+# レシピ記事専用（固定）
+AFFILIATE_BOOK_RECIPE = {
+    'url': 'https://amzn.asia/d/0bkhnDrf',
+    'title': '「まいにちのごはん」で健康になっちゃう！ずぼら薬膳',
+    'desc': '特別な食材は不要。いつものごはんに薬膳の考え方をプラスするだけで体が変わる一冊。',
 }
+
+# アーユルヴェーダ記事専用（もしもアフィ）
+AFFILIATE_BOOK_AYURVEDA = {
+    'raw_html': '<a href="//af.moshimo.com/af/c/click?a_id=5429137&p_id=4140&pc_id=10486&pl_id=56829" rel="nofollow" referrerpolicy="no-referrer-when-downgrade" attributionsrc><img src="//image.moshimo.com/af-img/3597/000000056829.jpg" width="240" height="120" style="border:none;"></a><img src="//i.moshimo.com/af/i/impression?a_id=5429137&p_id=4140&pc_id=10486&pl_id=56829" width="1" height="1" style="border:none;" loading="lazy">',
+}
+
+# 睡眠本の紹介記事（foodmakehealth.com）で取り上げた本のプール → ここからランダム選択
+# 新しい睡眠本を紹介記事に追加したらここにも追記する（睡眠特化本のみ）
+AFFILIATE_BOOKS_POOL = [
+    {
+        'url': 'https://amzn.asia/d/05Bxs0RW',
+        'title': 'スタンフォード式 最高の睡眠',
+        'desc': '世界最高の睡眠研究機関が教える、眠りの質を劇的に上げる90分の法則。医師も推薦の一冊。',
+    },
+]
 
 
 def _select_affiliate_book(title, content_md):
     ayurveda_keywords = ['アーユルヴェーダ', 'スパイス検定', 'アーユル']
-    kids_keywords = ['子ども', 'こども', '子育て', '育児', '小児', 'キッズ']
-    soup_keywords = ['スープ', '鍋', '温活', '温め', 'シチュー', 'お粥', '粥']
+    recipe_keywords = ['レシピ', '作り方', '材料', 'お粥', '粥', '料理', '献立', '炒め', '煮', '茹で', '蒸し', '食べ方']
     text = title + content_md[:500]
     if any(k in text for k in ayurveda_keywords):
-        return AFFILIATE_BOOKS['ayurveda']
-    if any(k in text for k in kids_keywords):
-        return AFFILIATE_BOOKS['kids']
-    if any(k in text for k in soup_keywords):
-        return AFFILIATE_BOOKS['soup']
-    return AFFILIATE_BOOKS['default']
+        return AFFILIATE_BOOK_AYURVEDA
+    if any(k in text for k in recipe_keywords):
+        return AFFILIATE_BOOK_RECIPE
+    return _random.choice(AFFILIATE_BOOKS_POOL)
 
 
 def _build_affiliate_cta(title, content_md):
@@ -538,7 +538,7 @@ def _build_affiliate_cta(title, content_md):
     if 'raw_html' in book:
         return f'<div style="margin:30px 0;">{book["raw_html"]}</div>'
     return f'''<div style="background:#f9f6f0;border-left:4px solid #8b6914;padding:20px;margin:30px 0;border-radius:4px;">
-<p style="font-weight:bold;margin:0 0 8px;">📚 もっと薬膳を日常に取り入れたい方へ</p>
+<p style="font-weight:bold;margin:0 0 8px;">📚 睡眠をもっと深く知りたい方へ</p>
 <p style="margin:0 0 4px;font-weight:bold;">{book["title"]}</p>
 <p style="margin:0 0 15px;font-size:0.95em;">{book["desc"]}</p>
 <a href="{book["url"]}" target="_blank" rel="nofollow" style="display:inline-block;background:#ff9900;color:white;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;">Amazonで見る →</a>
@@ -560,7 +560,7 @@ def search_rakuten_items(keyword, hits=3):
         if RAKUTEN_ACCESS_KEY:
             params['accessKey'] = RAKUTEN_ACCESS_KEY
         res = requests.get(
-            'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
+            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601',
             params=params,
             headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
             timeout=10
@@ -617,16 +617,9 @@ def _build_rakuten_natural_intro(title, content_md, keyword):
         return f'''<p>就寝前のひとときを変えるだけで、眠りの深さが変わることがあります。体を内側から落ち着かせる薬膳食材を、まずは飲み物から試してみませんか。特別な調理も不要なので忙しい夜でも続けやすいです。</p>'''
 
 
-def _build_rakuten_section(title, content_md=''):
-    keyword = _extract_rakuten_keyword(title, content_md)
-    items = search_rakuten_items(keyword)
-    if not items:
-        return ''
-    intro = _build_rakuten_natural_intro(title, content_md, keyword)
-    cards = ''
-    for item in items:
-        name = item['name'][:50] + ('...' if len(item['name']) > 50 else '')
-        cards += f'''<div style="display:flex;gap:12px;margin-bottom:12px;padding:12px;border:1px solid #e8d5c5;border-radius:6px;background:#fff;">
+def _build_item_card(item):
+    name = item['name'][:50] + ('...' if len(item['name']) > 50 else '')
+    return f'''<div style="display:flex;gap:12px;margin-bottom:12px;padding:12px;border:1px solid #e8d5c5;border-radius:6px;background:#fff;">
   <a href="{item['url']}" target="_blank" rel="nofollow" style="flex-shrink:0;"><img src="{item['image']}" alt="" style="width:70px;height:70px;object-fit:cover;border-radius:4px;"></a>
   <div>
     <a href="{item['url']}" target="_blank" rel="nofollow" style="font-size:0.9em;font-weight:bold;color:#333;text-decoration:none;">{name}</a>
@@ -634,9 +627,48 @@ def _build_rakuten_section(title, content_md=''):
     <a href="{item['url']}" target="_blank" rel="nofollow" style="background:#bf0000;color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.85em;font-weight:bold;">楽天で見る →</a>
   </div>
 </div>'''
+
+
+def _extract_rakuten_keywords_multi(title, content_md):
+    """記事内容から楽天で検索できる商品・食材を2〜3件抽出する"""
+    try:
+        response = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=80,
+            messages=[{
+                'role': 'user',
+                'content': f"""この薬膳・睡眠ブログ記事に登場する食材・商品から、楽天市場で検索できるものを2〜3件選んでください。
+食材だけでなく、枕・アイマスク・アロマオイル・ナイトウェアなど寝具・グッズも記事に出ていれば含めてください。
+タイトル：{title}
+記事：{content_md[:800]}
+
+カンマ区切りで商品名のみ答えてください（例：カモミールティー,温熱アイマスク,なつめ茶）。説明不要。"""
+            }]
+        )
+        raw = response.content[0].text.strip()
+        keywords = [k.strip() for k in raw.replace('、', ',').replace('・', ',').split(',') if k.strip()]
+        return keywords[:3]
+    except Exception as e:
+        print(f"楽天マルチキーワード抽出エラー: {e}")
+        return [title.replace('薬膳', '').strip()[:20] or title]
+
+
+def _build_rakuten_section(title, content_md=''):
+    keywords = _extract_rakuten_keywords_multi(title, content_md)
+    cards = ''
+    found_labels = []
+    for kw in keywords:
+        items = search_rakuten_items(kw, hits=1)
+        if items:
+            cards += _build_item_card(items[0])
+            found_labels.append(kw)
+    if not cards:
+        return ''
+    intro = _build_rakuten_natural_intro(title, content_md, found_labels[0] if found_labels else keywords[0])
+    label = '・'.join(found_labels)
     return f'''<div style="background:#fff5f5;border-left:4px solid #bf0000;padding:20px;margin:30px 0;border-radius:4px;">
 {intro}
-<p style="font-weight:bold;margin:12px 0 16px;">🛒 楽天市場で探す（{keyword}）</p>
+<p style="font-weight:bold;margin:12px 0 16px;">🛒 楽天市場で探す（{label}）</p>
 {cards}
 </div>'''
 
