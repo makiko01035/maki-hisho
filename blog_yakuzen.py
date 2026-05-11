@@ -10,6 +10,13 @@ from clients import line_bot_api, anthropic_client
 RAKUTEN_APP_ID = os.environ.get('RAKUTEN_APP_ID', '')
 RAKUTEN_ACCESS_KEY = os.environ.get('RAKUTEN_ACCESS_KEY', '')
 RAKUTEN_AFFILIATE_ID = os.environ.get('RAKUTEN_AFFILIATE_ID', '')
+AMAZON_ASSOCIATE_ID = os.environ.get('AMAZON_ASSOCIATE_ID', 'makiko01035-22')
+
+
+def _amazon_url(url):
+    """AmazonURLにアソシエイトタグを付与する"""
+    tag = f'tag={AMAZON_ASSOCIATE_ID}'
+    return f'{url}?{tag}' if '?' not in url else f'{url}&{tag}'
 
 YAKUZEN_BOARD_RULES = {
     # 更年期×睡眠
@@ -541,7 +548,7 @@ def _build_affiliate_cta(title, content_md):
 <p style="font-weight:bold;margin:0 0 8px;">📚 睡眠をもっと深く知りたい方へ</p>
 <p style="margin:0 0 4px;font-weight:bold;">{book["title"]}</p>
 <p style="margin:0 0 15px;font-size:0.95em;">{book["desc"]}</p>
-<a href="{book["url"]}" target="_blank" rel="nofollow" style="display:inline-block;background:#ff9900;color:white;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;">Amazonで見る →</a>
+<a href="{_amazon_url(book["url"])}" target="_blank" rel="nofollow" style="display:inline-block;background:#ff9900;color:white;padding:10px 24px;border-radius:4px;text-decoration:none;font-weight:bold;">Amazonで見る →</a>
 </div>'''
 
 
