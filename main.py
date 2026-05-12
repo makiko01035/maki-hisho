@@ -780,6 +780,22 @@ def post_sekisui_direct():
         return {'error': str(e)}, 500
 
 
+@app.route('/notify-ig', methods=['POST'])
+def notify_ig():
+    """記事タイトルとURLを受け取りInstagramネタをLINEに送信"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('LINE_USER_ID', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    title = data.get('title', '')
+    url = data.get('url', '')
+    content_md = data.get('content_md', '')
+    if not title or not url:
+        return {'error': 'title and url required'}, 400
+    _notify_line_ig(title, url, content_md)
+    return {'status': 'ok', 'message': f'LINEにInstagramネタを送信中: {title}'}
+
+
 def _notify_line_ig(title, post_url, content_md=''):
     """薬膳記事公開後にInstagramキャプションをLINEにバックグラウンド送信"""
     import threading
