@@ -4200,7 +4200,12 @@ scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:0
 # 朝9:00 テキストのみ旅あるある、夜20:30 スレッド形式アフィURL
 scheduler.add_job(post_kvision_morning_tweet, 'cron', hour=9, minute=0)
 scheduler.add_job(post_kvision_travel_aff, 'cron', hour=20, minute=30, args=[0])
-scheduler.start()
+def _delayed_scheduler_start():
+    time.sleep(120)
+    scheduler.start()
+    print("[scheduler] 起動完了（デプロイ並走防止のため120秒遅延）")
+
+threading.Thread(target=_delayed_scheduler_start, daemon=True).start()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
