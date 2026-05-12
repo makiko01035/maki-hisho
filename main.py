@@ -27,6 +27,7 @@ PRINT_SESSION_FILE = '/tmp/print_sessions.json'
 MORNING_SENT_FILE = '/tmp/morning_sent_date.txt'
 NOTE_SESSION_FILE = '/tmp/note_sessions.json'
 ROOM_TAG_SESSION_FILE = '/tmp/room_tag_sessions.json'
+NEWSLETTER_SESSION_FILE = '/tmp/newsletter_sessions.json'
 
 _morning_sent_date = None
 _morning_sent_lock = threading.Lock()
@@ -94,6 +95,51 @@ def save_note_sessions(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"note_sessions save error: {e}")
+
+
+def load_newsletter_sessions():
+    try:
+        with open(NEWSLETTER_SESSION_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_newsletter_sessions(data):
+    try:
+        with open(NEWSLETTER_SESSION_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"newsletter_sessions save error: {e}")
+
+
+def save_newsletter_to_notion(email):
+    """メルマガ1件をNotionのメルマガDBに保存"""
+    notion_token = os.environ.get('NOTION_TOKEN', '')
+    headers = {
+        "Authorization": f"Bearer {notion_token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    today = datetime.datetime.now(JST).strftime('%Y-%m-%d')
+    title = f"[{email.get('category', '')}] {email.get('from_name', email.get('from', ''))}"
+    content = f"件名：{email.get('subject', '')}\n\n{email.get('summary', '')}"
+    body = {
+        "after": "323f8d6d-41de-809d-9e98-f9a5da8556a8",
+        "children": [{
+            "object": "block",
+            "type": "to_do",
+            "to_do": {
+                "rich_text": [{"type": "text", "text": {"content": f"📧 {today} {title}\n{content}"}}],
+                "checked": False
+            }
+        }]
+    }
+    requests.patch(
+        "https://api.notion.com/v1/blocks/323f8d6d41de80dea66efad500806f69/children",
+        headers=headers,
+        json=body
+    )
 
 
 def load_room_tag_sessions():
@@ -1421,6 +1467,30 @@ def post_threads_now():
     except Exception as e:
         return f'❌ エラー: {e}', 500
 
+@app.route('/newsletter-summary', methods=['POST'])
+def newsletter_summary():
+    """GASからメルマガ要約を受け取り、LINEに送信＋セッション保存"""
+    data = request.json or {}
+    secret = data.get('secret')
+    if secret != os.environ.get('NOTIFY_SECRET', ''):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    summary = data.get('summary', '')
+    emails = data.get('emails', [])
+    user_id = os.environ.get('LINE_USER_ID')
+
+    sessions = load_newsletter_sessions()
+    sessions[user_id] = {
+        'emails': emails,
+        'timestamp': datetime.datetime.now(JST).isoformat()
+    }
+    save_newsletter_sessions(sessions)
+
+    message = f"📧 今週のメルマガまとめ（{len(emails)}件）\n\n{summary}\n\n━━━━━━━━━━\n保存したいものは番号で返信してください\n例：「①③保存して」"
+    line_bot_api.push_message(user_id, TextSendMessage(text=message))
+    return jsonify({'status': 'ok', 'count': len(emails)})
+
+
 @app.route('/add-task', methods=['POST'])
 def add_task():
     """Power Automateからメール検知時に呼ばれる：LINE通知 + Notionにタスク追加"""
@@ -2050,6 +2120,36 @@ def _sanitize_text(text: str) -> str:
 def handle_message(event):
     user_message = _sanitize_text(event.message.text)
     user_id = event.source.user_id
+
+    # メルマガ保存コマンド（「①③保存して」など）
+    if '保存' in user_message and any(c in user_message for c in '①②③④⑤⑥⑦⑧⑨⑩0123456789'):
+        sessions = load_newsletter_sessions()
+        session = sessions.get(user_id)
+        if not session:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text='保存できるメルマガが見つかりませんでした。\nまずメルマガまとめを受け取ってから返信してください。'))
+            return
+        emails = session.get('emails', [])
+        circle_map = {'①': 1, '②': 2, '③': 3, '④': 4, '⑤': 5, '⑥': 6, '⑦': 7, '⑧': 8, '⑨': 9, '⑩': 10}
+        numbers = set()
+        for char, num in circle_map.items():
+            if char in user_message:
+                numbers.add(num)
+        import re as _re
+        for m in _re.findall(r'\d+', user_message):
+            n = int(m)
+            if 1 <= n <= len(emails):
+                numbers.add(n)
+        if not numbers:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text='番号が見つかりませんでした。\n例：「①③保存して」'))
+            return
+        saved = []
+        circle_chars = '①②③④⑤⑥⑦⑧⑨⑩'
+        for n in sorted(numbers):
+            if n <= len(emails):
+                save_newsletter_to_notion(emails[n - 1])
+                saved.append(circle_chars[n - 1])
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f'{"・".join(saved)}をNotionの今週やることに保存しました✅'))
+        return
 
     # ユーザーIDを確認するコマンド
     if user_message == 'myid':
@@ -3113,7 +3213,6 @@ TWEET_STOCK = [
     # ── 2026-05-12追加 ──
     "AIで作った自動投稿、Threadsに入れたら即アカBANされた。MetaがAPI投稿を厳しく制限してるらしい。同じ仕組みをXに移したら何事もなく動いてる。使えなくなった仕組みをすぐ代替に変えられるのが、自分でツールを作れる強さだと思った。 #AI副業 #ClaudeCode #自動化",
     "X APIが動かない原因、アクセストークンの権限が『読み取り専用』になってた。投稿するには『Read and Write』が必要で、権限を変えたらトークンの再生成も必須。1時間かけてデバッグして、原因が1行の設定ミスだと分かったときの気持ち、複雑。でも次は迷わず直せる。 #AI副業 #ClaudeCode",
-    "旅行好きワーママの楽天アフィXアカウントをAIと一緒に設計した。コンセプト・ペルソナ・ジャンル選定・投稿構成・自動化まで丸ごと。昔なら「何からやれば」で止まってたやつが、話しかけるだけで形になる。AIって壁を突破するための道具だ。 #AI副業 #ClaudeCode #楽天アフィ",
     # ── 2026-05-09追加 ──
     "LINEに届くInstagramキャプション、1通にまとめてたら自分で「切り分けるのが面倒」と気づいた。キャプション・タイトル・説明文を別々のメッセージに分割したら、コピペが一瞬に。ツールは作って終わりじゃなく、使いながら直すもの。自分のツールを育てる感覚が好きだ。 #AI副業 #ClaudeCode #LINE",
     "LINEメニューの「メルカリ」ボタンを「楽天Roomタグ」に入れ替えた。商品写真を送るだけでハッシュタグ15個が届く機能。使わないボタンより毎日使う機能を置く。たったそれだけで使い心地が全然違う。自分のツールの「使いにくい」を放置しないのが、長く続けられる秘訣だと思う。 #AI副業 #楽天Room #自動化",
