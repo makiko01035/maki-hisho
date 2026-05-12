@@ -780,6 +780,20 @@ def post_sekisui_direct():
         return {'error': str(e)}, 500
 
 
+def _notify_line_ig(title, post_url, content_md=''):
+    """薬膳記事公開後にInstagramキャプションをLINEにバックグラウンド送信"""
+    import threading
+    def _send():
+        try:
+            from blog_yakuzen import send_sns_messages
+            user_id = os.environ.get('LINE_USER_ID', '')
+            if user_id:
+                send_sns_messages(user_id, title, post_url, None, content_md or '')
+        except Exception as e:
+            print(f"LINE Instagram通知エラー: {e}")
+    threading.Thread(target=_send, daemon=True).start()
+
+
 @app.route('/post-yakuzen-direct', methods=['POST'])
 def post_yakuzen_direct():
     """Claude Codeから直接薬膳記事を投稿するエンドポイント"""
@@ -834,7 +848,9 @@ def post_yakuzen_direct():
                                     auth=(wp_user, wp_pass), json=post_data, timeout=30)
             if res.status_code in (200, 201):
                 post = res.json()
-                return {'status': 'ok', 'post_id': post['id'], 'url': post['link']}, res.status_code
+                post_url = post['link']
+                _notify_line_ig(title, post_url, content_md)
+                return {'status': 'ok', 'post_id': post['id'], 'url': post_url}, res.status_code
             return {'error': res.text[:200]}, 500
         from blog_yakuzen import post_to_yakuzen_wp
         post_id, post_url = post_to_yakuzen_wp(title, content_md, post_id=pid, status='publish')
@@ -845,6 +861,7 @@ def post_yakuzen_direct():
             import requests as req
             req.post(f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
                      auth=(wp_user, wp_pass), json={'slug': slug}, timeout=15)
+        _notify_line_ig(title, post_url, content_md)
         return {'status': 'ok', 'post_id': post_id, 'url': post_url}, 201
     except Exception as e:
         return {'error': str(e)}, 500
