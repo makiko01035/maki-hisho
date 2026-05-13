@@ -1447,6 +1447,185 @@ def company_dashboard():
 </html>'''
 
 
+DASHBOARD_PASSWORD = os.environ.get('DASHBOARD_PASSWORD', 'maki1234')
+
+@app.route('/dashboard', methods=['GET', 'POST'])
+def dashboard():
+    pw = request.args.get('pw') or request.form.get('pw', '')
+    if pw != DASHBOARD_PASSWORD:
+        err = '<p class="err">パスワードが違います</p>' if request.method == 'POST' else ''
+        return f'''<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  body {{ background: #f4f0eb; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Noto Sans JP', sans-serif; margin: 0; }}
+  .box {{ background: #fff; border: 1px solid #e2dbd3; border-radius: 10px; padding: 40px 36px; width: 320px; text-align: center; }}
+  h2 {{ font-size: 16px; font-weight: 400; color: #3d3530; margin-bottom: 24px; letter-spacing: 1px; }}
+  input {{ width: 100%; padding: 10px 14px; border: 1px solid #e2dbd3; border-radius: 6px; font-size: 14px; margin-bottom: 14px; box-sizing: border-box; }}
+  button {{ width: 100%; padding: 10px; background: #7a9e6e; border: none; border-radius: 6px; color: #fff; font-size: 14px; cursor: pointer; font-family: inherit; }}
+  button:hover {{ background: #5c7d52; }}
+  .err {{ color: #b56b5e; font-size: 12px; margin-top: 10px; }}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>Maki &amp; Co. Dashboard</h2>
+  <form method="POST" action="/dashboard">
+    <input type="password" name="pw" placeholder="パスワード" autofocus>
+    <button type="submit">ログイン</button>
+    {err}
+  </form>
+</div>
+</body>
+</html>'''
+
+    try:
+        events = get_upcoming_events(days=7)
+    except Exception:
+        events = []
+
+    now = datetime.datetime.now(JST)
+    today = now.date()
+    weekdays = ["月", "火", "水", "木", "金", "土", "日"]
+    today_str = f"{today.month}月{today.day}日（{weekdays[today.weekday()]}）"
+
+    today_events = []
+    future_events_by_date = {}
+    for event in events:
+        start_raw = event['start'].get('date') or event['start'].get('dateTime', '')[:10]
+        try:
+            evt_date = datetime.date.fromisoformat(start_raw)
+        except Exception:
+            continue
+        title = event.get('summary', '（タイトルなし）')
+        if evt_date == today:
+            if 'T' in event['start'].get('dateTime', ''):
+                dt = datetime.datetime.fromisoformat(event['start']['dateTime']).astimezone(JST)
+                today_events.append(f"{dt.strftime('%H:%M')} {title}")
+            else:
+                today_events.append(title)
+        elif evt_date > today:
+            if evt_date not in future_events_by_date:
+                future_events_by_date[evt_date] = []
+            future_events_by_date[evt_date].append(title)
+
+    today_html = ''.join(f'<li>{e}</li>' for e in today_events) or '<li class="empty">予定なし</li>'
+    future_html = ''
+    for d in sorted(future_events_by_date.keys()):
+        future_html += f'<div class="date-header">{d.month}月{d.day}日（{weekdays[d.weekday()]}）</div>'
+        for t in future_events_by_date[d]:
+            future_html += f'<div class="event-item">📌 {t}</div>'
+    if not future_html:
+        future_html = '<div class="empty">今後7日間の予定なし</div>'
+
+    link_groups = [
+        ('Blog', [
+            ('WordPress（薬膳）', 'https://foodmakehealth.com/wp-admin/', False),
+            ('WordPress（セキスイ）', 'https://order-sekisui.com/wp-admin/', False),
+            ('Notion', 'https://notion.so/', True),
+        ]),
+        ('Medical', [
+            ('CareNet', 'https://www.carenet.com/', False),
+            ('MedPeer', 'https://medpeer.jp/keymessage/list/point3', False),
+        ]),
+        ('Sales', [
+            ('メルハント', 'https://auction2024.com/admin/main.php', True),
+            ('物販ブースター', 'https://buppan-booster.com/list-sell', True),
+            ('メルカリ', 'https://jp.mercari.com/', False),
+            ('eBay出品中', 'https://www.ebay.com/mys/active', True),
+        ]),
+        ('まきの会社', [
+            ('まるちゃんワールド', 'https://maki-hisho.onrender.com/game', True),
+            ('会社組織図', 'https://maki-hisho.onrender.com/office', False),
+            ('会社LP', 'https://maki-hisho.onrender.com/company', False),
+        ]),
+    ]
+    links_rows = ''
+    for label, items in link_groups:
+        btns = ''.join(
+            f'<a href="{url}" target="_blank" class="link-btn {"link-btn-hl" if hl else ""}">{name}</a>'
+            for name, url, hl in items
+        )
+        links_rows += f'<div class="links-row"><span class="links-category">{label}</span>{btns}</div>'
+
+    return f'''<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="3600">
+<title>Maki &amp; Co. | Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&family=Lato:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --bg: #f4f0eb; --surface: #faf8f5; --card: #ffffff;
+    --border: #e2dbd3; --border-light: #ede8e2;
+    --text: #3d3530; --text-sub: #7a6f68; --muted: #b0a89f;
+    --accent: #7a9e6e; --accent-dark: #5c7d52; --accent-red: #b56b5e;
+    --link-bg: #f0ece7;
+  }}
+  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+  body {{ background: var(--bg); color: var(--text); font-family: 'Noto Sans JP', sans-serif; font-weight: 300; min-height: 100vh; font-size: 14px; line-height: 1.7; }}
+  header {{ background: var(--surface); border-bottom: 1px solid var(--border); padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; }}
+  .logo {{ font-family: 'Lato', sans-serif; font-size: 18px; font-weight: 300; color: var(--text); letter-spacing: 3px; text-transform: uppercase; }}
+  .logo span {{ display: block; font-size: 10px; color: var(--muted); letter-spacing: 2px; margin-top: 2px; }}
+  .date-display {{ text-align: right; }}
+  .date-display strong {{ display: block; font-size: 18px; font-weight: 400; }}
+  .date-display small {{ font-size: 11px; color: var(--muted); letter-spacing: 1px; }}
+  .links-bar {{ background: var(--surface); border-bottom: 2px solid var(--border); padding: 0 40px; }}
+  .links-row {{ display: flex; align-items: center; flex-wrap: wrap; padding: 7px 0; border-bottom: 1px solid var(--border-light); gap: 5px; }}
+  .links-row:last-child {{ border-bottom: none; }}
+  .links-category {{ font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); min-width: 60px; margin-right: 6px; flex-shrink: 0; }}
+  .link-btn {{ display: inline-block; background: var(--link-bg); border: 1px solid var(--border); color: var(--text-sub); padding: 3px 10px; border-radius: 4px; text-decoration: none; font-size: 11px; transition: background 0.15s, color 0.15s; }}
+  .link-btn:hover {{ background: var(--accent); border-color: var(--accent); color: #fff; }}
+  .link-btn-hl {{ background: #fff3e0; border-color: #ff8c00; color: #d05000; font-weight: 600; }}
+  .link-btn-hl:hover {{ background: #ff8c00; border-color: #ff8c00; color: #fff; }}
+  main {{ padding: 28px 40px; }}
+  .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }}
+  .card {{ background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }}
+  .card-header {{ background: var(--link-bg); border-bottom: 1px solid var(--border); padding: 10px 18px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-sub); font-weight: 400; }}
+  .card-body {{ padding: 16px 18px; }}
+  ul {{ list-style: none; }}
+  li {{ padding: 6px 0; border-bottom: 1px solid var(--border-light); font-size: 13px; }}
+  li:last-child {{ border-bottom: none; }}
+  .empty {{ color: var(--muted); font-style: italic; }}
+  .date-header {{ font-size: 11px; font-weight: 500; color: var(--accent-dark); margin: 12px 0 4px; letter-spacing: 1px; }}
+  .event-item {{ padding: 4px 0 4px 10px; font-size: 13px; border-left: 3px solid var(--accent); margin-left: 2px; border-bottom: 1px solid var(--border-light); }}
+  .updated {{ text-align: right; font-size: 11px; color: var(--muted); padding: 12px 40px; border-top: 1px solid var(--border); background: var(--surface); }}
+  @media (max-width: 760px) {{
+    header, .links-bar, main, .updated {{ padding-left: 16px; padding-right: 16px; }}
+    .grid {{ grid-template-columns: 1fr; }}
+    header {{ flex-direction: column; align-items: flex-start; gap: 8px; }}
+  }}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Maki &amp; Co.<span>Daily Operations Dashboard</span></div>
+  <div class="date-display"><strong>{today_str}</strong><small>Today</small></div>
+</header>
+<div class="links-bar">{links_rows}</div>
+<main>
+  <div class="grid">
+    <div class="card">
+      <div class="card-header">Today&#x27;s Schedule</div>
+      <div class="card-body"><ul>{today_html}</ul></div>
+    </div>
+    <div class="card">
+      <div class="card-header">Upcoming — Next 7 Days</div>
+      <div class="card-body">{future_html}</div>
+    </div>
+  </div>
+</main>
+<div class="updated">最終更新: {now.strftime('%Y-%m-%d %H:%M')}</div>
+</body>
+</html>'''
+
+
 @app.route('/game')
 def game_index():
     return send_from_directory('.', 'index.html')
