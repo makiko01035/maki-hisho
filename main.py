@@ -790,14 +790,15 @@ def notify_ig():
     title = data.get('title', '')
     url = data.get('url', '')
     content_md = data.get('content_md', '')
+    image_url = data.get('image_url', None)
     if not title or not url:
         return {'error': 'title and url required'}, 400
-    _notify_line_ig(title, url, content_md)
+    _notify_line_ig(title, url, content_md, image_url)
     return {'status': 'ok', 'message': f'LINEにInstagramネタを送信中: {title}'}
 
 
-def _fetch_wp_content_from_url(post_url):
-    """記事URLからスラッグを取得しWP REST APIで本文を取得"""
+def _fetch_wp_post_info(post_url):
+    """記事URLからWP REST APIで本文・アイキャッチURLを取得。(content_md, featured_url)を返す"""
     import re as _re
     try:
         slug = post_url.rstrip('/').split('/')[-1]
@@ -806,28 +807,39 @@ def _fetch_wp_content_from_url(post_url):
         wp_pass = os.environ.get('YAKUZEN_WP_APP_PASSWORD', '')
         r = requests.get(
             f'{yakuzen_wp_url}/wp-json/wp/v2/posts',
-            params={'slug': slug, '_fields': 'content'},
+            params={'slug': slug, '_embed': 1},
             auth=(wp_user, wp_pass),
             timeout=15
         )
         if r.status_code == 200 and r.json():
-            content_html = r.json()[0].get('content', {}).get('rendered', '')
-            return _re.sub(r'<[^>]+>', '', content_html)[:3000]
+            post = r.json()[0]
+            content_html = post.get('content', {}).get('rendered', '')
+            content_md = _re.sub(r'<[^>]+>', '', content_html)[:3000]
+            featured_url = None
+            for media in post.get('_embedded', {}).get('wp:featuredmedia', []):
+                featured_url = media.get('source_url')
+                break
+            return content_md, featured_url
     except Exception as e:
-        print(f"WP content fetch error: {e}")
-    return ''
+        print(f"WP post info fetch error: {e}")
+    return '', None
 
 
-def _notify_line_ig(title, post_url, content_md=''):
+def _notify_line_ig(title, post_url, content_md='', image_url=None):
     """薬膳記事公開後にInstagramキャプションをLINEにバックグラウンド送信"""
     import threading
     def _send():
         try:
-            actual_content = content_md or _fetch_wp_content_from_url(post_url)
+            actual_content = content_md
+            actual_image = image_url
+            if not actual_content or not actual_image:
+                fetched_content, fetched_image = _fetch_wp_post_info(post_url)
+                actual_content = actual_content or fetched_content
+                actual_image = actual_image or fetched_image
             from blog_yakuzen import send_sns_messages
             user_id = os.environ.get('LINE_USER_ID', '')
             if user_id:
-                send_sns_messages(user_id, title, post_url, None, actual_content)
+                send_sns_messages(user_id, title, post_url, actual_image, actual_content)
         except Exception as e:
             print(f"LINE Instagram通知エラー: {e}")
     threading.Thread(target=_send, daemon=True).start()
