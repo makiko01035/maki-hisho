@@ -13,7 +13,7 @@ from googleapiclient.discovery import build
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
-from ebay_handler import run_ebay_research
+from ebay_handler import run_ebay_research, send_daily_purchase_candidates
 from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
@@ -4414,6 +4414,11 @@ scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:0
 # 朝9:00 テキストのみ旅あるある、夜20:30 スレッド形式アフィURL
 scheduler.add_job(post_kvision_morning_tweet, 'cron', hour=9, minute=0)
 scheduler.add_job(post_kvision_travel_aff, 'cron', hour=20, minute=30, args=[0])
+# 毎朝6:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
+scheduler.add_job(
+    lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
+    'cron', hour=6, minute=30,
+)
 def _delayed_scheduler_start():
     time.sleep(120)
     scheduler.start()
