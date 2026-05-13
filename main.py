@@ -1681,11 +1681,30 @@ def instagram_roadmap():
 def threads_guide():
     return send_from_directory('.', 'threads_guide.html')
 
+@app.route('/check-kvision')
+def check_kvision():
+    """KVISION X APIキーの設定状況を確認"""
+    keys = {
+        'KVISION_X_API_KEY': os.environ.get('KVISION_X_API_KEY', ''),
+        'KVISION_X_API_SECRET': os.environ.get('KVISION_X_API_SECRET', ''),
+        'KVISION_X_ACCESS_TOKEN': os.environ.get('KVISION_X_ACCESS_TOKEN', ''),
+        'KVISION_X_ACCESS_TOKEN_SECRET': os.environ.get('KVISION_X_ACCESS_TOKEN_SECRET', ''),
+    }
+    result = []
+    for k, v in keys.items():
+        status = f'✅ 設定済み（{v[:6]}...）' if v.strip() else '❌ 未設定'
+        result.append(f'{k}: {status}')
+    return '<br>'.join(result)
+
+
 @app.route('/post-kvision-now')
 def post_kvision_now():
     """今すぐ@kvision_mにアフィスレッドを1本送る（手動テスト用）"""
     import random
     slot = random.randint(0, len(TRAVEL_GENRES) - 1)
+    client = _get_kvision_x_client()
+    if not client:
+        return '❌ KVISION X APIキーが未設定です。Renderの環境変数を確認してください。', 500
     try:
         post_kvision_travel_aff(slot)
         return f'✅ @kvision_m スレッド投稿完了！ジャンル：{TRAVEL_GENRES[slot]["name"]}　Xアプリで確認してください。'

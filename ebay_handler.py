@@ -9,8 +9,8 @@ from datetime import datetime
 from linebot.models import TextSendMessage
 from clients import line_bot_api, anthropic_client
 
-EBAY_APP_ID = os.environ.get('EBAY_APP_ID', 'MakikoKi-Makik13s-PRD-1bf555bb5-8096e034')
-EBAY_CERT_ID = os.environ.get('EBAY_CERT_ID', 'PRD-bf555bb5d8e6-7178-48cc-acde-8290')
+EBAY_APP_ID = os.environ.get('EBAY_APP_ID', '')
+EBAY_CERT_ID = os.environ.get('EBAY_CERT_ID', '')
 EBAY_TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 EBAY_BROWSE_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search"
 FINDING_API_URL = "https://svcs.ebay.com/services/search/FindingService/v1"
