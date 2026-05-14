@@ -1697,6 +1697,48 @@ def check_kvision():
     return '<br>'.join(result)
 
 
+@app.route('/debug-kvision')
+def debug_kvision():
+    """@kvision_m X投稿の各ステップを詳細デバッグ（実際に投稿する）"""
+    import random
+    log = []
+    try:
+        # Step1: APIクライアント生成
+        client = _get_kvision_x_client()
+        if not client:
+            return '❌ Step1: APIクライアント生成失敗（キー未設定）'
+        log.append('✅ Step1: APIクライアント生成OK')
+
+        # Step2: 楽天APIで商品取得＋投稿文生成
+        genre = random.choice(TRAVEL_GENRES)
+        log.append(f'📦 Step2: ジャンル={genre["name"]}')
+        body, url = _fetch_travel_suggestion(genre)
+        if not body or not url:
+            log.append('❌ Step2: 楽天API商品取得または投稿文生成に失敗')
+            return '<br>'.join(log)
+        log.append(f'✅ Step2: 投稿文生成OK → {body[:40]}...')
+        log.append(f'🔗 URL: {url[:60]}...')
+
+        # Step3: Xに本文ツイート
+        resp = client.create_tweet(text=body)
+        tweet_id = resp.data['id']
+        log.append(f'✅ Step3: ツイート投稿OK → ID={tweet_id}')
+
+        # Step4: リプライにURL
+        import time as _time
+        _time.sleep(3)
+        client.create_tweet(
+            text=f"↓ 商品はこちら\n{url}\n[楽天PR]",
+            in_reply_to_tweet_id=tweet_id
+        )
+        log.append('✅ Step4: リプライ（URL）投稿OK')
+
+    except Exception as e:
+        log.append(f'❌ 例外発生: {type(e).__name__}: {e}')
+
+    return '<br>'.join(log)
+
+
 @app.route('/post-kvision-now')
 def post_kvision_now():
     """今すぐ@kvision_mにアフィスレッドを1本送る（手動テスト用）"""
