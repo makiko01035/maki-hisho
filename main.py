@@ -1701,6 +1701,8 @@ def check_kvision():
 def debug_kvision():
     """@kvision_m X投稿の各ステップを詳細デバッグ（実際に投稿する）"""
     import random
+    import requests as _requests
+    import traceback
     log = []
     try:
         # Step1: APIクライアント生成
@@ -1709,32 +1711,62 @@ def debug_kvision():
             return '❌ Step1: APIクライアント生成失敗（キー未設定）'
         log.append('✅ Step1: APIクライアント生成OK')
 
-        # Step2: 楽天APIで商品取得＋投稿文生成
+        # Step2: 楽天APIを直接叩いてレスポンス確認
+        from blog_yakuzen import RAKUTEN_APP_ID, RAKUTEN_AFFILIATE_ID, RAKUTEN_ACCESS_KEY
         genre = random.choice(TRAVEL_GENRES)
         log.append(f'📦 Step2: ジャンル={genre["name"]}')
+        log.append(f'🔑 RAKUTEN_APP_ID: {"✅ あり" if RAKUTEN_APP_ID else "❌ なし"}')
+        log.append(f'🔑 RAKUTEN_AFFILIATE_ID: {"✅ あり" if RAKUTEN_AFFILIATE_ID else "❌ なし"}')
+
+        params = {
+            'applicationId': RAKUTEN_APP_ID,
+            'affiliateId': RAKUTEN_AFFILIATE_ID,
+            'keyword': genre['keyword'],
+            'hits': 3,
+            'sort': '-reviewCount',
+            'format': 'json',
+        }
+        if RAKUTEN_ACCESS_KEY:
+            params['accessKey'] = RAKUTEN_ACCESS_KEY
+        res = _requests.get(
+            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601',
+            params=params,
+            headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
+            timeout=10
+        )
+        log.append(f'📡 楽天APIステータス: {res.status_code}')
+        data = res.json()
+        if 'error' in data:
+            log.append(f'❌ 楽天APIエラー: {data.get("error")} / {data.get("error_description")}')
+            return '<br>'.join(log)
+        items = data.get('Items', [])
+        log.append(f'✅ Step2: 商品{len(items)}件取得')
+        if not items:
+            log.append('❌ 商品0件のため投稿不可')
+            return '<br>'.join(log)
+
+        # Step3: 投稿文生成＋X投稿
         body, url = _fetch_travel_suggestion(genre)
         if not body or not url:
-            log.append('❌ Step2: 楽天API商品取得または投稿文生成に失敗')
+            log.append('❌ Step3: 投稿文またはURL生成失敗')
             return '<br>'.join(log)
-        log.append(f'✅ Step2: 投稿文生成OK → {body[:40]}...')
-        log.append(f'🔗 URL: {url[:60]}...')
+        log.append(f'✅ Step3: 投稿文生成OK → {body[:40]}...')
 
-        # Step3: Xに本文ツイート
         resp = client.create_tweet(text=body)
         tweet_id = resp.data['id']
-        log.append(f'✅ Step3: ツイート投稿OK → ID={tweet_id}')
+        log.append(f'✅ Step4: ツイート投稿OK → ID={tweet_id}')
 
-        # Step4: リプライにURL
         import time as _time
         _time.sleep(3)
         client.create_tweet(
             text=f"↓ 商品はこちら\n{url}\n[楽天PR]",
             in_reply_to_tweet_id=tweet_id
         )
-        log.append('✅ Step4: リプライ（URL）投稿OK')
+        log.append('✅ Step5: リプライ（URL）投稿OK')
 
     except Exception as e:
         log.append(f'❌ 例外発生: {type(e).__name__}: {e}')
+        log.append(f'詳細: {traceback.format_exc()[-400:]}')
 
     return '<br>'.join(log)
 
