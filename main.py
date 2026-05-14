@@ -1903,6 +1903,40 @@ def ebay_guide():
 def ebay_calculator():
     return send_from_directory('.', 'ebay_calculator.html')
 
+@app.route('/note-roadmap')
+def note_roadmap():
+    import markdown
+    with open('note_roadmap_pome.md', encoding='utf-8') as f:
+        content = f.read()
+    html_body = markdown.markdown(content, extensions=['tables'])
+    html = f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>noteロードマップまとめ</title>
+<style>
+  body {{ font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.8; color: #333; }}
+  h1 {{ color: #2c3e50; border-bottom: 3px solid #e74c3c; padding-bottom: 10px; }}
+  h2 {{ color: #2c3e50; border-left: 4px solid #e74c3c; padding-left: 12px; margin-top: 40px; }}
+  h3 {{ color: #555; }}
+  table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
+  th {{ background: #2c3e50; color: white; padding: 10px; text-align: left; }}
+  td {{ border: 1px solid #ddd; padding: 10px; }}
+  tr:nth-child(even) {{ background: #f9f9f9; }}
+  code {{ background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }}
+  pre {{ background: #f4f4f4; padding: 16px; border-radius: 6px; overflow-x: auto; }}
+  blockquote {{ border-left: 4px solid #e74c3c; margin: 0; padding-left: 16px; color: #666; }}
+  ul, ol {{ padding-left: 24px; }}
+  li {{ margin: 6px 0; }}
+</style>
+</head>
+<body>
+{html_body}
+</body>
+</html>"""
+    return html
+
 @app.route('/game/rhythm')
 def game_rhythm():
     return send_from_directory('.', 'maruchan_rhythm.html')
