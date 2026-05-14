@@ -35,6 +35,11 @@ EXCLUDE_TITLE_KEYWORDS = [
     "lens", "furniture", "umbrella", "bag set lot", "ski",
 ]
 
+# ウォッチセラーリスト（seller_usernameをここに追加するとご毎日自動チェック対象になる）
+WATCHED_SELLERS = [
+    # 例: "seller_username_here",
+]
+
 DEFAULT_KEYWORDS = [
     "Japan vintage kanzashi hair pin",
     "Japan vintage brooch",
@@ -290,6 +295,90 @@ def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 40
         return []
 
 
+def _search_seller_sold_items(seller_username: str, limit: int = 10) -> list:
+    """特定セラーが最近売った商品を取得（Finding API）"""
+    url = (
+        f"{FINDING_API_URL}"
+        f"?OPERATION-NAME=findCompletedItems"
+        f"&SERVICE-VERSION=1.0.0"
+        f"&SECURITY-APPNAME={EBAY_APP_ID}"
+        f"&RESPONSE-DATA-FORMAT=JSON"
+        f"&itemFilter(0).name=SoldItemsOnly&itemFilter(0).value=true"
+        f"&itemFilter(1).name=Seller&itemFilter(1).value={urllib.parse.quote(seller_username)}"
+        f"&itemFilter(2).name=ListingType&itemFilter(2).value=FixedPrice"
+        f"&sortOrder=EndTimeSoonest"
+        f"&paginationInput.entriesPerPage={limit}"
+    )
+    try:
+        resp = requests.get(url, timeout=15)
+        if resp.status_code != 200:
+            return []
+        data = resp.json()
+        return data["findCompletedItemsResponse"][0].get(
+            "searchResult", [{}])[0].get("item", [])
+    except Exception as e:
+        print(f"Finding API error [seller:{seller_username}]: {e}")
+        return []
+
+
+def _format_seller_results(items: list, seller_username: str) -> list:
+    """セラーの売れた商品をパースして候補リスト形式に変換"""
+    results = []
+    seen = set()
+    for it in items:
+        try:
+            title = it["title"][0]
+            price = float(it["sellingStatus"][0]["convertedCurrentPrice"][0]["__value__"])
+            end_time = it["listingInfo"][0]["endTime"][0][:10]
+            if title[:30] in seen:
+                continue
+            seen.add(title[:30])
+            title_lower = title.lower()
+            if any(ex in title_lower for ex in EXCLUDE_TITLE_KEYWORDS):
+                continue
+            purchase_limit = _calc_purchase_limit(price)
+            results.append({
+                "title": title,
+                "price_usd": price,
+                "sold_date": end_time,
+                "purchase_limit": purchase_limit,
+                "mercari_url": _mercari_url(title),
+                "seller": seller_username,
+            })
+        except Exception:
+            continue
+    return results
+
+
+def check_seller_now(user_id: str, seller_username: str):
+    """LINEから即チェック：特定セラーの売れた商品をすぐに返す"""
+    try:
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"セラー「{seller_username}」の売れた商品を調べています..."
+        ))
+        items = _search_seller_sold_items(seller_username, limit=15)
+        results = _format_seller_results(items, seller_username)
+
+        if not results:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text=f"「{seller_username}」の売れた商品が見つかりませんでした。\nセラーIDが正しいか確認してください。"
+            ))
+            return
+
+        results.sort(key=lambda x: x["price_usd"], reverse=True)
+        msg = f"[{seller_username}] 最近売れた商品\n\n"
+        for i, r in enumerate(results[:7], 1):
+            msg += f"{i}. ${r['price_usd']:.0f} | {r['title'][:40]}\n"
+            msg += f"   仕入れ上限: ¥{r['purchase_limit']:,}以下 ({r['sold_date']})\n"
+            msg += f"   {r['mercari_url']}\n\n"
+        msg += f"→ 気に入ったらウォッチリストに追加できます\n「セラー登録：{seller_username}」とClaude Codeに伝えてね"
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+
+    except Exception as e:
+        print(f"check_seller_now error: {e}")
+        line_bot_api.push_message(user_id, TextSendMessage(text=f"エラーが発生しました: {str(e)[:80]}"))
+
+
 def send_daily_purchase_candidates(user_id: str):
     """毎日の仕入れ候補リストをLINEに送信"""
     try:
@@ -328,24 +417,36 @@ def send_daily_purchase_candidates(user_id: str):
                 except Exception:
                     continue
 
+        # ウォッチセラーの売れた商品も追加
+        for seller in WATCHED_SELLERS:
+            seller_items = _search_seller_sold_items(seller, limit=10)
+            time.sleep(1.2)
+            for r in _format_seller_results(seller_items, seller):
+                if r["title"][:30] not in seen_titles:
+                    seen_titles.add(r["title"][:30])
+                    r["seller_watch"] = True
+                    all_items.append(r)
+
         if not all_items:
             line_bot_api.push_message(user_id, TextSendMessage(
                 text="今日の仕入れ候補リサーチ：該当商品が見つかりませんでした。明日また確認します。"
             ))
             return
 
-        # 仕入れ上限が大きい順（利益幅が広い）にソートして上位5件
+        # 仕入れ上限が大きい順にソートして上位5件
         all_items.sort(key=lambda x: x["purchase_limit"], reverse=True)
         top = all_items[:5]
 
         today = datetime.now().strftime("%-m/%-d")
         msg = f"【今日の仕入れ候補】{today}\n\n"
         for i, r in enumerate(top, 1):
-            msg += f"{i}. ${r['price_usd']:.0f} | {r['title'][:40]}\n"
+            seller_tag = f" [{r.get('seller', '')}]" if r.get("seller_watch") else ""
+            msg += f"{i}.{seller_tag} ${r['price_usd']:.0f} | {r['title'][:38]}\n"
             msg += f"   仕入れ上限: ¥{r['purchase_limit']:,}以下\n"
             msg += f"   {r['mercari_url']}\n\n"
 
-        msg += f"合計{len(all_items)}件の売れ商品から{len(top)}件を抽出\n"
+        watch_note = f"（ウォッチ: {', '.join(WATCHED_SELLERS)}）\n" if WATCHED_SELLERS else ""
+        msg += f"合計{len(all_items)}件から{len(top)}件を抽出 {watch_note}"
         msg += "→ URLをタップしてメルカリで相場確認してね"
 
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
