@@ -609,8 +609,6 @@ def search_rakuten_items(keyword, hits=3):
             'sort': '-reviewCount',
             'format': 'json',
         }
-        if RAKUTEN_ACCESS_KEY:
-            params['accessKey'] = RAKUTEN_ACCESS_KEY
         res = requests.get(
             'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
             params=params,
