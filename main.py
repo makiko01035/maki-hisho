@@ -1734,9 +1734,10 @@ def debug_kvision():
             timeout=10
         )
         log.append(f'📡 楽天APIステータス: {res.status_code}')
+        log.append(f'📄 レスポンス本文（先頭300文字）: {res.text[:300]}')
         data = res.json()
-        if 'error' in data:
-            log.append(f'❌ 楽天APIエラー: {data.get("error")} / {data.get("error_description")}')
+        if 'error' in data or res.status_code != 200:
+            log.append(f'❌ 楽天APIエラー: {data.get("error")} / {data.get("error_description")} / {data.get("message", "")}')
             return '<br>'.join(log)
         items = data.get('Items', [])
         log.append(f'✅ Step2: 商品{len(items)}件取得')
