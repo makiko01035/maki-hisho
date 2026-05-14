@@ -612,12 +612,15 @@ def search_rakuten_items(keyword, hits=3):
         if RAKUTEN_ACCESS_KEY:
             params['accessKey'] = RAKUTEN_ACCESS_KEY
         res = requests.get(
-            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601',
+            'https://app.rakuten.co.jp/services/api/IchibaItem/Search/20170706',
             params=params,
             headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
             timeout=10
         )
         data = res.json()
+        if 'error' in data:
+            print(f"楽天API エラーレスポンス: {data}")
+            return []
         items = []
         for item_wrap in data.get('Items', []):
             i = item_wrap.get('Item', item_wrap)
