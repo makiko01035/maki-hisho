@@ -379,17 +379,22 @@ def check_seller_now(user_id: str, seller_username: str):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"エラーが発生しました: {str(e)[:80]}"))
 
 
-def send_daily_purchase_candidates(user_id: str):
+def send_daily_purchase_candidates(user_id: str, debug: bool = False):
     """毎日の仕入れ候補リストをLINEに送信"""
     try:
         all_items = []
         seen_titles = set()
+        api_errors = 0
+        raw_count = 0
 
         for kw in DAILY_RESEARCH_KEYWORDS:
             items = _search_jp_sold_one(kw)
             time.sleep(1.2)  # レートリミット対策
+            if items is None:
+                api_errors += 1
+            raw_count += len(items) if items else 0
 
-            for it in items:
+            for it in (items or []):
                 try:
                     title = it["title"][0]
                     price = float(it["sellingStatus"][0]["convertedCurrentPrice"][0]["__value__"])
@@ -428,9 +433,13 @@ def send_daily_purchase_candidates(user_id: str):
                     all_items.append(r)
 
         if not all_items:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="今日の仕入れ候補リサーチ：該当商品が見つかりませんでした。明日また確認します。"
-            ))
+            msg = f"仕入れ候補リサーチ：条件に合う商品なし\n"
+            msg += f"取得件数={raw_count}件 / APIエラー={api_errors}件\n"
+            if raw_count == 0:
+                msg += "→ Finding APIがレートリミット中の可能性あり。数時間後に再試行してみてください。"
+            else:
+                msg += f"→ {raw_count}件取得できたが価格条件($50〜$400・仕入れ¥10,000以上)をすべて外れました。"
+            line_bot_api.push_message(user_id, TextSendMessage(text=msg))
             return
 
         # 仕入れ上限が大きい順にソートして上位5件

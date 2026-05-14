@@ -1733,7 +1733,7 @@ def debug_kvision():
             headers={
                 'Referer': 'http://foodmakehealth.com',
                 'Origin': 'https://maki-hisho.onrender.com',
-                'Authorization': f'Bearer {RAKUTEN_ACCESS_KEY}',
+                'accessKey': RAKUTEN_ACCESS_KEY,
             },
             timeout=10
         )
@@ -3041,6 +3041,13 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🏷️ 楽天Roomタグ\n\n{tags}"))
         except Exception as e:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"タグ生成エラー: {str(e)[:100]}"))
+        return
+
+    # 仕入れ候補 即時実行（テスト・デバッグ兼用）
+    if user_message in ['仕入れ候補', '仕入れ候補テスト', '仕入れリサーチ']:
+        threading.Thread(
+            target=send_daily_purchase_candidates, args=(user_id,), daemon=True
+        ).start()
         return
 
     # セラーチェック（即時）
