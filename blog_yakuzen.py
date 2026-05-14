@@ -615,7 +615,7 @@ def search_rakuten_items(keyword, hits=3):
             headers={
                 'Referer': 'http://foodmakehealth.com',
                 'Origin': 'https://maki-hisho.onrender.com',
-                'Authorization': f'Bearer {RAKUTEN_ACCESS_KEY}',
+                'accessKey': RAKUTEN_ACCESS_KEY,
             },
             timeout=10
         )
