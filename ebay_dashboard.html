@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eBay 売上管理</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #333; }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header h1 { font-size: 18px; }
+        .header-btns { display: flex; gap: 8px; }
+        .sync-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .sync-btn:disabled { background: #7f8c8d; cursor: not-allowed; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 12px 16px;
+        }
+        .kpi-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        }
+        .kpi-label { font-size: 10px; color: #888; margin-bottom: 4px; }
+        .kpi-value { font-size: 18px; font-weight: bold; color: #2c3e50; }
+        .kpi-value.green { color: #27ae60; }
+        .kpi-value.orange { color: #e67e22; }
+        .kpi-value.red { color: #e74c3c; }
+
+        .section { padding: 0 12px 16px; }
+        .section-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #666;
+            padding: 10px 4px 6px;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 8px;
+        }
+
+        .order-card {
+            background: white;
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+            cursor: pointer;
+            border-left: 4px solid #ddd;
+            transition: box-shadow 0.15s;
+        }
+        .order-card:active { box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .order-card.pending  { border-left-color: #e67e22; }
+        .order-card.done     { border-left-color: #27ae60; }
+        .order-card.loss     { border-left-color: #e74c3c; }
+
+        .order-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; line-height: 1.4; color: #222; }
+        .order-meta  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .order-price { font-size: 14px; color: #2980b9; font-weight: bold; }
+        .order-date  { font-size: 11px; color: #aaa; }
+        .order-profit {
+            margin-left: auto;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .order-profit.pos { color: #27ae60; }
+        .order-profit.neg { color: #e74c3c; }
+        .order-pending { margin-left: auto; font-size: 12px; color: #e67e22; font-weight: bold; }
+
+        /* Modal bottom sheet */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 200;
+            align-items: flex-end;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            padding: 16px 20px 30px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-handle {
+            width: 40px;
+            height: 4px;
+            background: #ddd;
+            border-radius: 2px;
+            margin: 0 auto 14px;
+        }
+        .modal-date    { font-size: 11px; color: #999; margin-bottom: 3px; }
+        .modal-product { font-size: 14px; font-weight: bold; color: #222; margin-bottom: 14px; line-height: 1.4; }
+
+        .form-row   { margin-bottom: 12px; }
+        .form-label { font-size: 12px; color: #666; margin-bottom: 4px; display: block; }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            background: #fafafa;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #3498db;
+            background: white;
+        }
+        .form-input[readonly] { background: #f0f0f0; color: #888; }
+
+        .profit-preview {
+            background: #f0f9ff;
+            border-radius: 10px;
+            padding: 14px;
+            margin: 14px 0;
+            text-align: center;
+        }
+        .profit-preview-label { font-size: 11px; color: #888; margin-bottom: 2px; }
+        .profit-preview-value { font-size: 30px; font-weight: bold; }
+        .profit-preview-value.pos { color: #27ae60; }
+        .profit-preview-value.neg { color: #e74c3c; }
+        .profit-breakdown { font-size: 10px; color: #999; margin-top: 4px; line-height: 1.6; }
+
+        .btn-save {
+            width: 100%;
+            padding: 15px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 6px;
+        }
+        .btn-save:disabled { background: #95a5a6; cursor: not-allowed; }
+        .btn-cancel {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            color: #aaa;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+
+        .toast {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(44,62,80,0.92);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 400;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+        }
+        .toast.show { opacity: 1; }
+
+        .empty-state { text-align: center; padding: 40px 20px; color: #bbb; }
+        .empty-icon  { font-size: 40px; margin-bottom: 8px; }
+        .loading     { text-align: center; padding: 30px; color: #bbb; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>📦 eBay 売上管理</h1>
+    <div class="header-btns">
+        <button class="sync-btn" id="syncBtn" onclick="syncOrders()">同期</button>
+    </div>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-label">今月売上</div>
+        <div class="kpi-value" id="kpiSales">-</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">今月利益</div>
+        <div class="kpi-value green" id="kpiProfit">-</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">入力待ち</div>
+        <div class="kpi-value orange" id="kpiPending">-</div>
+    </div>
+</div>
+
+<div id="pendingSection" class="section" style="display:none">
+    <div class="section-title">⚠️ 入力待ち</div>
+    <div id="pendingList"></div>
+</div>
+
+<div class="section">
+    <div class="section-title">全注文（入力済み）</div>
+    <div id="allList"><div class="loading">読み込み中...</div></div>
+</div>
+
+<!-- 入力モーダル -->
+<div class="modal-overlay" id="modalOverlay" onclick="onOverlayClick(event)">
+    <div class="modal">
+        <div class="modal-handle"></div>
+        <div class="modal-date" id="modalDate"></div>
+        <div class="modal-product" id="modalTitle"></div>
+
+        <div class="form-row">
+            <label class="form-label">販売価格（USD）</label>
+            <input type="number" class="form-input" id="inSalePrice" readonly>
+        </div>
+        <div class="form-row">
+            <label class="form-label">仕入れ値（円）</label>
+            <input type="number" class="form-input" id="inPurchase" placeholder="例: 800" oninput="calcProfit()">
+        </div>
+        <div class="form-row">
+            <label class="form-label">発送方法</label>
+            <select class="form-select" id="inShipMethod" onchange="calcProfit()">
+                <option value="CPASS">CPASS（eBay SpeedPAK）</option>
+                <option value="船便">船便</option>
+                <option value="EMS">EMS</option>
+                <option value="その他">その他</option>
+            </select>
+        </div>
+        <div class="form-row">
+            <label class="form-label">送料（円）— CPaSSポータルの推定送料</label>
+            <input type="number" class="form-input" id="inShipping" placeholder="例: 6821" oninput="calcProfit()">
+        </div>
+        <div class="form-row">
+            <label class="form-label">為替レート（円/USD）</label>
+            <input type="number" class="form-input" id="inFxRate" value="155" oninput="calcProfit()">
+        </div>
+
+        <div class="profit-preview">
+            <div class="profit-preview-label">利益（概算）</div>
+            <div class="profit-preview-value" id="profitVal">-</div>
+            <div class="profit-breakdown" id="profitBreak"></div>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">備考（任意）</label>
+            <input type="text" class="form-input" id="inNotes" placeholder="">
+        </div>
+
+        <button class="btn-save" id="saveBtn" onclick="saveOrder()">保存</button>
+        <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let orders = [];
+let current = null;
+
+async function loadData() {
+    try {
+        const res = await fetch('/api/ebay/data');
+        const data = await res.json();
+        if (data.error) { showToast('エラー: ' + data.error); return; }
+        orders = data.orders;
+        renderAll();
+    } catch(e) {
+        document.getElementById('allList').innerHTML =
+            '<div class="empty-state"><div class="empty-icon">⚠️</div>データ取得失敗<br><small>ページを再読み込みしてください</small></div>';
+    }
+}
+
+function renderAll() {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    let mSales = 0, mProfit = 0, pendingCount = 0;
+    const pending = [], done = [];
+
+    orders.forEach(o => {
+        const isDone = o.completed === 'TRUE';
+        if (!isDone) { pending.push(o); pendingCount++; }
+        else done.push(o);
+
+        if ((o.sale_date || '').startsWith(ym)) {
+            const fx = parseFloat(o.fx_rate) || 155;
+            mSales += parseFloat(o.sale_price_usd || 0) * fx;
+            if (isDone) mProfit += parseFloat(o.profit_jpy || 0);
+        }
+    });
+
+    document.getElementById('kpiSales').textContent   = mSales   ? `¥${Math.round(mSales).toLocaleString()}`   : '-';
+    document.getElementById('kpiProfit').textContent  = mProfit  ? `¥${Math.round(mProfit).toLocaleString()}`  : '¥0';
+    document.getElementById('kpiPending').textContent = `${pendingCount}件`;
+
+    if (pending.length > 0) {
+        document.getElementById('pendingSection').style.display = 'block';
+        document.getElementById('pendingList').innerHTML = pending.map(cardHtml).join('');
+    } else {
+        document.getElementById('pendingSection').style.display = 'none';
+    }
+
+    const sorted = [...done].sort((a,b) => (b.sale_date||'').localeCompare(a.sale_date||''));
+    document.getElementById('allList').innerHTML = sorted.length
+        ? sorted.map(cardHtml).join('')
+        : '<div class="empty-state"><div class="empty-icon">📦</div>入力済みの注文はありません</div>';
+}
+
+function cardHtml(o) {
+    const done   = o.completed === 'TRUE';
+    const profit = parseFloat(o.profit_jpy || 0);
+    const cls    = !done ? 'pending' : (profit < 0 ? 'loss' : 'done');
+    const fx     = parseFloat(o.fx_rate) || 155;
+    const usd    = parseFloat(o.sale_price_usd || 0);
+    const enc    = JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    const right  = done
+        ? `<span class="order-profit ${profit>=0?'pos':'neg'}">¥${Math.round(profit).toLocaleString()}</span>`
+        : `<span class="order-pending">入力待ち ✏️</span>`;
+    return `<div class="order-card ${cls}" onclick='openModal(JSON.parse(this.dataset.o))' data-o="${enc}">
+        <div class="order-title">${o.title||'(タイトルなし)'}</div>
+        <div class="order-meta">
+            <span class="order-price">$${usd.toFixed(2)}</span>
+            <span class="order-date">${o.sale_date||''}</span>
+            ${right}
+        </div>
+    </div>`;
+}
+
+function openModal(o) {
+    current = o;
+    document.getElementById('modalDate').textContent    = `${o.sale_date||''} | $${parseFloat(o.sale_price_usd||0).toFixed(2)}`;
+    document.getElementById('modalTitle').textContent   = o.title || '';
+    document.getElementById('inSalePrice').value        = parseFloat(o.sale_price_usd||0).toFixed(2);
+    document.getElementById('inPurchase').value         = o.purchase_price_jpy || '';
+    document.getElementById('inShipMethod').value       = o.shipping_method || 'CPASS';
+    document.getElementById('inShipping').value         = o.shipping_cost_jpy || '';
+    document.getElementById('inFxRate').value           = o.fx_rate || '155';
+    document.getElementById('inNotes').value            = o.notes || '';
+    calcProfit();
+    document.getElementById('modalOverlay').classList.add('active');
+}
+
+function onOverlayClick(e) {
+    if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+    current = null;
+}
+
+function calcProfit() {
+    const usd      = parseFloat(document.getElementById('inSalePrice').value)  || 0;
+    const purchase = parseFloat(document.getElementById('inPurchase').value)    || 0;
+    const shipping = parseFloat(document.getElementById('inShipping').value)    || 0;
+    const fx       = parseFloat(document.getElementById('inFxRate').value)      || 155;
+    const salesJpy = Math.round(usd * fx);
+    const fee      = Math.round(salesJpy * 0.1325);
+    const profit   = salesJpy - purchase - shipping - fee;
+    const margin   = salesJpy > 0 ? Math.round(profit / salesJpy * 100) : 0;
+
+    const el = document.getElementById('profitVal');
+    el.textContent  = `¥${profit.toLocaleString()}`;
+    el.className    = 'profit-preview-value ' + (profit >= 0 ? 'pos' : 'neg');
+    document.getElementById('profitBreak').innerHTML =
+        `売上 ¥${salesJpy.toLocaleString()} — 仕入 ¥${purchase.toLocaleString()} — 送料 ¥${shipping.toLocaleString()} — eBay手数料 ¥${fee.toLocaleString()}<br>利益率 ${margin}%`;
+}
+
+async function saveOrder() {
+    if (!current) return;
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.textContent = '保存中...';
+    const payload = {
+        row_num:           current.row_num,
+        sale_price_usd:    parseFloat(document.getElementById('inSalePrice').value)  || 0,
+        purchase_price_jpy:parseFloat(document.getElementById('inPurchase').value)   || 0,
+        shipping_method:   document.getElementById('inShipMethod').value,
+        shipping_cost_jpy: parseFloat(document.getElementById('inShipping').value)   || 0,
+        fx_rate:           parseFloat(document.getElementById('inFxRate').value)     || 155,
+        notes:             document.getElementById('inNotes').value,
+    };
+    try {
+        const res  = await fetch('/api/ebay/update', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        showToast(`保存完了！利益: ¥${Math.round(data.profit).toLocaleString()}`);
+        closeModal();
+        await loadData();
+    } catch(e) {
+        showToast('エラー: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '保存';
+    }
+}
+
+async function syncOrders() {
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true; btn.textContent = '同期中...';
+    try {
+        const res  = await fetch('/api/ebay/sync');
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        showToast(`同期完了！ 新規 ${data.added} 件追加`);
+        await loadData();
+    } catch(e) {
+        showToast('同期失敗: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '同期';
+    }
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+loadData();
+</script>
+</body>
+</html>
