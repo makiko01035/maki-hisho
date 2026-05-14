@@ -264,8 +264,8 @@ def _mercari_url(title: str) -> str:
     return f"https://jp.mercari.com/search?keyword={q}&status=on_sale"
 
 
-def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 400.0) -> list:
-    """1キーワードで日本人セラーが売れた商品を取得（Finding API）"""
+def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 400.0):
+    """日本人セラーが売れた商品を取得（Finding API）。失敗時はNoneを返す"""
     url = (
         f"{FINDING_API_URL}"
         f"?OPERATION-NAME=findCompletedItems"
@@ -286,13 +286,64 @@ def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 40
     try:
         resp = requests.get(url, timeout=15)
         if resp.status_code != 200:
-            return []
+            print(f"Finding API [{keyword}]: HTTP {resp.status_code}")
+            return None  # エラーはNoneで返す
         data = resp.json()
         return data["findCompletedItemsResponse"][0].get(
             "searchResult", [{}])[0].get("item", [])
     except Exception as e:
         print(f"Finding API error [{keyword}]: {e}")
+        return None
+
+
+def _search_jp_browse(keyword: str, min_usd: float = 50.0, max_usd: float = 400.0) -> list:
+    """Browse APIで日本発送・現在出品中の商品を取得（Finding APIのフォールバック用）"""
+    token = get_ebay_token()
+    if not token:
         return []
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+    }
+    params = {
+        "q": keyword,
+        "filter": f"itemLocationCountry:JP,buyingOptions:{{FIXED_PRICE}},price:[{min_usd}..{max_usd}],priceCurrency:USD",
+        "sort": "newlyListed",
+        "limit": "10",
+    }
+    try:
+        resp = requests.get(EBAY_BROWSE_URL, headers=headers, params=params, timeout=15)
+        if resp.status_code != 200:
+            return []
+        return resp.json().get("itemSummaries", [])
+    except Exception as e:
+        print(f"Browse API error [{keyword}]: {e}")
+        return []
+
+
+def _browse_items_to_candidates(items: list) -> list:
+    """Browse APIの結果を仕入れ候補リスト形式に変換"""
+    results = []
+    for item in items:
+        try:
+            title = item.get("title", "")
+            price = float(item.get("price", {}).get("value", 0))
+            if not title or price <= 0:
+                continue
+            title_lower = title.lower()
+            if any(ex in title_lower for ex in EXCLUDE_TITLE_KEYWORDS):
+                continue
+            purchase_limit = _calc_purchase_limit(price)
+            results.append({
+                "title": title,
+                "price_usd": price,
+                "sold_date": "出品中",
+                "purchase_limit": purchase_limit,
+                "mercari_url": _mercari_url(title),
+            })
+        except Exception:
+            continue
+    return results
 
 
 def _search_seller_sold_items(seller_username: str, limit: int = 10) -> list:
@@ -432,13 +483,26 @@ def send_daily_purchase_candidates(user_id: str, debug: bool = False):
                     r["seller_watch"] = True
                     all_items.append(r)
 
+        # Finding APIが全件エラーならBrowse APIにフォールバック
+        using_fallback = False
+        if not all_items and api_errors == len(DAILY_RESEARCH_KEYWORDS):
+            print("Finding API全件エラー → Browse APIにフォールバック")
+            using_fallback = True
+            for kw in DAILY_RESEARCH_KEYWORDS[:5]:  # Browse APIは5キーワードに絞る
+                browse_items = _search_jp_browse(kw)
+                for r in _browse_items_to_candidates(browse_items):
+                    if r["title"][:30] not in seen_titles and r["purchase_limit"] >= 10000:
+                        seen_titles.add(r["title"][:30])
+                        all_items.append(r)
+                time.sleep(0.5)
+
         if not all_items:
             msg = f"仕入れ候補リサーチ：条件に合う商品なし\n"
             msg += f"取得件数={raw_count}件 / APIエラー={api_errors}件\n"
-            if raw_count == 0:
-                msg += "→ Finding APIがレートリミット中の可能性あり。数時間後に再試行してみてください。"
+            if api_errors > 0:
+                msg += "→ Finding APIのレートリミットが継続中。明朝6:30に再試行します。"
             else:
-                msg += f"→ {raw_count}件取得できたが価格条件($50〜$400・仕入れ¥10,000以上)をすべて外れました。"
+                msg += f"→ {raw_count}件取得できたが価格条件($50〜$400)を外れました。"
             line_bot_api.push_message(user_id, TextSendMessage(text=msg))
             return
 
@@ -447,7 +511,8 @@ def send_daily_purchase_candidates(user_id: str, debug: bool = False):
         top = all_items[:5]
 
         today = datetime.now().strftime("%-m/%-d")
-        msg = f"【今日の仕入れ候補】{today}\n\n"
+        fallback_note = "※売れ筋APIが一時停止中のため現在出品中の商品を表示\n\n" if using_fallback else "\n"
+        msg = f"【今日の仕入れ候補】{today}\n{fallback_note}"
         for i, r in enumerate(top, 1):
             seller_tag = f" [{r.get('seller', '')}]" if r.get("seller_watch") else ""
             msg += f"{i}.{seller_tag} ${r['price_usd']:.0f} | {r['title'][:38]}\n"
