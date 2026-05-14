@@ -1726,12 +1726,15 @@ def debug_kvision():
             'hits': 3,
             'sort': '-reviewCount',
             'format': 'json',
-            'accessKey': RAKUTEN_ACCESS_KEY,
         }
         res = _requests.get(
             'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
             params=params,
-            headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
+            headers={
+                'Referer': 'http://foodmakehealth.com',
+                'Origin': 'https://maki-hisho.onrender.com',
+                'Authorization': f'Bearer {RAKUTEN_ACCESS_KEY}',
+            },
             timeout=10
         )
         log.append(f'📡 楽天APIステータス: {res.status_code}')
