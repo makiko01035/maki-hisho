@@ -259,7 +259,7 @@ def _mercari_url(title: str) -> str:
     return f"https://jp.mercari.com/search?keyword={q}&status=on_sale"
 
 
-def _search_jp_sold_one(keyword: str, min_usd: float = 12.0, max_usd: float = 80.0) -> list:
+def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 400.0) -> list:
     """1キーワードで日本人セラーが売れた商品を取得（Finding API）"""
     url = (
         f"{FINDING_API_URL}"
@@ -315,7 +315,7 @@ def send_daily_purchase_candidates(user_id: str):
                     seen_titles.add(title[:30])
 
                     purchase_limit = _calc_purchase_limit(price)
-                    if purchase_limit < 300:  # 仕入れ上限が低すぎるものは除外
+                    if purchase_limit < 10000:  # ¥10,000未満は除外
                         continue
 
                     all_items.append({
