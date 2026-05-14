@@ -1715,8 +1715,9 @@ def debug_kvision():
         from blog_yakuzen import RAKUTEN_APP_ID, RAKUTEN_AFFILIATE_ID, RAKUTEN_ACCESS_KEY
         genre = random.choice(TRAVEL_GENRES)
         log.append(f'📦 Step2: ジャンル={genre["name"]}')
-        log.append(f'🔑 RAKUTEN_APP_ID: {"✅ あり" if RAKUTEN_APP_ID else "❌ なし"}')
-        log.append(f'🔑 RAKUTEN_AFFILIATE_ID: {"✅ あり" if RAKUTEN_AFFILIATE_ID else "❌ なし"}')
+        log.append(f'🔑 RAKUTEN_APP_ID: {"✅ あり → " + repr(RAKUTEN_APP_ID[:12]) if RAKUTEN_APP_ID else "❌ なし"}')
+        log.append(f'🔑 RAKUTEN_AFFILIATE_ID: {"✅ あり → " + repr(RAKUTEN_AFFILIATE_ID[:12]) if RAKUTEN_AFFILIATE_ID else "❌ なし"}')
+        log.append(f'🔑 RAKUTEN_ACCESS_KEY: {"✅ あり → " + repr(RAKUTEN_ACCESS_KEY[:12]) if RAKUTEN_ACCESS_KEY else "❌ なし"}')
 
         params = {
             'applicationId': RAKUTEN_APP_ID,
