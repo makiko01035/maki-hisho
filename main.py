@@ -13,7 +13,7 @@ from googleapiclient.discovery import build
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
-from ebay_handler import run_ebay_research, send_daily_purchase_candidates
+from ebay_handler import run_ebay_research, send_daily_purchase_candidates, check_seller_now
 from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
@@ -1726,6 +1726,7 @@ def debug_kvision():
             'hits': 3,
             'sort': '-reviewCount',
             'format': 'json',
+            'accessKey': RAKUTEN_ACCESS_KEY,
         }
         res = _requests.get(
             'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
@@ -2890,6 +2891,15 @@ def handle_message(event):
         except Exception as e:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"タグ生成エラー: {str(e)[:100]}"))
         return
+
+    # セラーチェック（即時）
+    seller_check_prefixes = ['セラーチェック：', 'セラーチェック:', 'セラー確認：', 'セラー確認:']
+    for prefix in seller_check_prefixes:
+        if user_message.startswith(prefix):
+            seller_name = user_message[len(prefix):].strip()
+            if seller_name:
+                threading.Thread(target=check_seller_now, args=(user_id, seller_name), daemon=True).start()
+            return
 
     # eBayリサーチ
     ebay_research_keywords = ['eBayリサーチ', 'ebayリサーチ', 'eBay リサーチ', 'eBayリサーチして', '物販リサーチ', 'リサーチして']

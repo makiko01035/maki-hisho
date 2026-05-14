@@ -608,6 +608,7 @@ def search_rakuten_items(keyword, hits=3):
             'hits': hits,
             'sort': '-reviewCount',
             'format': 'json',
+            'accessKey': RAKUTEN_ACCESS_KEY,
         }
         res = requests.get(
             'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
