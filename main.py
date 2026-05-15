@@ -1728,9 +1728,7 @@ def post_kvision_card_now():
     """今すぐ楽天カード誘導ツイートを送る（手動テスト用）"""
     try:
         post_kvision_card_tweet()
-        card_url = os.environ.get('RAKUTEN_CARD_AFF_URL', '')
-        mode = 'URL付きスレッド形式' if card_url else 'テキストのみ（RAKUTEN_CARD_AFF_URL未設定）'
-        return f'✅ @kvision_m 楽天カード誘導ツイート完了！モード：{mode}'
+        return '✅ @kvision_m 楽天カード誘導ツイート完了！（スレッド形式・URLランダム）'
     except Exception as e:
         return f'❌ エラー: {e}', 500
 
@@ -4769,34 +4767,52 @@ CARD_TWEETS = [
     "旅行貯金を楽天カードのポイントで賄ってる。現金じゃないから心理的ハードルが低くて続いてる",
 ]
 
+RAKUTEN_CARD_AFF_URLS = [
+    "https://a.r10.to/hkZjJw",
+    "https://a.r10.to/h5E1Na",
+    "https://a.r10.to/h5yRmz",
+    "https://a.r10.to/h5v161",
+    "https://a.r10.to/h55SLT",
+    "https://a.r10.to/hksjy7",
+    "https://a.r10.to/h5MZJX",
+    "https://a.r10.to/hYrRdd",
+    "https://a.r10.to/h5aOuJ",
+    "https://a.r10.to/h57LDq",
+]
+
 CARD_AFF_TWEETS_WITH_URL = [
     "楽天カード、旅行好きには正直マストだと思ってる。楽天トラベルのポイント還元が段違い\n\n詳細はこちら↓",
     "子連れ旅行のコスト、楽天カードのポイントで少し軽くできてる。年会費無料でこの恩恵は大きい\n\n詳細はこちら↓",
     "楽天プレミアムカードの空港ラウンジ特典、旅行好きなら元が取れる。子連れ出発前の待機場所として最高\n\n詳細はこちら↓",
+    "旅行前にとりあえず楽天カードで予約する癖をつけてから、ポイントがどんどん貯まるようになった\n\n詳細はこちら↓",
+    "楽天カードの旅行保険、カードで予約するだけで付帯されるの知ってた？子連れ旅行なら絶対確認して\n\n詳細はこちら↓",
+    "子ども連れの旅費って地味にかさむ。楽天カードのポイント還元で少しでも圧縮するのがマイルール\n\n詳細はこちら↓",
+    "楽天マラソン前に楽天カード作っておくと、まとめ買いのポイントが倍以上変わる話\n\n詳細はこちら↓",
 ]
 
 
+def _pick_card_url():
+    """楽天カードアフィURLをランダムに1つ返す"""
+    import random
+    return random.choice(RAKUTEN_CARD_AFF_URLS)
+
+
 def post_kvision_card_tweet():
-    """週2回（水・土）昼12:30：楽天カード誘導ツイート（URL設定済みならスレッド形式）"""
+    """週2回（水・土）昼12:30：楽天カード誘導ツイート（スレッド形式）"""
     import random, time as _time
     try:
         client = _get_kvision_x_client()
         if not client:
             print("KVISION X API keys not configured, skipping card tweet")
             return
-        card_url = os.environ.get('RAKUTEN_CARD_AFF_URL', '').strip()
-        if card_url:
-            text = random.choice(CARD_AFF_TWEETS_WITH_URL)
-            resp = client.create_tweet(text=text)
-            tweet_id = resp.data['id']
-            _time.sleep(3)
-            client.create_tweet(
-                text=f"{card_url}\n[楽天PR]",
-                in_reply_to_tweet_id=tweet_id
-            )
-        else:
-            text = random.choice(CARD_TWEETS)
-            client.create_tweet(text=text)
+        text = random.choice(CARD_AFF_TWEETS_WITH_URL)
+        resp = client.create_tweet(text=text)
+        tweet_id = resp.data['id']
+        _time.sleep(3)
+        client.create_tweet(
+            text=f"{_pick_card_url()}\n[楽天PR]",
+            in_reply_to_tweet_id=tweet_id
+        )
         print("kvision card tweet successful")
     except Exception as e:
         print(f"post_kvision_card_tweet error: {e}")
@@ -4877,19 +4893,14 @@ def post_koharu_threads_aff_auto():
 
 
 def post_koharu_threads_card():
-    """こはるまま Threads週2回（水・土）12:30：楽天カード誘導"""
+    """こはるまま Threads週2回（水・土）12:30：楽天カード誘導（スレッド形式）"""
     import random, time as _time
     try:
-        card_url = os.environ.get('RAKUTEN_CARD_AFF_URL', '').strip()
-        if card_url:
-            text = random.choice(CARD_AFF_TWEETS_WITH_URL)
-            post_id = _post_to_koharu_threads(text)
-            if post_id:
-                _time.sleep(5)
-                _post_to_koharu_threads(f"{card_url}\n[楽天PR]", reply_to_id=post_id)
-        else:
-            text = random.choice(CARD_TWEETS)
-            _post_to_koharu_threads(text)
+        text = random.choice(CARD_AFF_TWEETS_WITH_URL)
+        post_id = _post_to_koharu_threads(text)
+        if post_id:
+            _time.sleep(5)
+            _post_to_koharu_threads(f"{_pick_card_url()}\n[楽天PR]", reply_to_id=post_id)
         print("koharu threads card post successful")
     except Exception as e:
         print(f"post_koharu_threads_card error: {e}")
