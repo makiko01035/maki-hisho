@@ -1940,9 +1940,22 @@ def ebay_debug():
         'EBAY_APP_ID_set':         bool(os.environ.get('EBAY_APP_ID', '')),
         'EBAY_CERT_ID_set':        bool(os.environ.get('EBAY_CERT_ID', '')),
     }
+    # Sheetsの詳細テスト
     try:
-        creds = get_sheets_creds()
-        result['sheets_creds_ok'] = creds is not None
+        from google.oauth2.credentials import Credentials as GCreds
+        from google.auth.transport.requests import Request as GRequest
+        raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
+        data = json.loads(raw)
+        result['token_keys'] = list(data.keys())
+        info = {
+            'client_id': data['client_id'], 'client_secret': data['client_secret'],
+            'refresh_token': data['refresh_token'],
+            'token_uri': data.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            'type': 'authorized_user',
+        }
+        creds = GCreds.from_authorized_user_info(info, scopes=['https://www.googleapis.com/auth/spreadsheets'])
+        creds.refresh(GRequest())
+        result['sheets_creds_ok'] = True
     except Exception as e:
         result['sheets_creds_ok'] = False
         result['sheets_error'] = traceback.format_exc()
