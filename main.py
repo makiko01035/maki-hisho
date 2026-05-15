@@ -1885,27 +1885,27 @@ def get_ebay_user_token():
     return resp.json().get("access_token")
 
 def get_sheets_creds():
+    """google-authライブラリを使わず直接HTTPでアクセストークンを取得してCredentialsを返す"""
     from google.oauth2.credentials import Credentials as GCreds
-    from google.auth.transport.requests import Request as GRequest
     raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
     try:
-        if raw:
-            data = json.loads(raw)
-        else:
-            with open('token_sheets.json', encoding='utf-8') as f:
-                data = json.load(f)
-        info = {
-            'client_id':     data['client_id'],
-            'client_secret': data['client_secret'],
-            'refresh_token': data['refresh_token'],
-            'token_uri':     data.get('token_uri', 'https://oauth2.googleapis.com/token'),
-            'type':          'authorized_user',
-        }
-        creds = GCreds.from_authorized_user_info(
-            info, scopes=['https://www.googleapis.com/auth/spreadsheets']
+        data = json.loads(raw) if raw else json.load(open('token_sheets.json', encoding='utf-8'))
+        resp = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'client_id':     data['client_id'],
+                'client_secret': data['client_secret'],
+                'refresh_token': data['refresh_token'],
+                'grant_type':    'refresh_token',
+            },
+            timeout=10,
         )
-        creds.refresh(GRequest())
-        return creds
+        result = resp.json()
+        token = result.get('access_token')
+        if not token:
+            print(f"[get_sheets_creds] token取得失敗: {result}")
+            return None
+        return GCreds(token=token)
     except Exception as e:
         print(f"[get_sheets_creds error] {e}")
         return None
@@ -1938,22 +1938,25 @@ def ebay_debug():
         'EBAY_APP_ID_set':         bool(os.environ.get('EBAY_APP_ID', '')),
         'EBAY_CERT_ID_set':        bool(os.environ.get('EBAY_CERT_ID', '')),
     }
-    # Sheetsの詳細テスト
+    # Sheetsの詳細テスト（直接HTTPリクエスト）
     try:
-        from google.oauth2.credentials import Credentials as GCreds
-        from google.auth.transport.requests import Request as GRequest
         raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
         data = json.loads(raw)
         result['token_keys'] = list(data.keys())
-        info = {
-            'client_id': data['client_id'], 'client_secret': data['client_secret'],
-            'refresh_token': data['refresh_token'],
-            'token_uri': data.get('token_uri', 'https://oauth2.googleapis.com/token'),
-            'type': 'authorized_user',
-        }
-        creds = GCreds.from_authorized_user_info(info, scopes=['https://www.googleapis.com/auth/spreadsheets'])
-        creds.refresh(GRequest())
-        result['sheets_creds_ok'] = True
+        result['refresh_token_prefix'] = data.get('refresh_token', '')[:15]
+        resp = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'client_id':     data['client_id'],
+                'client_secret': data['client_secret'],
+                'refresh_token': data['refresh_token'],
+                'grant_type':    'refresh_token',
+            },
+            timeout=10,
+        )
+        r = resp.json()
+        result['google_token_response'] = {k: v for k, v in r.items() if k != 'access_token'}
+        result['sheets_creds_ok'] = 'access_token' in r
     except Exception as e:
         result['sheets_creds_ok'] = False
         result['sheets_error'] = traceback.format_exc()
