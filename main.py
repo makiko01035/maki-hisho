@@ -4900,11 +4900,56 @@ def _get_all_kvision_genres():
     return TRAVEL_GENRES + _get_monthly_kvision_genres()
 
 
+# まきが選んだ固定アフィ商品ストック（URL直指定・投稿文もまきのコメントベース）
+FIXED_AFF_POSTS = [
+    {
+        'name': 'ポケットチェア',
+        'body': "庭ピクのときとかも大活躍\n折りたためるポケットチェア、アウトドアも運動会も持って行けるサイズ感がちょうどいい",
+        'url': 'https://a.r10.to/hXxfyW',
+    },
+    {
+        'name': 'ネッククーラー',
+        'body': "これからの季節あったら絶対便利\n熱中症予防に早めに用意しておきたいやつ。子連れのお出かけ前の準備リストに入れてる",
+        'url': 'https://a.r10.to/hgY7sa',
+    },
+    {
+        'name': 'ピクニックマット',
+        'body': "庭ピクするのにもいつも使ってる\n天気のいい休みの日は庭でピクニックが定番。1枚あると出番がとにかく多い",
+        'url': 'https://a.r10.to/hkV4yh',
+    },
+]
+
+
+def _post_kvision_fixed_aff(post, client, time_module):
+    """固定アフィ商品をXにスレッド形式で投稿"""
+    resp = client.create_tweet(text=post['body'])
+    tweet_id = resp.data['id']
+    time_module.sleep(3)
+    client.create_tweet(
+        text=f"↓ 商品はこちら\n{post['url']}\n[楽天PR]",
+        in_reply_to_tweet_id=tweet_id
+    )
+    print(f"kvision fixed aff post ({post['name']}) successful")
+
+
 def post_kvision_travel_aff_auto():
-    """日付ベースでジャンルをローテーション（固定＋月替わり）して夜アフィ投稿"""
-    all_genres = _get_all_kvision_genres()
-    slot = datetime.now().day % len(all_genres)
-    post_kvision_travel_aff(slot)
+    """日付ベースでローテーション。3日に1回は固定アフィストックから投稿"""
+    import time as _time
+    day = datetime.now().day
+    if FIXED_AFF_POSTS and day % 3 == 0:
+        post = FIXED_AFF_POSTS[(day // 3) % len(FIXED_AFF_POSTS)]
+        client = _get_kvision_x_client()
+        if not client:
+            print("KVISION X API keys not configured, skipping")
+            return
+        try:
+            _post_kvision_fixed_aff(post, client, _time)
+        except Exception as e:
+            print(f"post_kvision_fixed_aff error: {e}")
+    else:
+        all_genres = _get_all_kvision_genres()
+        slot = day % len(all_genres)
+        post_kvision_travel_aff(slot)
 
 
 # ========== 楽天カード誘導ツイート ==========
@@ -5026,10 +5071,22 @@ def post_koharu_threads_morning():
 
 
 def post_koharu_threads_aff_auto():
-    """こはるまま Threads夜20:00：旅行グッズアフィ投稿（日付ローテーション・Xとずらす）"""
+    """こはるまま Threads夜20:00：旅行グッズアフィ投稿（日付ローテーション・Xとずらす）3日に1回は固定ストック"""
     import time as _time
+    day = datetime.now().day
+    if FIXED_AFF_POSTS and (day + 1) % 3 == 0:
+        post = FIXED_AFF_POSTS[((day + 1) // 3) % len(FIXED_AFF_POSTS)]
+        try:
+            post_id = _post_to_koharu_threads(post['body'])
+            if post_id:
+                _time.sleep(5)
+                _post_to_koharu_threads(f"↓ 商品はこちら\n{post['url']}\n[楽天PR]", reply_to_id=post_id)
+            print(f"koharu threads fixed aff post ({post['name']}) successful")
+        except Exception as e:
+            print(f"koharu threads fixed aff error: {e}")
+        return
     all_genres = _get_all_kvision_genres()
-    slot = (datetime.now().day + 3) % len(all_genres)
+    slot = (day + 3) % len(all_genres)
     genre = all_genres[slot]
     try:
         body, url = _fetch_travel_suggestion(genre)
