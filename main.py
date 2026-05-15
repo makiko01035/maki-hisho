@@ -1889,7 +1889,9 @@ def get_sheets_creds():
     from google.oauth2.credentials import Credentials as GCreds
     raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
     try:
-        data = json.loads(raw) if raw else json.load(open('token_sheets.json', encoding='utf-8'))
+        import re
+        clean = re.sub(r'[\x00-\x1f\x7f]', '', raw) if raw else ''
+        data = json.loads(clean) if clean else json.load(open('token_sheets.json', encoding='utf-8'))
         resp = requests.post(
             'https://oauth2.googleapis.com/token',
             data={
@@ -1940,8 +1942,10 @@ def ebay_debug():
     }
     # Sheetsの詳細テスト（直接HTTPリクエスト）
     try:
+        import re
         raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
-        data = json.loads(raw)
+        clean = re.sub(r'[\x00-\x1f\x7f]', '', raw)
+        data = json.loads(clean)
         result['token_keys'] = list(data.keys())
         result['refresh_token_prefix'] = data.get('refresh_token', '')[:15]
         resp = requests.post(
@@ -2986,6 +2990,22 @@ def handle_message(event):
     if any(kw in user_message for kw in work_log_keywords):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📋 今日の業務ログを確認中です..."))
         threading.Thread(target=send_daily_work_log).start()
+        return
+
+    # 日記メモ（「メモ」改行形式 → Notionの今日の日記ページに追記）
+    if user_message.startswith('メモ\n'):
+        memo_text = user_message.split('\n', 1)[1].strip()
+        if memo_text:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📓 日記に追記中..."))
+            def _add_diary():
+                ok = add_diary_memo(memo_text)
+                uid = os.environ.get('LINE_USER_ID', '')
+                if uid:
+                    msg = "✅ 日記に追記しました！" if ok else "❌ 追記に失敗しました（NOTION_TOKENを確認）"
+                    line_bot_api.push_message(uid, TextSendMessage(text=msg))
+            threading.Thread(target=_add_diary).start()
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📝 2行目にメモ内容を書いてください\n例：\nメモ\n今日の外来、更年期が多かった"))
         return
 
     # 勉強ノートへのメモ追加
@@ -4237,6 +4257,73 @@ def add_study_memo(memo_text):
         headers=headers, json=update_payload
     )
     return r2.status_code in (200, 201)
+
+
+def find_or_create_diary_page(notion_token, today_str):
+    """今日の日記ページをNotionで探す。なければ作成して返す"""
+    import requests as req
+    headers = {
+        "Authorization": f"Bearer {notion_token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    # 検索APIで今日の日記ページを探す
+    r = req.post("https://api.notion.com/v1/search",
+        headers=headers,
+        json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 20}
+    )
+    if r.status_code == 200:
+        for page in r.json().get("results", []):
+            props = page.get("properties", {})
+            date_val = props.get("日付", {}).get("date") or {}
+            if date_val.get("start") == today_str:
+                return page["id"]
+
+    # 見つからなければDBに新規作成
+    db_id = "323f8d6d-41de-8082-9c88-e476d05c2a0a"
+    r2 = req.post("https://api.notion.com/v1/pages",
+        headers=headers,
+        json={
+            "parent": {"database_id": db_id},
+            "properties": {
+                "今日やること": {"title": [{"text": {"content": "日記"}}]},
+                "日付": {"date": {"start": today_str}}
+            }
+        }
+    )
+    if r2.status_code == 200:
+        return r2.json()["id"]
+    return None
+
+
+def add_diary_memo(memo_text):
+    """LINEからのメモを今日の日記ページに時刻付きで追記する"""
+    import requests as req
+    notion_token = os.environ.get('NOTION_TOKEN', '')
+    if not notion_token:
+        return False
+    now = datetime.datetime.now(JST)
+    today_str = now.strftime('%Y-%m-%d')
+    time_str = now.strftime('%H:%M')
+    page_id = find_or_create_diary_page(notion_token, today_str)
+    if not page_id:
+        return False
+    r = req.patch(
+        f"https://api.notion.com/v1/blocks/{page_id}/children",
+        headers={
+            "Authorization": f"Bearer {notion_token}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+        },
+        json={"children": [{
+            "object": "block",
+            "type": "bulleted_list_item",
+            "bulleted_list_item": {
+                "rich_text": [{"type": "text", "text": {"content": f"{time_str} {memo_text}"}}]
+            }
+        }]}
+    )
+    return r.status_code == 200
 
 
 def auto_improve_tweet_stock(top_tweets_text, analysis_text):
