@@ -1855,31 +1855,28 @@ def get_ebay_user_token():
     return resp.json().get("access_token")
 
 def get_sheets_creds():
+    from google.oauth2.credentials import Credentials as GCreds
+    from google.auth.transport.requests import Request as GRequest
     raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
-    if raw:
-        try:
-            data = json.loads(raw)
-            from google.oauth2.credentials import Credentials as GCreds
-            return GCreds(
-                token=data.get('token'),
-                refresh_token=data.get('refresh_token'),
-                client_id=data.get('client_id'),
-                client_secret=data.get('client_secret'),
-                token_uri='https://oauth2.googleapis.com/token',
-                scopes=data.get('scopes', ['https://www.googleapis.com/auth/spreadsheets']),
-            )
-        except Exception:
-            return None
     try:
-        from google.oauth2.credentials import Credentials as GCreds
-        from google.auth.transport.requests import Request as GRequest
-        creds = GCreds.from_authorized_user_file(
-            'token_sheets.json', ['https://www.googleapis.com/auth/spreadsheets']
+        if raw:
+            data = json.loads(raw)
+        else:
+            with open('token_sheets.json', encoding='utf-8') as f:
+                data = json.load(f)
+        creds = GCreds(
+            token=data.get('token'),
+            refresh_token=data.get('refresh_token'),
+            client_id=data.get('client_id'),
+            client_secret=data.get('client_secret'),
+            token_uri=data.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            scopes=data.get('scopes', ['https://www.googleapis.com/auth/spreadsheets']),
         )
-        if creds and creds.expired and creds.refresh_token:
+        if not creds.valid:
             creds.refresh(GRequest())
         return creds
-    except Exception:
+    except Exception as e:
+        print(f"[get_sheets_creds error] {e}")
         return None
 
 def ensure_ebay_mgmt_sheet(service):
@@ -1938,7 +1935,9 @@ def ebay_update_api():
         ebay_fee      = round(sales_jpy * 0.1325)
         profit        = sales_jpy - round(purchase) - round(ship_cost) - ebay_fee
 
-        creds   = get_sheets_creds()
+        creds = get_sheets_creds()
+        if not creds:
+            return jsonify({"error": "Google Sheets認証エラー"}), 500
         service = build("sheets", "v4", credentials=creds)
         service.spreadsheets().values().update(
             spreadsheetId=EBAY_MGMT_SHEET_ID,
@@ -3769,6 +3768,10 @@ QUOTE_TWEET_TEMPLATES = [
     # ── 楽天API・外部API保守 ──
     "外部APIは突然動かなくなる。楽天APIのエンドポイントがいつの間にか旧仕様→廃止になってた。気づいたのはデバッグ中。新エンドポイントに1行変えたら動いた。自動化の仕組みは「作って終わり」じゃなくて、たまに動作確認が必要だと学んだ。 #AI副業 #ClaudeCode #自動化",
     "複数のXアカウントをClaude Codeで自動管理できるようになった。キー4つ・関数1本・スケジューラー1行。アカウントが増えても同じパターンで追加できる。仕組みを作るのは最初だけで、あとは全部自動。 #AI副業 #X運用 #自動化",
+    # ── eBay初売れ・仕入れ自動化 ──
+    "eBay初売れした。メルカリで仕入れてeBayで出品、初めての海外への販売。ドキドキしながら通知を確認したら本当に売れてた。ゼロから積み上げてきた感じがちゃんとある。 #AI副業 #eBay #ワーママ副業",
+    "毎朝LINEに『今日の仕入れ候補』が届くようにした。eBayで日本人セラーが売れた商品を自動リサーチして、メルカリ相場確認URLと仕入れ上限も一緒に届く。朝起きたら見るだけ。 #Claude #AI副業 #自動化",
+    "気になるeBayセラーをLINEで即追跡できるようにした。セラーIDを送ると売れた商品・価格・仕入れ上限をすぐ返してくれる。競合調査が秒で終わる。 #Claude #AI副業 #eBay",
 ]
 
 
