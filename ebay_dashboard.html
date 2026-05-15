@@ -282,6 +282,11 @@
 let orders = [];
 let current = null;
 
+function fmtJPY(n) {
+    n = Math.round(n);
+    return n < 0 ? `-¥${Math.abs(n).toLocaleString()}` : `¥${n.toLocaleString()}`;
+}
+
 async function loadData() {
     try {
         const res = await fetch('/api/ebay/data');
@@ -313,8 +318,8 @@ function renderAll() {
         }
     });
 
-    document.getElementById('kpiSales').textContent   = mSales   ? `¥${Math.round(mSales).toLocaleString()}`   : '-';
-    document.getElementById('kpiProfit').textContent  = mProfit  ? `¥${Math.round(mProfit).toLocaleString()}`  : '¥0';
+    document.getElementById('kpiSales').textContent   = mSales   ? fmtJPY(mSales)   : '-';
+    document.getElementById('kpiProfit').textContent  = mProfit  ? fmtJPY(mProfit)  : '¥0';
     document.getElementById('kpiPending').textContent = `${pendingCount}件`;
 
     if (pending.length > 0) {
@@ -338,7 +343,7 @@ function cardHtml(o) {
     const usd    = parseFloat(o.sale_price_usd || 0);
     const enc    = JSON.stringify(o).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     const right  = done
-        ? `<span class="order-profit ${profit>=0?'pos':'neg'}">¥${Math.round(profit).toLocaleString()}</span>`
+        ? `<span class="order-profit ${profit>=0?'pos':'neg'}">${fmtJPY(profit)}</span>`
         : `<span class="order-pending">入力待ち ✏️</span>`;
     return `<div class="order-card ${cls}" onclick='openModal(JSON.parse(this.dataset.o))' data-o="${enc}">
         <div class="order-title">${o.title||'(タイトルなし)'}</div>
@@ -383,10 +388,10 @@ function calcProfit() {
     const margin   = salesJpy > 0 ? Math.round(profit / salesJpy * 100) : 0;
 
     const el = document.getElementById('profitVal');
-    el.textContent  = `¥${profit.toLocaleString()}`;
+    el.textContent  = fmtJPY(profit);
     el.className    = 'profit-preview-value ' + (profit >= 0 ? 'pos' : 'neg');
     document.getElementById('profitBreak').innerHTML =
-        `売上 ¥${salesJpy.toLocaleString()} — 仕入 ¥${purchase.toLocaleString()} — 送料 ¥${shipping.toLocaleString()} — eBay手数料 ¥${fee.toLocaleString()}<br>利益率 ${margin}%`;
+        `売上 ${fmtJPY(salesJpy)} — 仕入 ${fmtJPY(purchase)} — 送料 ${fmtJPY(shipping)} — eBay手数料 ${fmtJPY(fee)}<br>利益率 ${margin}%`;
 }
 
 async function saveOrder() {
@@ -406,7 +411,7 @@ async function saveOrder() {
         const res  = await fetch('/api/ebay/update', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        showToast(`保存完了！利益: ¥${Math.round(data.profit).toLocaleString()}`);
+        showToast(`保存完了！利益: ${fmtJPY(data.profit)}`);
         closeModal();
         await loadData();
     } catch(e) {
