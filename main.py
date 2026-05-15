@@ -1753,6 +1753,26 @@ def post_koharu_threads_morning_now():
         return f'❌ エラー: {e}', 500
 
 
+@app.route('/post-mako-threads-now')
+def post_mako_threads_now():
+    """今すぐMAKOのThreadsにアフィ投稿を送る（手動テスト用）"""
+    try:
+        post_mako_threads_aff_auto()
+        return '✅ MAKO Threads アフィ投稿完了！Threadsアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@app.route('/post-mako-threads-morning-now')
+def post_mako_threads_morning_now():
+    """今すぐMAKOのThreadsに朝の共感投稿を送る（手動テスト用）"""
+    try:
+        post_mako_threads_morning()
+        return '✅ MAKO Threads 朝投稿完了！Threadsアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @app.route('/post-threads-now')
 def post_threads_now():
     """今すぐThreadsに楽天アフィ投稿を1本送る（手動トリガー）"""
@@ -2255,12 +2275,24 @@ def auth_threads_callback():
     if long_res.status_code != 200:
         return f'長期トークン取得エラー: {long_res.status_code} {long_res.text}', 400
     long_token = long_res.json().get('access_token')
+    user_id_val = res.json().get('user_id', '（取得できませんでした）')
+    account = request.args.get('account', 'koharu')
+    if account == 'mako':
+        token_key = 'MAKO_THREADS_ACCESS_TOKEN'
+        uid_key = 'MAKO_THREADS_USER_ID'
+        label = 'MAKO'
+    else:
+        token_key = 'KOHARU_THREADS_ACCESS_TOKEN'
+        uid_key = 'KOHARU_THREADS_USER_ID'
+        label = 'こはるまま'
     return f'''<html><body>
-<h2>✅ Threads認証成功！</h2>
-<p>以下をRenderの環境変数にコピペしてください：</p>
-<p><b>THREADS_ACCESS_TOKEN:</b><br>
+<h2>✅ {label} Threads認証成功！</h2>
+<p>以下2つをRenderの環境変数にコピペしてください：</p>
+<p><b>{token_key}:</b><br>
 <textarea rows="4" cols="80">{long_token}</textarea></p>
-<p><small>このトークンは60日間有効です。期限が切れたら再度 /auth/threads にアクセスしてください。</small></p>
+<p><b>{uid_key}:</b><br>
+<textarea rows="1" cols="80">{user_id_val}</textarea></p>
+<p><small>トークンは60日間有効。期限切れになったら /auth/threads?account={account} に再アクセスしてください。</small></p>
 </body></html>'''
 
 
@@ -4718,6 +4750,29 @@ TRAVEL_HOOKS = [
     "おでかけバッグに毎回入れてるのが",
 ]
 
+MAKO_THREADS_MORNING = [
+    "夜中に何度も目が覚める…\n\nそういう方、思った以上に多いんです。\n\n「眠れない」より「眠りが浅い」という感覚。\n\n原因の一つに、就寝後の体温調節がうまくいっていないことがあるかもしれません。\n\n入浴で体を温めてから自然に冷ます流れが、深い眠りに入りやすくなる方もいます。",
+    "夜になると考えすぎてしまう、という方いませんか？\n\n頭が静まらないまま布団に入ると、なかなか眠れないことも。\n\n東洋医学的には「心」の気が乱れている状態かもしれません。\n\nゆっくり吐く呼吸を意識するだけで、少し落ち着く方もいます。",
+    "疲れているのに眠れない…\n\nこれって結構つらいですよね。\n\n「疲労」と「眠気」は別物で、体は疲れていても脳が興奮していると眠れないことがあります。\n\n就寝1時間前にブルーライトを避けると、改善した方もいます。\n\n小さなことですが、試してみる価値はあるかもしれません。",
+    "更年期に入ってから眠りが浅くなった、という声を聞くことがあります。\n\nエストロゲンの変動が自律神経に影響し、体温調節が乱れやすくなることが関係しているかもしれません。\n\n薬膳的には、血を補う食材（なつめ・クコの実・黒ごまなど）が助けになるという方もいます。",
+    "睡眠は「量」より「質」という話があります。\n\n6時間でも深く眠れる方もいれば、8時間眠っても疲れが取れない方もいます。\n\n睡眠の質に関わる要素は体温・光・音・寝具・ストレスなど様々。\n\n一つずつ試してみるのが遠回りに見えて近道かもしれません。",
+    "子育て中のママって、眠れない理由が本当に多いですよね。\n\n子どもの夜泣き・翌日の段取りへの不安・自分だけの時間への渇望…\n\n眠れない夜に「何かできることはないか」と考えてしまう気持ち、わかります。\n\nまず「眠れなくてもOK」と思えると、少し体の力が抜けることもあるかもしれません。",
+    "漢方や薬膳に興味はあるけど、どこから始めればいいか分からない…\n\nそういう声、よく聞きます。\n\nスーパーで買えるなつめ・黒豆・くるみ・黒ごまは、東洋医学で「腎」を補い、睡眠と深く関わるとされています。\n\n日々の料理に少し取り入れるだけでも、変化を感じる方もいます。",
+    "「疲れているのに眠れない」「眠っても疲れが取れない」\n\nこの2つはちょっと違う問題かもしれません。\n\n前者は睡眠に入れないこと、後者は睡眠の質の問題です。\n\nどちらも辛いですが、対策も少し違うことがあります。\n\nブログでも詳しく書いています。",
+    "マグネシウムが睡眠に関係している、という話があります。\n\n神経の興奮を抑え、体をリラックスさせる働きがあるとされています。\n\n海藻・ナッツ・ほうれん草などに含まれています。\n\n食事から意識するのも一つかもしれません。",
+    "眠る前のスマホ、なんとなく分かっていてもやめられない…\n\nブルーライトがメラトニン（眠気を作るホルモン）の分泌を抑えるという研究があります。\n\n完全にやめなくても、画面を暗くする・ナイトモードにするだけで変わる方もいます。\n\n小さな工夫から始めてみませんか？",
+]
+
+MAKO_THREADS_AFF_GENRES = [
+    {'name': '睡眠サプリ（GABA）', 'keyword': 'GABA 睡眠 サプリ'},
+    {'name': 'マグネシウムサプリ', 'keyword': 'マグネシウム サプリ 睡眠'},
+    {'name': 'なつめ薬膳食材', 'keyword': 'なつめ 薬膳 乾燥'},
+    {'name': '睡眠アイマスク', 'keyword': 'アイマスク 睡眠 遮光'},
+    {'name': 'クコの実', 'keyword': 'クコの実 薬膳 乾燥'},
+    {'name': '漢方（睡眠）', 'keyword': '漢方 睡眠 改善'},
+    {'name': '睡眠枕', 'keyword': '枕 睡眠 低反発'},
+]
+
 TRAVEL_MORNING_TWEETS = [
     "子連れ旅行の荷物、毎回多すぎて笑う。でもこれが楽しいんだよな",
     "旅行前夜のパッキングが一番楽しい説、わかる人いる？",
@@ -5003,6 +5058,120 @@ def post_koharu_threads_card():
         print(f"post_koharu_threads_card error: {e}")
 
 
+# ========== MAKO Threads自動投稿 ==========
+
+def _post_to_mako_threads(text, reply_to_id=None):
+    """MAKOのThreads APIに投稿。成功時はpost_idを返す、失敗時はNone"""
+    import time as _time
+    access_token = os.environ.get('MAKO_THREADS_ACCESS_TOKEN', '').strip()
+    user_id = os.environ.get('MAKO_THREADS_USER_ID', '').strip()
+    if not access_token or not user_id:
+        print("MAKO_THREADS tokens not configured, skipping")
+        return None
+    try:
+        params = {
+            'media_type': 'TEXT',
+            'text': text,
+            'access_token': access_token,
+        }
+        if reply_to_id:
+            params['reply_to_id'] = reply_to_id
+        container_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads',
+            params=params,
+            timeout=15
+        )
+        if container_res.status_code != 200:
+            print(f"mako threads container error: {container_res.status_code} {container_res.text}")
+            return None
+        creation_id = container_res.json().get('id')
+        _time.sleep(5)
+        publish_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads_publish',
+            params={'creation_id': creation_id, 'access_token': access_token},
+            timeout=15
+        )
+        if publish_res.status_code != 200:
+            print(f"mako threads publish error: {publish_res.status_code} {publish_res.text}")
+            return None
+        post_id = publish_res.json().get('id')
+        print(f"mako threads posted: {post_id}")
+        return post_id
+    except Exception as e:
+        print(f"_post_to_mako_threads error: {e}")
+        return None
+
+
+def _fetch_mako_sleep_suggestion(genre):
+    """楽天APIで睡眠グッズ・サプリ1件取得 → Claude投稿文生成（MAKOトーン）。(本文, url) を返す"""
+    import random
+    from blog_yakuzen import search_rakuten_items
+    items = search_rakuten_items(genre['keyword'], hits=5)
+    if not items:
+        return None, None
+    item = random.choice(items)
+    name = item['name'][:40]
+    price = item['price']
+    url = item['url']
+    prompt = (
+        f"商品名：{name}\n価格：{price}円\nジャンル：{genre['name']}\n\n"
+        "Threads投稿文を作ってください（本文のみ。URLなし）。\n"
+        "ルール：\n"
+        "・医師として発信しているため「売る」方向NG\n"
+        "・悩みへの共感から始める\n"
+        "・医学・薬膳の知識を淡々と伝える\n"
+        "・「〜です」「〜効果があります」などの言い切り表現は使わない\n"
+        "・「〜かもしれません」「〜という方もいます」「試してみる価値はあります」などの柔らかい表現を使う\n"
+        "・商品への言及は最後の1行で「気になる方はこちら」程度\n"
+        "・ハッシュタグなし\n"
+        "・全体150文字以内\n\n"
+        "余計な説明不要。投稿文だけ出力。"
+    )
+    try:
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=400,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        body = resp.content[0].text.strip()
+    except Exception as e:
+        print(f"mako sleep suggestion generate error ({genre['name']}): {e}")
+        body = f"眠れない夜が続いているという方もいるかもしれません。\n\n気になる方はこちら"
+    return body, url
+
+
+def post_mako_threads_morning():
+    """MAKO Threads朝8:00：睡眠共感ツイート"""
+    import random
+    try:
+        text = random.choice(MAKO_THREADS_MORNING)
+        _post_to_mako_threads(text)
+        print(f"mako threads morning post successful: {text[:30]}...")
+    except Exception as e:
+        print(f"post_mako_threads_morning error: {e}")
+
+
+def post_mako_threads_aff_auto():
+    """MAKO Threads夜21:00：睡眠グッズ・サプリアフィ投稿（日付ローテーション）"""
+    import time as _time
+    slot = datetime.now().day % len(MAKO_THREADS_AFF_GENRES)
+    genre = MAKO_THREADS_AFF_GENRES[slot]
+    try:
+        body, url = _fetch_mako_sleep_suggestion(genre)
+        if not body or not url:
+            return
+        post_id = _post_to_mako_threads(body)
+        if post_id and url:
+            _time.sleep(5)
+            _post_to_mako_threads(
+                f"気になる方はこちら\n{url}\n[楽天PR]",
+                reply_to_id=post_id
+            )
+        print(f"mako threads aff post ({genre['name']}) successful")
+    except Exception as e:
+        print(f"post_mako_threads_aff_auto error: {e}")
+
+
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
@@ -5067,6 +5236,10 @@ scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=1
 scheduler.add_job(post_koharu_threads_morning, 'cron', hour=7, minute=30)
 scheduler.add_job(post_koharu_threads_aff_auto, 'cron', hour=20, minute=0)
 scheduler.add_job(post_koharu_threads_card, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
+# MAKO Threads：1日2本（MAKO_THREADS_ACCESS_TOKEN設定後に自動稼働）
+# 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
+scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)
+scheduler.add_job(post_mako_threads_aff_auto, 'cron', hour=21, minute=0)
 # 毎朝6:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
 scheduler.add_job(
     lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
