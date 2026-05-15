@@ -11,8 +11,8 @@
 | まきの依頼内容 | 振り先 |
 |-------------|--------|
 | eBay・メルカリ・物販に関すること | 物販部 `C:/Users/nyank/ebay/` |
-| ブログ・SEO・記事に関すること | ブログ部 `C:/Users/nyank/blog-automation/` |
-| X投稿・SNS・広報に関すること | 広報部（同フォルダ内） |
+| ブログ・SEO・記事・note制作に関すること | コンテンツ部 `C:/Users/nyank/blog-automation/` |
+| X投稿・SNS・広報に関すること | 広報部 `CLAUDE_koho.md` |
 | カレンダー・スケジュール・リマインド | 秘書部（自分で対応） |
 | どこに聞けばよいか分からない相談 | 秘書部（自分で判断・振り分け） |
 | 会社全体の方針・改善 | 秘書部（自分で対応・CLAUDE.md更新） |
@@ -27,8 +27,6 @@
 - 毎朝7時：今日・明日の予定をLINEに送信（今日セクション・明日セクションに分けて表示）
 - 毎週日曜20時：3日以内の予定リマインド
 - 話しかけに対してClaudeが返答（カレンダー情報も参照）
-- **セキスイブログ記事作成・即公開**（LINEから「セキスイ記事書きたい」で起動）
-- **薬膳ブログ新規作成・リライト**（LINEから「薬膳記事」で起動）
 - **毎月1日8:30：HSBC換金リマインダー**（HKD↔USD少額換金で口座凍結防止）
 - **毎週月曜9:10：在宅専門医 取得プロジェクト週次リマインダー**（先延ばし防止）
 
@@ -110,7 +108,7 @@ git push origin main
 - `PINTEREST_APP_SECRET`: 未設定（Trial拒否のため保留）
 - `PINTEREST_REFRESH_TOKEN`: 未設定（同上）
 - `PINTEREST_BOARD_SEASONAL` / `PINTEREST_BOARD_RECIPE` / `PINTEREST_BOARD_BASICS` / `PINTEREST_BOARD_QUALIF`: 未設定
-- `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET`: 広報部X自動投稿用（設定状況は広報部CLAUDE.md参照）
+- `X_API_KEY` / `X_API_SECRET` / `X_ACCESS_TOKEN` / `X_ACCESS_TOKEN_SECRET`: 広報部X自動投稿用（詳細は `CLAUDE_koho.md` 参照）
 - `RAKUTEN_APP_ID`: 楽天Web ServiceのアプリID（**設定済み**）
 - `RAKUTEN_ACCESS_KEY`: 楽天Web Serviceのアクセスキー（**設定済み**）
 - `RAKUTEN_AFFILIATE_ID`: 楽天アフィリエイトID（**設定済み**）
@@ -121,18 +119,21 @@ git push origin main
 
 ## LINEから使える機能（main.py）
 
-| 送るキーワード | 動作 |
-|-------------|------|
-| `スレッズネタ` | Threads投稿案3パターン生成（共感型・レビュー型・日常型）ランダムジャンル |
-| `睡眠記事` | 睡眠ブログメニュー表示（新規/リライト選択）※`薬膳記事`も有効 |
-| → `1` または `新規作成` | テーマを聞いてきて記事作成→即公開 |
-| → `2` または `リライト` | 季節に合った記事を自動選択→リライト→即公開 |
-| → `3` または `テーマ指定` | テーマを自分で決めて新規作成 |
-| → `4` または `古い記事` | 一番古い記事をClaude判断→「リライト/スキップ/削除/やめる」で操作 |
-| `セキスイ記事` | セキスイブログ記事作成フロー起動 |
-| 画像送信 | チラシからイベント情報を読み取り |
-| `登録して` | 読み取ったイベントをGoogleカレンダーに登録 |
-| `〇〇の期限 4月10日` | 申込期限をカレンダーに登録＋リマインド設定 |
+| 送るキーワード | 担当部署 | 動作 |
+|-------------|---------|------|
+| `スレッズネタ` | 広報部 | Threads投稿案3パターン生成（共感型・レビュー型・日常型）ランダムジャンル |
+| `睡眠記事` | コンテンツ部 | 睡眠ブログメニュー表示（新規/リライト選択）※`薬膳記事`も有効 |
+| → `1` または `新規作成` | コンテンツ部 | テーマを聞いてきて記事作成→即公開 |
+| → `2` または `リライト` | コンテンツ部 | 季節に合った記事を自動選択→リライト→即公開 |
+| → `3` または `テーマ指定` | コンテンツ部 | テーマを自分で決めて新規作成 |
+| → `4` または `古い記事` | コンテンツ部 | 一番古い記事をClaude判断→「リライト/スキップ/削除/やめる」で操作 |
+| `セキスイ記事` | コンテンツ部 | セキスイブログ記事作成フロー起動 |
+| `note書きたい` | コンテンツ部 | 有料・無料選択→テーマ入力→下書き生成→コピペ用MD出力 |
+| 画像送信 | 秘書部 | チラシからイベント情報を読み取り |
+| `登録して` | 秘書部 | 読み取ったイベントをGoogleカレンダーに登録 |
+| `〇〇の期限 4月10日` | 秘書部 | 申込期限をカレンダーに登録＋リマインド設定 |
+
+---
 
 ## Claude Codeから使える機能
 
@@ -147,63 +148,11 @@ python post_sekisui_direct.py "C:\path\to\記事.md"
 ### セキスイ記事のアイキャッチ自動更新
 記事公開時にWP Webhooksが `/wp-post-published` を呼び出し、バックグラウンドでタイトル入り画像を生成してアイキャッチを差し替える（30〜60秒で完了）。
 
-## Pinterest連携の現状（2026-04-15時点）
-
-- Pinterest Developer App（MAKOYAKUZEN / ID:1553666）は作成済み
-- **Trial accessが拒否されている → pins:writeが使えない**
-- Standard access申請が必要（審査に数週間かかる可能性あり）
-- **現在の動作**：記事公開後にピンテキスト（タイトル・説明文・ボード名）をLINEに送信
-- 認証用エンドポイントは実装済み（承認後にすぐ使える）：
-  - `/auth/pinterest` → OAuth認証ページ
-  - `/auth/pinterest/callback` → トークン取得
-  - `/auth/pinterest/boards` → ボードID一覧
-
-## Instagram連携の現状
-
-- Instagram Graph APIもMeta審査が必要でPinterestと同様に困難
-- Instagram→Pinterest自動フローはMetaのAPI制限で現在は使えない
-- 代替案：Zapierを使えばWP新記事→Instagram→Pinterestの自動化が可能（画像作成は手動）
-
 ---
 
 ## 広報部
 
-### Threads自動投稿（makikosroom / 楽天アフィ）
-- アカウント：makikosroom（楽天Room連動）
-- 毎日5本自動投稿：7:30 / 12:30 / 17:30 / 20:00 / 22:00
-- ジャンル：UV・冷感寝具・父の日・虫除け・美容サプリ・育児・スキンケア（5月特化）
-- 投稿形式：本文（フック＋3行以内・ハッシュタグなし）→コメントにURL＋[楽天PR]
-- 商品画像（楽天API）を自動添付
-- トークン取得方法：Meta開発者ダッシュボード→Graph APIエクスプローラー（OAuthフロー不要）
-- **トークン期限：2026-07-07**（期限前にLINEリマインドあり）
-- 手動投稿URL：`https://maki-hisho.onrender.com/post-threads-now`
-- 攻略ガイド：`https://maki-hisho.onrender.com/threads-guide`
-
-### X（@maki_claude_lab）
-- Xアカウント：@maki_claude_lab
-- 表示名：まき｜3児ワーママ×AI副業奮闘中（2026-05-06更新）
-- Bio：小学生３児の母×医療職×ワンオペ / Claude Codeで秘書ボット・ブログ自動化・eBayを仕組み化 / プログラミング歴ゼロからスタート / 0→1に奮闘中。リアルな過程を毎日投稿中 / noteも書いてます👇
-- X URL：note.com/maki_claude_lab
-- ピン止めツイート：自己紹介型（夫急逝・ワンオペ・プログラミングゼロ・0→1まだこれから）設定済み
-- 毎朝8:30に自動投稿（main.pyのpost_to_x_daily関数）
-- テーマ：AI副業実体験（LINE秘書ボット・カレンダー自動登録など）
-- 目的：認知拡大 → フォロワー獲得 → note・コンサルへの導線
-- 将来目標：フォロワー1,000人でnote有料記事販売開始
-- noteアカウント：maki_claude_lab
-- noteプロフィール：3児の母×医療職×ワンオペ。半年前夫が急逝し、プログラミング歴ゼロで副業を始めた。コード知識ゼロでもAIで生活は豊かになる。リアルな過程を記録中（2026-05-06更新）
-- note有料記事①：「プログラミングゼロからClaude Codeで秘書ボットを作るまで」980円（公開済み 2026-04-17）
-- note記事②：「コピー知識ゼロでAI副業してた私が、今さら気づいた"売れる文章"の話」無料（公開済み 2026-04-21）
-- 毎月末日朝9時：noteリマインドをLINEで自動送信（「note書きたい」と話しかけるだけでドラフト作成可能）
-- noteは週1〜隔週ペースで更新。LINEから「note書きたい」で下書き自動生成→コピペするだけ
-- 無料記事（体験談・共感系）でフォロワー獲得 → 有料記事（テクニック系・300〜500円）で収益化
-- noteに貼るときはClaude Codeに「noteに記事貼りたい」と声かけるだけでOK
-
-### X APIキーのRegenerateが必要な場合
-1. console.x.com にアクセス（@maki_claude_labでログイン）
-2. アプリ → アプリをクリック → OAuth 1.0キー
-3. コンシューマーキー → **再生成** → コピー
-4. Access Token and Secret → **Revoke** → **Generate** → コピー
-5. Render → maki-hisho → Environment で4つの値を更新して Save Changes
+詳細は `C:/Users/nyank/Documents/maki-hisho/CLAUDE_koho.md` を参照。
 
 ---
 
@@ -220,7 +169,7 @@ python post_sekisui_direct.py "C:\path\to\記事.md"
 
 ---
 
-### 楽天アフィリエイトAPI（薬膳ブログ自動挿入）
+### 楽天アフィリエイトAPI（睡眠ブログ自動挿入）
 - 実装場所：`blog_yakuzen.py`の`search_rakuten_items()`
 - エンドポイント：`https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401`（新仕様）
 - 必須ヘッダー：`Referer: http://foodmakehealth.com` と `Origin: https://maki-hisho.onrender.com`（両方ないと403エラー）
