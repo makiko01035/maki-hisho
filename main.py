@@ -5492,8 +5492,8 @@ scheduler.add_job(koharu_researcher, 'cron', day_of_week='mon', hour=5, minute=0
 # ② ライター：月曜 06:00（投稿案生成→AI採点→LINEで確認依頼）
 scheduler.add_job(koharu_writer, 'cron', day_of_week='mon', hour=6, minute=0)
 # ③ ポスター：承認済みストックから投稿（ストック切れ時はフォールバック自動生成）
-scheduler.add_job(koharu_poster_morning, 'cron', hour=7, minute=30)
-scheduler.add_job(koharu_poster_aff,     'cron', hour=20, minute=0)
+scheduler.add_job(koharu_poster_morning, 'cron', hour=6, minute=30, jitter=7200)   # 6:30〜8:30のランダム
+scheduler.add_job(koharu_poster_aff,     'cron', hour=19, minute=0,  jitter=7200)   # 19:00〜21:00のランダム
 # カード・ROOM誘導は既存関数を継続
 scheduler.add_job(post_koharu_threads_card,      'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 scheduler.add_job(post_koharu_threads_room_intro,'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
