@@ -1854,6 +1854,34 @@ def get_ebay_user_token():
     )
     return resp.json().get("access_token")
 
+def get_sheets_creds():
+    raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
+    if raw:
+        try:
+            data = json.loads(raw)
+            from google.oauth2.credentials import Credentials as GCreds
+            return GCreds(
+                token=data.get('token'),
+                refresh_token=data.get('refresh_token'),
+                client_id=data.get('client_id'),
+                client_secret=data.get('client_secret'),
+                token_uri='https://oauth2.googleapis.com/token',
+                scopes=data.get('scopes', ['https://www.googleapis.com/auth/spreadsheets']),
+            )
+        except Exception:
+            return None
+    try:
+        from google.oauth2.credentials import Credentials as GCreds
+        from google.auth.transport.requests import Request as GRequest
+        creds = GCreds.from_authorized_user_file(
+            'token_sheets.json', ['https://www.googleapis.com/auth/spreadsheets']
+        )
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(GRequest())
+        return creds
+    except Exception:
+        return None
+
 def ensure_ebay_mgmt_sheet(service):
     meta   = service.spreadsheets().get(spreadsheetId=EBAY_MGMT_SHEET_ID).execute()
     titles = [s["properties"]["title"] for s in meta["sheets"]]
@@ -1876,9 +1904,9 @@ def ebay_dashboard_page():
 @app.route('/api/ebay/data')
 def ebay_data_api():
     try:
-        creds = get_google_creds()
+        creds = get_sheets_creds()
         if not creds:
-            return jsonify({"error": "Google認証エラー"}), 500
+            return jsonify({"error": "Google Sheets認証エラー"}), 500
         service = build("sheets", "v4", credentials=creds)
         ensure_ebay_mgmt_sheet(service)
         result = service.spreadsheets().values().get(
@@ -1910,7 +1938,7 @@ def ebay_update_api():
         ebay_fee      = round(sales_jpy * 0.1325)
         profit        = sales_jpy - round(purchase) - round(ship_cost) - ebay_fee
 
-        creds   = get_google_creds()
+        creds   = get_sheets_creds()
         service = build("sheets", "v4", credentials=creds)
         service.spreadsheets().values().update(
             spreadsheetId=EBAY_MGMT_SHEET_ID,
@@ -1937,7 +1965,7 @@ def ebay_sync_api():
         )
         ebay_orders = resp.json().get("orders", [])
 
-        creds   = get_google_creds()
+        creds   = get_sheets_creds()
         service = build("sheets", "v4", credentials=creds)
         ensure_ebay_mgmt_sheet(service)
 
