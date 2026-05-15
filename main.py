@@ -4900,7 +4900,7 @@ def post_kvision_travel_aff(slot_index):
 def _get_monthly_kvision_genres():
     """今月の特集ジャンルをkvision_monthly_genres.jsonから取得"""
     import json
-    month_key = datetime.now().strftime('%Y-%m')
+    month_key = datetime.now().strftime('%m')
     try:
         with open('kvision_monthly_genres.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
