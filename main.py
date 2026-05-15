@@ -3461,6 +3461,38 @@ def send_zaitage_reminder():
         print(f"Zaitage reminder error: {e}")
 
 
+def send_may25_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        msg = (
+            "📱【5/25 実装リマインド】\n\n"
+            "以下の2つを進めましょう！\n\n"
+            "① MAKOのX自動投稿の実装\n"
+            "　→ クレカ届いてたら「MAKO X実装して」\n\n"
+            "② こはるままのThreads連携\n"
+            "　→ トークン取得してRenderに設定\n"
+            "　→ 「こはるままThreads連携して」"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"May25 reminder error: {e}")
+
+
+def send_may30_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        msg = (
+            "📱【5/30 実装リマインド】\n\n"
+            "MAKOのThreads連携を進めましょう！\n\n"
+            "→ トークン取得してRenderに設定\n"
+            "→ 「MAKOのThreads連携して」"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"May30 reminder error: {e}")
+
+
+
 def send_x_engage_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -4646,6 +4678,10 @@ scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
 scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minute=10)
+# 2026-05-25 朝9時：MAKOのX実装 + こはるままThreads連携リマインド（一回限り）
+scheduler.add_job(send_may25_reminder, 'date', run_date='2026-05-25 09:00:00')
+# 2026-05-30 朝9時：MAKOのThreads連携リマインド（一回限り）
+scheduler.add_job(send_may30_reminder, 'date', run_date='2026-05-30 09:00:00')
 # 毎日朝8:30・昼12:30（奇数日のみ）・夜19:30：X（Twitter）自動投稿（2〜3本/日）
 scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
 scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
