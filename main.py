@@ -2395,7 +2395,7 @@ def setup_rich_menu():
             {"bounds": {"x": 833,  "y": 421, "width": 834, "height": 422},
              "action": {"type": "message", "text": "セキスイ記事"}},
             {"bounds": {"x": 1667, "y": 421, "width": 833, "height": 422},
-             "action": {"type": "message", "text": "今日の予定"}},
+             "action": {"type": "uri", "uri": "https://maki-hisho.onrender.com/ebay-dashboard"}},
         ]
     }
     res = requests.post('https://api.line.me/v2/bot/richmenu',
