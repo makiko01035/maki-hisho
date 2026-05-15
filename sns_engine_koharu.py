@@ -338,18 +338,28 @@ def run_writer():
         })
 
         # LINE確認依頼
-        preview = '\n'.join([
-            f"{i+1}. {'【朝】' if p['type']=='morning' else '【アフィ】'}"
-            f"{p['body'][:28]}… ({p['score']}点)"
-            for i, p in enumerate(approved[:5])
+        morning_posts = [p for p in approved if p['type'] == 'morning']
+        aff_posts     = [p for p in approved if p['type'] == 'aff']
+
+        morning_prev = '\n'.join([
+            f"  {i+1}. {p['body'][:30]}… ({p['score']}点)"
+            for i, p in enumerate(morning_posts[:3])
         ])
+        aff_prev = '\n'.join([
+            f"  {len(morning_posts)+i+1}. {p['body'][:30]}… ({p['score']}点)"
+            for i, p in enumerate(aff_posts[:3])
+        ])
+
         msg = (
             f"📱 今週のこはるまま投稿案 完成！\n\n"
             f"テーマ：{weekly_theme}\n"
-            f"生成：{len(approved)}本（採点落ち：{rejected}本）\n\n"
-            f"【プレビュー 先頭5件】\n{preview}\n\n"
+            f"生成：{len(approved)}本（採点落ち：{rejected}本）\n"
+            f"  └ 朝つぶやき{len(morning_posts)}本 ＋ アフィ{len(aff_posts)}本\n\n"
+            f"【朝つぶやき（先頭3件）】\n{morning_prev}\n\n"
+            f"【アフィ投稿（先頭3件）】\n{aff_prev}\n\n"
             f"✅ 全部OKなら「こはるままOK」\n"
-            f"番号指定で除外する場合「こはるまま2,4はNG」"
+            f"番号指定で除外する場合「こはるまま2,4はNG」\n"
+            f"件数確認は「こはるまま確認」"
         )
         _send_line(msg)
         print(f"[koharu] writer done: {len(approved)} posts, {rejected} rejected")
@@ -423,25 +433,37 @@ def _regenerate(post, feedback_text, ai):
 # LINEからの承認処理（main.py の message_handler から呼ぶ）
 # ============================================================
 
+def _norm(s):
+    """全角英数→半角・大文字→小文字に正規化（OK/ｏｋ/ＯＫ等を統一）"""
+    import unicodedata
+    return unicodedata.normalize('NFKC', s).lower()
+
+
 def handle_approval(message):
     """
     戻り値: True = 処理済み / False = 未対応メッセージ
     """
-    msg = message.strip()
+    msg      = message.strip()
+    msg_norm = _norm(msg)
 
     if msg == 'こはるまま確認':
-        pending = _load(STOCK_PENDING_PATH, {})
+        pending  = _load(STOCK_PENDING_PATH, {})
         approved = _load(STOCK_APPROVED_PATH, {'posts': []})
-        p_count  = len(pending.get('posts', []))
-        a_count  = len([p for p in approved.get('posts', []) if not p.get('posted')])
+        p_posts  = pending.get('posts', [])
+        a_posts  = [p for p in approved.get('posts', []) if not p.get('posted')]
+        p_morning = sum(1 for p in p_posts if p.get('type') == 'morning')
+        p_aff     = sum(1 for p in p_posts if p.get('type') == 'aff')
+        a_morning = sum(1 for p in a_posts if p.get('type') == 'morning')
+        a_aff     = sum(1 for p in a_posts if p.get('type') == 'aff')
         _send_line(
             f"📱 こはるまま投稿ストック状況\n\n"
-            f"承認待ち：{p_count}本\n"
-            f"承認済み（未投稿）：{a_count}本"
+            f"承認待ち：{len(p_posts)}本（朝{p_morning}・アフィ{p_aff}）\n"
+            f"承認済み（未投稿）：{len(a_posts)}本（朝{a_morning}・アフィ{a_aff}）"
         )
         return True
 
-    if msg == 'こはるままOK':
+    # OK承認：「こはるままOK」「こはるままok」「こはるままＯＫ」等すべて対応
+    if msg.startswith('こはるまま') and _norm(msg.replace('こはるまま', '', 1)).strip() == 'ok':
         pending = _load(STOCK_PENDING_PATH, {})
         posts = pending.get('posts', [])
         if not posts:
@@ -451,7 +473,13 @@ def handle_approval(message):
         approved['posts'].extend(posts)
         _save(STOCK_APPROVED_PATH, approved)
         _save(STOCK_PENDING_PATH, {})
-        _send_line(f"✅ {len(posts)}本を承認しました！今週から順次投稿されます。")
+        m_cnt = sum(1 for p in posts if p.get('type') == 'morning')
+        a_cnt = sum(1 for p in posts if p.get('type') == 'aff')
+        _send_line(
+            f"✅ {len(posts)}本を承認しました！\n"
+            f"（朝つぶやき{m_cnt}本・アフィ{a_cnt}本）\n\n"
+            "今週から朝7:30と夜20:00に順次投稿されます。"
+        )
         return True
 
     m = re.match(r'こはるまま([0-9,、\s]+)はNG$', msg)
