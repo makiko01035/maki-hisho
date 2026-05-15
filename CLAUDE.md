@@ -114,6 +114,8 @@ git push origin main
 - `RAKUTEN_AFFILIATE_ID`: 楽天アフィリエイトID（**設定済み**）
 - `THREADS_ACCESS_TOKEN`: makikosroomアカウントの長期アクセストークン（**設定済み**・**期限2026-07-07**）
 - `THREADS_USER_ID`: 26747493744902592（makikosroomのThreadsユーザーID）
+- `NOTIFY_SECRET`: make.com・GASからのリクエスト認証用シークレット（**設定済み**・値: maki2025）
+- `NOTION_TOKEN`: Notion API統合トークン（**設定済み**・今週やること追加用）
 
 ---
 
@@ -132,6 +134,51 @@ git push origin main
 | 画像送信 | 秘書部 | チラシからイベント情報を読み取り |
 | `登録して` | 秘書部 | 読み取ったイベントをGoogleカレンダーに登録 |
 | `〇〇の期限 4月10日` | 秘書部 | 申込期限をカレンダーに登録＋リマインド設定 |
+| `①③保存して` など | 秘書部 | メルマガ要約から番号指定してNotionの今週やることに保存 |
+
+---
+
+## メール自動化システム（2026-05-08構築）
+
+### 概要
+Hotmailに届くメールを3種類に分けて自動処理する。
+
+```
+Hotmail
+  ├─ eBayメール → 転送ルール → make.com → /add-task → LINE通知 + Notionタスク
+  ├─ 楽天アフィメール → 転送ルール → make.com → /add-task → LINE通知 + Notionタスク
+  └─ メルマガ → 転送ルール → makikokimura51@gmail.com → GAS（週2回）→ Claude要約 → LINE + Notion保存可
+```
+
+### make.com設定（www.make.com）
+- シナリオ①：eBayメール通知（from:ebay.com）
+  - トリガー：Microsoft 365 Email - Watch Emails（Hotmailアカウント）
+  - アクション：HTTP - Make a request → `https://maki-hisho.onrender.com/add-task`
+  - 送信内容：`{"secret": "maki2025", "message": "...", "task": "..."}`
+- シナリオ②：楽天アフィ警告メール（from:rakuten.co.jp）
+  - 同構成
+
+### /add-task エンドポイント（main.py）
+- `POST /add-task` + `{"secret": "maki2025", "message": "LINEに送るメッセージ", "task": "Notionタスク名"}`
+- LINE通知を送信 + NotionのToDoブロックとして「今週やること」セクションに追加
+- NotionページID：`323f8d6d-41de-809d-9e98-f9a5da8556a8`の直後に追加
+
+### GAS（Google Apps Script）
+- ファイル：`C:/Users/nyank/Documents/maki-hisho/newsletter_gas.js`
+- 実行アカウント：makikokimura51@gmail.com（メルマガ専用Gmail）
+- 実行頻度：週2回（日曜・水曜 20:00〜21:00）
+- 動作：未読メール最大30件 → Claude API（claude-sonnet-4-6）で要約 → LINE送信 → メールをゴミ箱へ
+- 分類：副業・ビジネス系（要点まとめ）、不動産（新築アパート・RC・土地のみ）、求人（削除のみ）
+- スクリプトプロパティに設定：`ANTHROPIC_API_KEY`・`NOTIFY_SECRET`（maki2025）
+
+### /newsletter-summary エンドポイント（main.py）
+- `POST /newsletter-summary` + `{"secret": "...", "summary": "要約テキスト", "emails": [...]}`
+- LINEに要約を送信 + セッションファイルに保存（`/tmp/newsletter_sessions.json`）
+- LINEで「①③保存して」と返信すると選択したメールをNotionの今週やることに保存
+
+### Hotmail転送設定
+- eBay・楽天アフィのメール：make.comシナリオが監視（転送不要）
+- メルマガ：Hotmailの転送ルールで makikokimura51@gmail.com に転送後削除
 
 ---
 
