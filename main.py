@@ -2222,6 +2222,19 @@ def auth_pinterest_boards():
     return f'エラー: {res.status_code} {res.text}', 400
 
 
+@app.route('/check-threads-app')
+def check_threads_app():
+    """THREADS_APP_IDが正しく設定されているか確認するデバッグ用"""
+    app_id = os.environ.get('THREADS_APP_ID', '')
+    app_secret = os.environ.get('THREADS_APP_SECRET', '')
+    return {
+        'THREADS_APP_ID_先頭6桁': app_id[:6] + '...' if len(app_id) > 6 else f'({len(app_id)}文字)',
+        'THREADS_APP_ID_桁数': len(app_id),
+        'THREADS_APP_ID_数字のみか': app_id.isdigit(),
+        'THREADS_APP_SECRET_先頭4文字': app_secret[:4] + '...' if len(app_secret) > 4 else f'({len(app_secret)}文字)',
+    }
+
+
 @app.route('/auth/threads')
 def auth_threads():
     app_id = os.environ.get('THREADS_APP_ID', '')
@@ -4801,6 +4814,51 @@ TRAVEL_MORNING_TWEETS = [
     "旅行中、子どもが「暑い暑い」って言い始めるタイミングが毎回同じ",
 ]
 
+KOHARU_ROOM_URL = "https://room.rakuten.co.jp/makiko01035/items"
+
+ROOM_INTRO_TWEETS = [
+    "私が実際に買ってよかったもの、ROOMにまとめてます\n子連れ旅行・アウトドア・日常使いのグッズを厳選してるので参考にしてみて↓",
+    "旅行グッズ・キャンプ道具・便利グッズ、使ってよかったものを楽天ROOMにまとめてます\n購入前の参考にどうぞ↓",
+    "子連れ旅行で本当に使えたものだけROOMに残してる\n301件あるのでお気に入り登録しておいてもらえると嬉しい↓",
+    "ワーママ目線で厳選した旅行・生活グッズ、楽天ROOMにまとめてます\n気になるものあったら見てみて↓",
+    "子ども連れのおでかけに役立つグッズ、全部ここにまとめてます\n使ってよかったものだけ厳選↓",
+]
+
+
+def post_kvision_room_intro():
+    """週1回（木曜）夜19時：楽天ROOM誘導投稿（X）"""
+    import random, time as _time
+    try:
+        client = _get_kvision_x_client()
+        if not client:
+            print("KVISION X API keys not configured, skipping room intro")
+            return
+        text = random.choice(ROOM_INTRO_TWEETS)
+        resp = client.create_tweet(text=text)
+        tweet_id = resp.data['id']
+        _time.sleep(3)
+        client.create_tweet(
+            text=KOHARU_ROOM_URL,
+            in_reply_to_tweet_id=tweet_id
+        )
+        print("kvision room intro tweet successful")
+    except Exception as e:
+        print(f"post_kvision_room_intro error: {e}")
+
+
+def post_koharu_threads_room_intro():
+    """週1回（木曜）夜19時：楽天ROOM誘導投稿（Threads）"""
+    import random, time as _time
+    try:
+        text = random.choice(ROOM_INTRO_TWEETS)
+        post_id = _post_to_koharu_threads(text)
+        if post_id:
+            _time.sleep(5)
+            _post_to_koharu_threads(KOHARU_ROOM_URL, reply_to_id=post_id)
+        print("koharu threads room intro successful")
+    except Exception as e:
+        print(f"post_koharu_threads_room_intro error: {e}")
+
 
 def _get_kvision_x_client():
     import tweepy
@@ -5302,12 +5360,13 @@ scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:0
 scheduler.add_job(post_kvision_morning_tweet, 'cron', hour=9, minute=0)
 scheduler.add_job(post_kvision_travel_aff_auto, 'cron', hour=20, minute=30)
 scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
-# こはるまま Threads：1日2本 + 楽天カード週2（KOHARU_THREADS_ACCESS_TOKEN設定後に自動稼働）
-# 朝7:30 旅あるある、夜20:00 アフィスレッド（Xとジャンルをずらす）
-# 水・土曜12:00〜13:00ランダム（jitter=3600で前後30分相当）楽天カード誘導
+# 木曜夜19時：楽天ROOM誘導投稿（前後30分ランダム）
+scheduler.add_job(post_kvision_room_intro, 'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
+# こはるまま Threads：1日2本 + 楽天カード週2 + ROOM誘導週1（KOHARU_THREADS_ACCESS_TOKEN設定後に自動稼働）
 scheduler.add_job(post_koharu_threads_morning, 'cron', hour=7, minute=30)
 scheduler.add_job(post_koharu_threads_aff_auto, 'cron', hour=20, minute=0)
 scheduler.add_job(post_koharu_threads_card, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
+scheduler.add_job(post_koharu_threads_room_intro, 'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
 # MAKO Threads：1日2本（MAKO_THREADS_ACCESS_TOKEN設定後に自動稼働）
 # 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
 scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)
