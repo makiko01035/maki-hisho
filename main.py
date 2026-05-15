@@ -14,6 +14,16 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler, anthropic_client, JST
 from ebay_handler import run_ebay_research, send_daily_purchase_candidates, check_seller_now
+from sns_engine_koharu import (
+    run_researcher as koharu_researcher,
+    run_writer    as koharu_writer,
+    run_poster_morning as koharu_poster_morning,
+    run_poster_aff     as koharu_poster_aff,
+    run_collector as koharu_collector,
+    run_analyst   as koharu_analyst,
+    run_monitor   as koharu_monitor,
+    handle_approval as koharu_handle_approval,
+)
 from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
@@ -194,7 +204,7 @@ def send_long_message(user_id, text, chunk_size=4000):
         line_bot_api.push_message(user_id, TextSendMessage(text=prefix + chunk))
 
 
-def generate_note_draft_async(user_id, note_type, theme):
+def generate_note_draft_async(user_id, note_type, target=None, worry=None, experience=None):
     """note下書きをClaude APIで生成してLINEに分割送信"""
     try:
         type_label = "有料" if note_type == "paid" else "無料"
@@ -203,28 +213,39 @@ def generate_note_draft_async(user_id, note_type, theme):
                 "有料記事として書いてください。\n"
                 "- 無料部分：導入・共感・この記事でわかること（全体の1/3程度）\n"
                 "- 「ここから有料記事です（300円）」という区切りを入れる\n"
-                "- 有料部分：再現性のある具体的な手順・プロンプト・実例を含める"
+                "- 有料部分：再現性のある具体的な手順・プロンプト・実例を含める\n"
+                "- 目標文字数：3,000〜4,000文字"
             )
         else:
             type_instruction = (
                 "無料記事として書いてください。\n"
                 "- 読みごたえがあり、SNSでシェアされるような内容\n"
-                "- 体験談ベースで共感を呼ぶ構成"
+                "- 体験談ベースで共感を呼ぶ構成\n"
+                "- 目標文字数：1,500〜2,000文字"
             )
+
+        design_info = ""
+        if target:
+            design_info += f"\n【届けたい読者】{target}"
+        if worry:
+            design_info += f"\n【読者の悩み】{worry}"
+        if experience:
+            design_info += f"\n【まきの体験エピソード】{experience}"
 
         response = anthropic_client.messages.create(
             model='claude-sonnet-4-6',
             max_tokens=4000,
             system=(
-                "あなたはAI副業実験中のワーママ「まき」として書きます。\n"
-                "プロフィール：医療職・3人の子育て・プログラミングゼロからClaude Codeで副業ツールを20個以上作った\n"
-                "読者：AI初心者・副業に興味があるワーママ・「自分にもできるかも」と思ってほしい人\n"
+                "あなたはAI×日常生活×ワーママ実体験を発信する「まき」として書きます。\n"
+                "プロフィール：医療職・3児ワンオペ・夫急逝後にプログラミングゼロからAIで毎日を仕組み化した\n"
+                "読者：「AIって何に使うの？」と思っているワーママ・AI初心者・日常を楽にしたい人\n"
                 "文体：ですます調・親しみやすい・体験談ベース・専門用語を使わない\n"
+                "重要：読者の悩みへの共感から入り、まきの実体験を通じて「私にもできる」と感じてもらう構成にする\n"
                 + type_instruction
             ),
             messages=[{
                 'role': 'user',
-                'content': f'テーマ：{theme}\n\nnoteの{type_label}記事の下書きを書いてください。タイトルも含めて。'
+                'content': f'以下の設計情報に基づいてnote{type_label}記事の下書きを書いてください。タイトルも含めて。\n{design_info}'
             }]
         )
 
@@ -1733,6 +1754,38 @@ def post_kvision_card_now():
         return f'❌ エラー: {e}', 500
 
 
+@app.route('/koharu-engine-writer-now')
+def koharu_engine_writer_now():
+    """こはるままエンジン：②ライターを今すぐ実行（手動テスト）"""
+    try:
+        import threading
+        threading.Thread(target=koharu_writer, daemon=True).start()
+        return '✅ こはるままライター起動！数分後にLINEに投稿案が届きます。'
+    except Exception as e:
+        return f'❌ {e}', 500
+
+
+@app.route('/koharu-engine-researcher-now')
+def koharu_engine_researcher_now():
+    """こはるままエンジン：①リサーチャーを今すぐ実行（手動テスト）"""
+    try:
+        koharu_researcher()
+        return '✅ こはるままリサーチャー完了！'
+    except Exception as e:
+        return f'❌ {e}', 500
+
+
+@app.route('/koharu-engine-analyst-now')
+def koharu_engine_analyst_now():
+    """こはるままエンジン：⑤アナリストを今すぐ実行（手動テスト）"""
+    try:
+        import threading
+        threading.Thread(target=koharu_analyst, daemon=True).start()
+        return '✅ こはるままアナリスト起動！数分後にLINEにレポートが届きます。'
+    except Exception as e:
+        return f'❌ {e}', 500
+
+
 @app.route('/post-koharu-threads-now')
 def post_koharu_threads_now():
     """今すぐこはるままのThreadsにアフィ投稿を送る（手動テスト用）"""
@@ -2719,6 +2772,12 @@ def handle_message(event):
     user_message = _sanitize_text(event.message.text)
     user_id = event.source.user_id
 
+    # こはるまま投稿承認コマンド
+    if user_message.startswith('こはるまま'):
+        if koharu_handle_approval(user_message):
+            return
+        # 未対応の場合はそのまま通常処理へ
+
     # メルマガ保存コマンド（「①③保存して」など）
     if '保存' in user_message and any(c in user_message for c in '①②③④⑤⑥⑦⑧⑨⑩0123456789'):
         sessions = load_newsletter_sessions()
@@ -3185,16 +3244,16 @@ def handle_message(event):
             import unicodedata
             normalized = unicodedata.normalize('NFKC', user_message)
             if any(kw in normalized for kw in ['有料', '1', '①']):
-                note_sessions[user_id] = {'state': 'waiting_for_note_theme', 'type': 'paid'}
+                note_sessions[user_id] = {'state': 'waiting_for_note_target', 'type': 'paid'}
                 save_note_sessions(note_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="💰 有料記事ですね！\n\nテーマを教えてください。\n（「おまかせ」でもOKです）\n\n例：「Claudeへの依頼の仕方」「壁打ちから始めるAI副業」"
+                    text="💰 有料記事ですね！\n\n【Step1】誰に届けたい記事ですか？\n\n例：「AIって何に使うかわからないワーママ」「忙しくて新しいことを始める余裕がない人」\n（「おまかせ」でもOK）"
                 ))
             elif any(kw in normalized for kw in ['無料', '2', '②']):
-                note_sessions[user_id] = {'state': 'waiting_for_note_theme', 'type': 'free'}
+                note_sessions[user_id] = {'state': 'waiting_for_note_target', 'type': 'free'}
                 save_note_sessions(note_sessions)
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(
-                    text="📖 無料記事ですね！\n\nテーマを教えてください。\n（「おまかせ」でもOKです）\n\n例：「ワーママがAI副業を始めた理由」"
+                    text="📖 無料記事ですね！\n\n【Step1】誰に届けたい記事ですか？\n\n例：「AIって何に使うかわからないワーママ」「忙しくて新しいことを始める余裕がない人」\n（「おまかせ」でもOK）"
                 ))
             else:
                 del note_sessions[user_id]
@@ -3202,16 +3261,54 @@ def handle_message(event):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text="キャンセルしました。"))
             return
 
-        if state == 'waiting_for_note_theme':
+        if state == 'waiting_for_note_target':
+            if user_message in ['おまかせ', 'おまかせで']:
+                target = 'AIって何に使うの？と思っているワーママ・AI初心者'
+            else:
+                target = user_message
+            note_sessions[user_id] = {
+                'state': 'waiting_for_note_worry',
+                'type': session.get('type', 'paid'),
+                'target': target
+            }
+            save_note_sessions(note_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"【Step2】その人の一番の悩みは何ですか？\n\n例：「毎日パンクしてるけどAIは難しそう」「何から始めればいいかわからない」\n（「おまかせ」でもOK）"
+            ))
+            return
+
+        if state == 'waiting_for_note_worry':
+            if user_message in ['おまかせ', 'おまかせで']:
+                worry = 'AIは難しそう・何に使えばいいかわからない・でも何か変えたい'
+            else:
+                worry = user_message
+            note_sessions[user_id] = {
+                'state': 'waiting_for_note_experience',
+                'type': session.get('type', 'paid'),
+                'target': session.get('target', ''),
+                'worry': worry
+            }
+            save_note_sessions(note_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"【Step3】まきさんのどんな体験エピソードとつながりますか？\n\n例：「夫急逝後にYohanaを試してAIに行き着いた話」「先生に教えてもらって1か月課金してみた話」\n（「おまかせ」でもOK）"
+            ))
+            return
+
+        if state == 'waiting_for_note_experience':
+            if user_message in ['おまかせ', 'おまかせで']:
+                experience = 'まきの実体験から一番刺さるエピソードを自由に選んで'
+            else:
+                experience = user_message
             note_type = session.get('type', 'paid')
-            theme = user_message if user_message not in ['おまかせ', 'おまかせで'] else 'まきの実体験からAI副業に関するテーマを自由に選んで'
+            target = session.get('target', '')
+            worry = session.get('worry', '')
             del note_sessions[user_id]
             save_note_sessions(note_sessions)
             type_label = "有料" if note_type == "paid" else "無料"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(
                 text=f"✍️ note{type_label}記事の下書きを作成中です...\n少しお待ちください（1〜2分かかります）"
             ))
-            threading.Thread(target=generate_note_draft_async, args=(user_id, note_type, theme)).start()
+            threading.Thread(target=generate_note_draft_async, args=(user_id, note_type, target, worry, experience)).start()
             return
 
     # noteキーワード
@@ -5362,11 +5459,25 @@ scheduler.add_job(post_kvision_travel_aff_auto, 'cron', hour=20, minute=30)
 scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 # 木曜夜19時：楽天ROOM誘導投稿（前後30分ランダム）
 scheduler.add_job(post_kvision_room_intro, 'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
-# こはるまま Threads：1日2本 + 楽天カード週2 + ROOM誘導週1（KOHARU_THREADS_ACCESS_TOKEN設定後に自動稼働）
-scheduler.add_job(post_koharu_threads_morning, 'cron', hour=7, minute=30)
-scheduler.add_job(post_koharu_threads_aff_auto, 'cron', hour=20, minute=0)
-scheduler.add_job(post_koharu_threads_card, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
-scheduler.add_job(post_koharu_threads_room_intro, 'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
+# ========== こはるまま SNSエンジン 6ロール ==========
+# ① リサーチャー：月曜 05:00（今週のテーマ生成）
+scheduler.add_job(koharu_researcher, 'cron', day_of_week='mon', hour=5, minute=0)
+# ② ライター：月曜 06:00（投稿案生成→AI採点→LINEで確認依頼）
+scheduler.add_job(koharu_writer, 'cron', day_of_week='mon', hour=6, minute=0)
+# ③ ポスター：承認済みストックから投稿（ストック切れ時はフォールバック自動生成）
+scheduler.add_job(koharu_poster_morning, 'cron', hour=7, minute=30)
+scheduler.add_job(koharu_poster_aff,     'cron', hour=20, minute=0)
+# カード・ROOM誘導は既存関数を継続
+scheduler.add_job(post_koharu_threads_card,      'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
+scheduler.add_job(post_koharu_threads_room_intro,'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
+# ④ コレクター：毎日 23:00（Threads APIでパフォーマンスデータ取得）
+scheduler.add_job(koharu_collector, 'cron', hour=23, minute=0)
+# ⑤ アナリスト：日曜 20:00（週次分析→LINEレポート）
+scheduler.add_job(koharu_analyst, 'cron', day_of_week='sun', hour=20, minute=0)
+# ⑥ モニター：毎日 07:00 / 13:00 / 22:00（正常稼働・凍結チェック）
+scheduler.add_job(koharu_monitor, 'cron', hour=7,  minute=0)
+scheduler.add_job(koharu_monitor, 'cron', hour=13, minute=0)
+scheduler.add_job(koharu_monitor, 'cron', hour=22, minute=0)
 # MAKO Threads：1日2本（MAKO_THREADS_ACCESS_TOKEN設定後に自動稼働）
 # 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
 scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)
