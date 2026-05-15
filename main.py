@@ -4963,13 +4963,13 @@ scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:0
 # 水・土曜12:30 楽天カード誘導ツイート（RAKUTEN_CARD_AFF_URL設定済みならURL付き）
 scheduler.add_job(post_kvision_morning_tweet, 'cron', hour=9, minute=0)
 scheduler.add_job(post_kvision_travel_aff_auto, 'cron', hour=20, minute=30)
-scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=12, minute=30)
+scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 # こはるまま Threads：1日2本 + 楽天カード週2（KOHARU_THREADS_ACCESS_TOKEN設定後に自動稼働）
 # 朝7:30 旅あるある、夜20:00 アフィスレッド（Xとジャンルをずらす）
-# 水・土曜12:30 楽天カード誘導（XのカードツイートとThreadsを同日同テーマで展開）
+# 水・土曜12:00〜13:00ランダム（jitter=3600で前後30分相当）楽天カード誘導
 scheduler.add_job(post_koharu_threads_morning, 'cron', hour=7, minute=30)
 scheduler.add_job(post_koharu_threads_aff_auto, 'cron', hour=20, minute=0)
-scheduler.add_job(post_koharu_threads_card, 'cron', day_of_week='wed,sat', hour=12, minute=30)
+scheduler.add_job(post_koharu_threads_card, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 # 毎朝6:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
 scheduler.add_job(
     lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
