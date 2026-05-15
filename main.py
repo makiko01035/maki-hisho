@@ -1723,6 +1723,38 @@ def post_kvision_morning_now():
         return f'❌ エラー: {e}', 500
 
 
+@app.route('/post-kvision-card-now')
+def post_kvision_card_now():
+    """今すぐ楽天カード誘導ツイートを送る（手動テスト用）"""
+    try:
+        post_kvision_card_tweet()
+        card_url = os.environ.get('RAKUTEN_CARD_AFF_URL', '')
+        mode = 'URL付きスレッド形式' if card_url else 'テキストのみ（RAKUTEN_CARD_AFF_URL未設定）'
+        return f'✅ @kvision_m 楽天カード誘導ツイート完了！モード：{mode}'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@app.route('/post-koharu-threads-now')
+def post_koharu_threads_now():
+    """今すぐこはるままのThreadsにアフィ投稿を送る（手動テスト用）"""
+    try:
+        post_koharu_threads_aff_auto()
+        return '✅ こはるまま Threads アフィ投稿完了！Threadsアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@app.route('/post-koharu-threads-morning-now')
+def post_koharu_threads_morning_now():
+    """今すぐこはるままのThreadsに朝つぶやきを送る（手動テスト用）"""
+    try:
+        post_koharu_threads_morning()
+        return '✅ こはるまま Threads 朝つぶやき投稿完了！Threadsアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @app.route('/post-threads-now')
 def post_threads_now():
     """今すぐThreadsに楽天アフィ投稿を1本送る（手動トリガー）"""
@@ -3833,6 +3865,10 @@ QUOTE_TWEET_TEMPLATES = [
     "ダウンロードフォルダ1,492件→1,113件。Claude Codeに頼んだら20分で終わった。重複削除・野球写真除外・不動産フォルダ分け・監修原稿一括削除。自分でやったら半日かかってたやつ。AIに任せると『整理しなきゃ』というストレスごと消える。 #ClaudeCode #AI副業 #時短",
     "「野球の写真はいらない」の一言でフォルダ丸ごと削除できる時代になった。Claude Codeが画像を1枚ずつ開いて内容を確認して、野球写真だけ選んで消してくれた。パソコン整理もAIに丸投げでいい。 #ClaudeCode #AI副業 #時短術",
     "不動産書類58件をリリア成増・板橋区計画・松戸市岩瀬・検討物件…に自動分類してもらった。フォルダ作成から移動まで全部AIがやってくれる。自分でやったら30分の作業が30秒。Claude Codeはコードだけじゃなくてファイル整理もできる。 #AI副業 #ClaudeCode",
+    # ── 複数キャラSNS展開 ──
+    "1人なのに3キャラで動いてる。まき（AI副業）・こはるまま（旅行アフィ）・MAKO（医師×睡眠）。全部Claudeが自動投稿を担当。SNSの運用を人格ごとに分けると刺さる層が変わる。AIカンパニーってこういうことだと思う。 #AI副業 #Claude #自動化",
+    "医師キャラのSNS投稿は『言い切りNG』という制約をClaudeに設定した。『〜です』じゃなく『〜かもしれません』『〜という方もいます』のトーンで自動生成させる。制約があるほど信頼感が出る。キャラ設計ってそういうもの。 #AI副業 #Claude #SNS運用",
+    "PowerShellを開くたびに『どの部署？』と毎回選択してたのをやめた。秘書部しか使わないから直接入るように変えた。こういう小さな摩擦を一つずつ消していくのがClaudeとの正しい付き合い方。 #ClaudeCode #AI副業 #自動化",
 ]
 
 
@@ -4658,7 +4694,8 @@ def post_kvision_morning_tweet():
 def post_kvision_travel_aff(slot_index):
     """@kvision_mに旅行×楽天アフィをXにスレッド形式で投稿（本文→リプライにURL）"""
     import time as _time
-    genre = TRAVEL_GENRES[slot_index % len(TRAVEL_GENRES)]
+    all_genres = _get_all_kvision_genres()
+    genre = all_genres[slot_index % len(all_genres)]
     try:
         body, url = _fetch_travel_suggestion(genre)
         if not body or not url:
@@ -4677,6 +4714,171 @@ def post_kvision_travel_aff(slot_index):
         print(f"kvision X thread post ({genre['name']}) successful")
     except Exception as e:
         print(f"post_kvision_travel_aff({slot_index}) error: {e}")
+
+
+# ========== 月替わりジャンル・ジャンル管理 ==========
+
+def _get_monthly_kvision_genres():
+    """今月の特集ジャンルをkvision_monthly_genres.jsonから取得"""
+    import json
+    month_key = datetime.now().strftime('%Y-%m')
+    try:
+        with open('kvision_monthly_genres.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get(month_key, [])
+    except Exception as e:
+        print(f"monthly kvision genres read error: {e}")
+        return []
+
+
+def _get_all_kvision_genres():
+    """固定ジャンル7種 + 今月の特集ジャンルを合わせたリスト"""
+    return TRAVEL_GENRES + _get_monthly_kvision_genres()
+
+
+def post_kvision_travel_aff_auto():
+    """日付ベースでジャンルをローテーション（固定＋月替わり）して夜アフィ投稿"""
+    all_genres = _get_all_kvision_genres()
+    slot = datetime.now().day % len(all_genres)
+    post_kvision_travel_aff(slot)
+
+
+# ========== 楽天カード誘導ツイート ==========
+
+CARD_TWEETS = [
+    "楽天トラベルで旅行予約するとき、楽天カードで払うとポイントが3〜4倍になる話、旅行前の自分に教えてあげたかった",
+    "旅行費用の積立を楽天カードに変えてから、気づいたら年間けっこうなポイントに。子どもの旅行代金に充当してる",
+    "楽天プレミアムカード、持ってると空港ラウンジが無料で使える。子連れ旅行の出発前の休憩にこれが地味に最高",
+    "楽天マラソン×楽天カードの組み合わせ、旅行グッズのまとめ買いするなら知っておいたほうがいいやつ",
+    "海外旅行の荷物リストに「楽天カード」を追加してから、旅先での買い物ポイントが馬鹿にならない",
+    "楽天カードの旅行保険、カードで予約すれば付帯されるのに使ってない人多すぎる。子連れ旅行なら確認して",
+    "旅行貯金を楽天カードのポイントで賄ってる。現金じゃないから心理的ハードルが低くて続いてる",
+]
+
+CARD_AFF_TWEETS_WITH_URL = [
+    "楽天カード、旅行好きには正直マストだと思ってる。楽天トラベルのポイント還元が段違い\n\n詳細はこちら↓",
+    "子連れ旅行のコスト、楽天カードのポイントで少し軽くできてる。年会費無料でこの恩恵は大きい\n\n詳細はこちら↓",
+    "楽天プレミアムカードの空港ラウンジ特典、旅行好きなら元が取れる。子連れ出発前の待機場所として最高\n\n詳細はこちら↓",
+]
+
+
+def post_kvision_card_tweet():
+    """週2回（水・土）昼12:30：楽天カード誘導ツイート（URL設定済みならスレッド形式）"""
+    import random, time as _time
+    try:
+        client = _get_kvision_x_client()
+        if not client:
+            print("KVISION X API keys not configured, skipping card tweet")
+            return
+        card_url = os.environ.get('RAKUTEN_CARD_AFF_URL', '').strip()
+        if card_url:
+            text = random.choice(CARD_AFF_TWEETS_WITH_URL)
+            resp = client.create_tweet(text=text)
+            tweet_id = resp.data['id']
+            _time.sleep(3)
+            client.create_tweet(
+                text=f"{card_url}\n[楽天PR]",
+                in_reply_to_tweet_id=tweet_id
+            )
+        else:
+            text = random.choice(CARD_TWEETS)
+            client.create_tweet(text=text)
+        print("kvision card tweet successful")
+    except Exception as e:
+        print(f"post_kvision_card_tweet error: {e}")
+
+
+# ========== こはるまま Threads自動投稿 ==========
+
+def _post_to_koharu_threads(text, reply_to_id=None):
+    """こはるままのThreads APIに投稿。成功時はpost_idを返す、失敗時はNone"""
+    access_token = os.environ.get('KOHARU_THREADS_ACCESS_TOKEN', '').strip()
+    user_id = os.environ.get('KOHARU_THREADS_USER_ID', '').strip()
+    if not access_token or not user_id:
+        print("KOHARU_THREADS tokens not configured, skipping")
+        return None
+    try:
+        params = {
+            'media_type': 'TEXT',
+            'text': text,
+            'access_token': access_token,
+        }
+        if reply_to_id:
+            params['reply_to_id'] = reply_to_id
+        container_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads',
+            params=params,
+            timeout=15
+        )
+        if container_res.status_code != 200:
+            print(f"koharu threads container error: {container_res.status_code} {container_res.text}")
+            return None
+        creation_id = container_res.json().get('id')
+        import time as _time
+        _time.sleep(5)
+        publish_res = requests.post(
+            f'https://graph.threads.net/v1.0/{user_id}/threads_publish',
+            params={'creation_id': creation_id, 'access_token': access_token},
+            timeout=15
+        )
+        if publish_res.status_code != 200:
+            print(f"koharu threads publish error: {publish_res.status_code} {publish_res.text}")
+            return None
+        post_id = publish_res.json().get('id')
+        print(f"koharu threads posted: {post_id}")
+        return post_id
+    except Exception as e:
+        print(f"_post_to_koharu_threads error: {e}")
+        return None
+
+
+def post_koharu_threads_morning():
+    """こはるまま Threads朝7:30：旅あるあるテキスト投稿"""
+    import random
+    try:
+        text = random.choice(TRAVEL_MORNING_TWEETS)
+        _post_to_koharu_threads(text)
+        print(f"koharu threads morning post successful: {text[:30]}...")
+    except Exception as e:
+        print(f"post_koharu_threads_morning error: {e}")
+
+
+def post_koharu_threads_aff_auto():
+    """こはるまま Threads夜20:00：旅行グッズアフィ投稿（日付ローテーション・Xとずらす）"""
+    import time as _time
+    all_genres = _get_all_kvision_genres()
+    slot = (datetime.now().day + 3) % len(all_genres)
+    genre = all_genres[slot]
+    try:
+        body, url = _fetch_travel_suggestion(genre)
+        if not body or not url:
+            return
+        post_id = _post_to_koharu_threads(body)
+        if post_id and url:
+            _time.sleep(5)
+            _post_to_koharu_threads(f"↓ 商品はこちら\n{url}\n[楽天PR]", reply_to_id=post_id)
+        print(f"koharu threads aff post ({genre['name']}) successful")
+    except Exception as e:
+        print(f"post_koharu_threads_aff_auto error: {e}")
+
+
+def post_koharu_threads_card():
+    """こはるまま Threads週2回（水・土）12:30：楽天カード誘導"""
+    import random, time as _time
+    try:
+        card_url = os.environ.get('RAKUTEN_CARD_AFF_URL', '').strip()
+        if card_url:
+            text = random.choice(CARD_AFF_TWEETS_WITH_URL)
+            post_id = _post_to_koharu_threads(text)
+            if post_id:
+                _time.sleep(5)
+                _post_to_koharu_threads(f"{card_url}\n[楽天PR]", reply_to_id=post_id)
+        else:
+            text = random.choice(CARD_TWEETS)
+            _post_to_koharu_threads(text)
+        print("koharu threads card post successful")
+    except Exception as e:
+        print(f"post_koharu_threads_card error: {e}")
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
@@ -4731,10 +4933,18 @@ scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[6]
 scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 # 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
 scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:00:00', timezone='Asia/Tokyo')
-# @kvision_m（こはるまま）旅行×楽天アフィ：1日2本
-# 朝9:00 テキストのみ旅あるある、夜20:30 スレッド形式アフィURL
+# @kvision_m（こはるまま）旅行×楽天アフィ X：1日2本 + 楽天カード週2
+# 朝9:00 旅あるあるつぶやき、夜20:30 固定＋月替わりジャンルをローテーションしてアフィスレッド
+# 水・土曜12:30 楽天カード誘導ツイート（RAKUTEN_CARD_AFF_URL設定済みならURL付き）
 scheduler.add_job(post_kvision_morning_tweet, 'cron', hour=9, minute=0)
-scheduler.add_job(post_kvision_travel_aff, 'cron', hour=20, minute=30, args=[0])
+scheduler.add_job(post_kvision_travel_aff_auto, 'cron', hour=20, minute=30)
+scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=12, minute=30)
+# こはるまま Threads：1日2本 + 楽天カード週2（KOHARU_THREADS_ACCESS_TOKEN設定後に自動稼働）
+# 朝7:30 旅あるある、夜20:00 アフィスレッド（Xとジャンルをずらす）
+# 水・土曜12:30 楽天カード誘導（XのカードツイートとThreadsを同日同テーマで展開）
+scheduler.add_job(post_koharu_threads_morning, 'cron', hour=7, minute=30)
+scheduler.add_job(post_koharu_threads_aff_auto, 'cron', hour=20, minute=0)
+scheduler.add_job(post_koharu_threads_card, 'cron', day_of_week='wed,sat', hour=12, minute=30)
 # 毎朝6:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
 scheduler.add_job(
     lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
