@@ -1896,16 +1896,17 @@ def get_sheets_creds():
         else:
             with open('token_sheets.json', encoding='utf-8') as f:
                 data = json.load(f)
-        creds = GCreds(
-            token=data.get('token'),
-            refresh_token=data.get('refresh_token'),
-            client_id=data.get('client_id'),
-            client_secret=data.get('client_secret'),
-            token_uri=data.get('token_uri', 'https://oauth2.googleapis.com/token'),
-            scopes=data.get('scopes', ['https://www.googleapis.com/auth/spreadsheets']),
+        info = {
+            'client_id':     data['client_id'],
+            'client_secret': data['client_secret'],
+            'refresh_token': data['refresh_token'],
+            'token_uri':     data.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            'type':          'authorized_user',
+        }
+        creds = GCreds.from_authorized_user_info(
+            info, scopes=['https://www.googleapis.com/auth/spreadsheets']
         )
-        if not creds.valid:
-            creds.refresh(GRequest())
+        creds.refresh(GRequest())
         return creds
     except Exception as e:
         print(f"[get_sheets_creds error] {e}")

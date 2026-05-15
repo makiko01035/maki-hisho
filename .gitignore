@@ -2,3 +2,14 @@ client_secret.json
 .env
 __pycache__/
 *.pyc
+# 認証情報・トークン（Renderの環境変数で管理）
+credentials_for_render.txt
+google_creds_clean.txt
+google_creds_temp.txt
+token_sheets.json
+# 作業用一時ファイル
+notify_ig_result.txt
+pdf_extract.txt
+web_guide_extract.txt
+wp_posts.txt
+maruchan_b64.txt
