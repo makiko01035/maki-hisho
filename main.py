@@ -1898,6 +1898,29 @@ def ensure_ebay_mgmt_sheet(service):
 def ebay_dashboard_page():
     return send_from_directory('.', 'ebay_dashboard.html')
 
+@app.route('/api/ebay/debug')
+def ebay_debug():
+    import traceback
+    result = {
+        'GOOGLE_SHEETS_TOKEN_set': bool(os.environ.get('GOOGLE_SHEETS_TOKEN', '')),
+        'EBAY_REFRESH_TOKEN_set':  bool(os.environ.get('EBAY_REFRESH_TOKEN', '')),
+        'EBAY_APP_ID_set':         bool(os.environ.get('EBAY_APP_ID', '')),
+        'EBAY_CERT_ID_set':        bool(os.environ.get('EBAY_CERT_ID', '')),
+    }
+    try:
+        creds = get_sheets_creds()
+        result['sheets_creds_ok'] = creds is not None
+    except Exception as e:
+        result['sheets_creds_ok'] = False
+        result['sheets_error'] = traceback.format_exc()
+    try:
+        token = get_ebay_user_token()
+        result['ebay_token_ok'] = token is not None
+    except Exception as e:
+        result['ebay_token_ok'] = False
+        result['ebay_token_error'] = str(e)
+    return jsonify(result)
+
 @app.route('/api/ebay/data')
 def ebay_data_api():
     try:
