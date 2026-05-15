@@ -234,43 +234,50 @@ def run_writer():
     """投稿案生成 → AI採点 → 承認待ちストック保存 → LINEで確認依頼"""
     try:
         research     = _load(RESEARCH_PATH, {})
-        feedback     = _load(FEEDBACK_PATH, {})
-        weekly_theme = research.get('weekly_theme', '旅行×楽天アフィ')
-        hook_hint    = research.get('hook_hint', '共感・お得感')
-        aff_keywords = research.get('aff_keywords') or _FALLBACK_AFF_GENRES
+        feedback       = _load(FEEDBACK_PATH, {})
+        weekly_theme   = research.get('weekly_theme', '旅行×楽天アフィ')
+        hook_hint      = research.get('hook_hint', '共感・お得感')
+        aff_keywords   = research.get('aff_keywords') or _FALLBACK_AFF_GENRES
         morning_themes = research.get('morning_themes', [])
-        good_hooks   = feedback.get('good_hooks', [])
+        good_hooks     = feedback.get('good_hooks', [])
+        is_marathon    = research.get('marathon_boost', False)
+
+        # 強化期（楽天マラソン）は生成数を2倍
+        morning_count = 14 if is_marathon else 7
+        aff_count     = 14 if is_marathon else 7
 
         ai = _client()
         posts = []
 
-        # ---- 朝つぶやき 7本 ----
+        # ---- 朝つぶやき（通常7本・強化期14本）----
         m_prompt = (
             f"今週テーマ：{weekly_theme}　フックヒント：{hook_hint}\n"
             f"参考テーマ：{', '.join(morning_themes)}\n"
             + (f"先週バズった1行目（参考）：{', '.join(good_hooks[:3])}\n" if good_hooks else "")
             + "こはるまま（旅行×楽天アフィ・30-40代子連れワーママ向け）の"
-            "朝つぶやきを7本生成。\n\n"
+            f"朝つぶやきを{morning_count}本生成。\n\n"
             "ルール：1投稿50字以内・テキストのみ・旅あるある共感系（売り込みなし）\n"
             "ですます調NG・口語・体言止めOK・URLなし・ハッシュタグなし\n"
             "1行目が命。\n\n"
             'JSON形式のみで出力：[{"type":"morning","body":"投稿文","theme":"テーマ"}, ...]'
         )
         r = ai.messages.create(
-            model='claude-haiku-4-5-20251001', max_tokens=1500,
+            model='claude-haiku-4-5-20251001', max_tokens=3000 if is_marathon else 1500,
             messages=[{'role': 'user', 'content': m_prompt}]
         )
         mt = re.search(r'\[.*\]', r.content[0].text, re.DOTALL)
         if mt:
             posts.extend(json.loads(mt.group()))
 
-        # ---- アフィ投稿 7本（楽天API → Claude生成）----
+        # ---- アフィ投稿（通常7本・強化期14本）楽天API → Claude生成 ----
+        # 強化期はキーワードをループして2周する
         try:
             from blog_yakuzen import search_rakuten_items
         except ImportError:
             search_rakuten_items = None
 
-        for i, kw in enumerate(aff_keywords[:7]):
+        aff_kw_list = (aff_keywords * 2)[:aff_count] if is_marathon else aff_keywords[:aff_count]
+        for i, kw in enumerate(aff_kw_list):
             try:
                 item = None
                 if search_rakuten_items:
@@ -350,8 +357,9 @@ def run_writer():
             for i, p in enumerate(aff_posts[:3])
         ])
 
+        marathon_label = "🔥 楽天マラソン強化期" if is_marathon else "通常期"
         msg = (
-            f"📱 今週のこはるまま投稿案 完成！\n\n"
+            f"📱 今週のこはるまま投稿案 完成！【{marathon_label}】\n\n"
             f"テーマ：{weekly_theme}\n"
             f"生成：{len(approved)}本（採点落ち：{rejected}本）\n"
             f"  └ 朝つぶやき{len(morning_posts)}本 ＋ アフィ{len(aff_posts)}本\n\n"
