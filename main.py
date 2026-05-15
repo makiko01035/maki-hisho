@@ -1964,7 +1964,9 @@ def ebay_sync_api():
         )
         ebay_orders = resp.json().get("orders", [])
 
-        creds   = get_sheets_creds()
+        creds = get_sheets_creds()
+        if not creds:
+            return jsonify({"error": "Google Sheets認証エラー"}), 500
         service = build("sheets", "v4", credentials=creds)
         ensure_ebay_mgmt_sheet(service)
 
@@ -3772,6 +3774,10 @@ QUOTE_TWEET_TEMPLATES = [
     "eBay初売れした。メルカリで仕入れてeBayで出品、初めての海外への販売。ドキドキしながら通知を確認したら本当に売れてた。ゼロから積み上げてきた感じがちゃんとある。 #AI副業 #eBay #ワーママ副業",
     "毎朝LINEに『今日の仕入れ候補』が届くようにした。eBayで日本人セラーが売れた商品を自動リサーチして、メルカリ相場確認URLと仕入れ上限も一緒に届く。朝起きたら見るだけ。 #Claude #AI副業 #自動化",
     "気になるeBayセラーをLINEで即追跡できるようにした。セラーIDを送ると売れた商品・価格・仕入れ上限をすぐ返してくれる。競合調査が秒で終わる。 #Claude #AI副業 #eBay",
+    # ── ファイル整理・PC管理 ──
+    "ダウンロードフォルダ1,492件→1,113件。Claude Codeに頼んだら20分で終わった。重複削除・野球写真除外・不動産フォルダ分け・監修原稿一括削除。自分でやったら半日かかってたやつ。AIに任せると『整理しなきゃ』というストレスごと消える。 #ClaudeCode #AI副業 #時短",
+    "「野球の写真はいらない」の一言でフォルダ丸ごと削除できる時代になった。Claude Codeが画像を1枚ずつ開いて内容を確認して、野球写真だけ選んで消してくれた。パソコン整理もAIに丸投げでいい。 #ClaudeCode #AI副業 #時短術",
+    "不動産書類58件をリリア成増・板橋区計画・松戸市岩瀬・検討物件…に自動分類してもらった。フォルダ作成から移動まで全部AIがやってくれる。自分でやったら30分の作業が30秒。Claude Codeはコードだけじゃなくてファイル整理もできる。 #AI副業 #ClaudeCode",
 ]
 
 
