@@ -4357,6 +4357,10 @@ def send_x_weekly_report():
                 target=auto_improve_tweet_stock,
                 args=(top_texts, analysis_text)
             ).start()
+
+        # Notionの日記メモからもツイート生成（バックグラウンド）
+        threading.Thread(target=auto_tweet_from_diary_memos).start()
+
     except Exception as e:
         print(f"X weekly report error: {e}")
         try:
@@ -4504,6 +4508,144 @@ def find_or_create_diary_page(notion_token, today_str):
     if r2.status_code == 200:
         return r2.json()["id"]
     return None
+
+
+def fetch_diary_memos_from_notion(days=7):
+    """Notionから直近N日間の日記メモを取得してテキストで返す"""
+    import requests as req
+    notion_token = os.environ.get('NOTION_TOKEN', '')
+    if not notion_token:
+        return ""
+    headers = {
+        "Authorization": f"Bearer {notion_token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    # 直近N日間の日付リストを作成
+    today = datetime.date.today()
+    target_dates = [(today - datetime.timedelta(days=i)).strftime('%Y-%m-%d') for i in range(days)]
+
+    # Notionから「日記」ページを検索
+    r = req.post("https://api.notion.com/v1/search",
+        headers=headers,
+        json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 30}
+    )
+    if r.status_code != 200:
+        return ""
+
+    all_memos = []
+    for page in r.json().get("results", []):
+        props = page.get("properties", {})
+        date_val = props.get("日付", {}).get("date") or {}
+        page_date = date_val.get("start", "")
+        if page_date not in target_dates:
+            continue
+        # そのページのブロック（メモ）を取得
+        page_id = page["id"]
+        rb = req.get(f"https://api.notion.com/v1/blocks/{page_id}/children",
+            headers=headers, params={"page_size": 100}
+        )
+        if rb.status_code != 200:
+            continue
+        for block in rb.json().get("results", []):
+            if block.get("type") == "bulleted_list_item":
+                texts = block["bulleted_list_item"].get("rich_text", [])
+                text = "".join(t.get("plain_text", "") for t in texts).strip()
+                if text:
+                    all_memos.append(f"[{page_date}] {text}")
+
+    return "\n".join(all_memos)
+
+
+def auto_tweet_from_diary_memos():
+    """Notionの日記メモをX投稿に変換してTWEET_STOCKに自動追加"""
+    import base64
+    import requests as req_lib
+
+    memos_text = fetch_diary_memos_from_notion(days=7)
+    if not memos_text:
+        print("diary memos: nothing to process")
+        return
+
+    github_token = (os.environ.get('GITHUB_TOKEN') or '').strip()
+    if not github_token:
+        return
+
+    # Claudeに渡してX投稿3本を生成
+    gen_prompt = (
+        "あなたはXアカウント（@maki_claude_lab：医療職×3児ワンオペ×AIで日常が楽になった実体験を発信）の投稿担当です。\n"
+        "以下は本人が日常の中でLINEにメモした内容です。\n"
+        "これをX投稿（140文字以内）に変換してください。3本作成してください。\n\n"
+        f"【日記メモ（直近7日）】\n{memos_text[:1500]}\n\n"
+        "条件：\n"
+        "- 「AIって何に使うの？」と思っているワーママ・AI初心者に刺さる書き方\n"
+        "- 副業・収益化より『日常の変化』『楽になった』『気づき』軸で書く\n"
+        "- ですます調・等身大のトーン\n"
+        "- ハッシュタグは #ワーママ #AI #子育て #AI秘書 #時短 のいずれか1〜2個\n"
+        "- 3本を1行ずつ、番号なし・余計な説明なしで出力\n"
+        "- メモがAI・副業と無関係でも日常の共感ネタとして活かしてOK"
+    )
+    try:
+        gen_resp = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=500,
+            messages=[{"role": "user", "content": gen_prompt}]
+        )
+        new_tweets = [
+            t.strip() for t in gen_resp.content[0].text.strip().split('\n')
+            if t.strip() and len(t.strip()) > 10
+        ][:3]
+    except Exception as e:
+        print(f"diary tweet generate error: {e}")
+        return
+
+    if not new_tweets:
+        return
+
+    # GitHub APIでTWEET_STOCKに追加
+    repo = 'makiko01035/maki-hisho'
+    file_path = 'main.py'
+    headers = {
+        'Authorization': f'token {github_token}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    r = req_lib.get(f'https://api.github.com/repos/{repo}/contents/{file_path}', headers=headers)
+    if r.status_code != 200:
+        return
+
+    data = r.json()
+    sha = data['sha']
+    content = base64.b64decode(data['content']).decode('utf-8')
+    stock_start = content.find('TWEET_STOCK = [')
+    if stock_start == -1:
+        return
+    stock_end = content.find('\n]', stock_start)
+    if stock_end == -1:
+        return
+
+    insert_lines = '\n'.join([f'    "{t}",' for t in new_tweets])
+    new_content = content[:stock_end] + '\n' + insert_lines + content[stock_end:]
+
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    commit_msg = f"広報部PDCA：{today_str} 日記メモからツイート{len(new_tweets)}本自動追加"
+    update_payload = {
+        'message': commit_msg,
+        'content': base64.b64encode(new_content.encode('utf-8')).decode('utf-8'),
+        'sha': sha,
+        'branch': 'main'
+    }
+    r2 = req_lib.put(
+        f'https://api.github.com/repos/{repo}/contents/{file_path}',
+        headers=headers, json=update_payload
+    )
+    line_uid = os.environ.get('LINE_USER_ID', '')
+    if r2.status_code in (200, 201) and line_uid:
+        preview = '\n'.join([f'・{t[:30]}…' for t in new_tweets])
+        line_bot_api.push_message(line_uid, TextSendMessage(
+            text=f"📓 日記メモからX投稿を追加しました！\n\n{preview}\n\n2〜3分でRenderに反映されます。"
+        ))
+    else:
+        print(f"diary tweet stock update error: {r2.status_code}")
 
 
 def add_diary_memo(memo_text):
