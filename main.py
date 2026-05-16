@@ -5650,7 +5650,21 @@ scheduler.add_job(send_hsbc_reminder, 'cron', day=1, hour=8, minute=30)
 scheduler.add_job(send_famm_reminder, 'cron', day=1, hour=9, minute=0)
 # 毎月6日朝9時：Famm期限3日前リマインダー
 scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
-# 毎週火曜朝9時：薬膳ブログ更新リマインダー
+# 月・木 8:00：薬膳ブログ新規記事を自動作成
+def auto_blog_new():
+    uid = os.environ.get('LINE_USER_ID', '')
+    if uid:
+        threading.Thread(target=process_yakuzen_new_article, args=(uid,), daemon=True).start()
+
+# 水・土 8:00：薬膳ブログ自動リライト
+def auto_blog_rewrite():
+    uid = os.environ.get('LINE_USER_ID', '')
+    if uid:
+        threading.Thread(target=auto_rewrite_yakuzen, args=(uid,), daemon=True).start()
+
+scheduler.add_job(auto_blog_new,     'cron', day_of_week='mon,thu', hour=8, minute=0)
+scheduler.add_job(auto_blog_rewrite, 'cron', day_of_week='wed,sat', hour=8, minute=0)
+# 毎週火曜朝9時：薬膳ブログ更新リマインダー（手動対応用）
 scheduler.add_job(send_yakuzen_blog_reminder, 'cron', day_of_week='tue', hour=9, minute=0)
 # 毎週木曜朝9時：セキスイブログ更新リマインダー
 scheduler.add_job(send_sekisui_blog_reminder, 'cron', day_of_week='thu', hour=9, minute=0)
