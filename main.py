@@ -5661,17 +5661,60 @@ scheduler.add_job(send_hsbc_reminder, 'cron', day=1, hour=8, minute=30)
 scheduler.add_job(send_famm_reminder, 'cron', day=1, hour=9, minute=0)
 # 毎月6日朝9時：Famm期限3日前リマインダー
 scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
-# 月・木 8:00：薬膳ブログ新規記事を自動作成
+# 月・木 8:00：7stepパイプラインで新規記事を自動作成
 def auto_blog_new():
-    uid = os.environ.get('LINE_USER_ID', '')
-    if uid:
-        threading.Thread(target=process_yakuzen_new_article, args=(uid,), daemon=True).start()
+    from phases import phase4_write, phase5_quality, phase6_publish
+    from pathlib import Path
 
-# 水・土 8:00：薬膳ブログ自動リライト
+    kw_file = Path(__file__).parent / "keywords_new.txt"
+    lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
+    if not lines:
+        return
+    keyword = lines[0]
+    kw_file.write_text('\n'.join(lines[1:]) + '\n', encoding='utf-8')
+
+    def _run():
+        try:
+            design = f"# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。"
+            draft, _ = phase4_write.run(keyword, design)
+            final, score, passed, _ = phase5_quality.run(keyword, draft)
+            if passed:
+                phase6_publish.run(keyword, final)
+        except Exception as e:
+            print(f"auto_blog_new error: {e}")
+    threading.Thread(target=_run, daemon=True).start()
+
+# 水・土 8:00：7stepパイプラインで旧レシピ記事を自動リライト
 def auto_blog_rewrite():
-    uid = os.environ.get('LINE_USER_ID', '')
-    if uid:
-        threading.Thread(target=auto_rewrite_yakuzen, args=(uid,), daemon=True).start()
+    from phases import phase4_rewrite, phase5_quality, phase6_publish
+    import requests as req
+
+    wp_url  = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+    wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+    wp_pass = os.environ.get('YAKUZEN_WP_APP_PASSWORD', '')
+
+    def _run():
+        try:
+            res = req.get(f"{wp_url}/wp-json/wp/v2/posts",
+                          auth=(wp_user, wp_pass),
+                          params={"categories": 9, "orderby": "date", "order": "asc",
+                                  "per_page": 1, "status": "publish",
+                                  "_fields": "id,title,link"},
+                          timeout=10)
+            posts = res.json()
+            if not posts:
+                return
+            post_id = posts[0]["id"]
+            title   = posts[0]["title"]["rendered"]
+            keyword = ' '.join(title.split()[:5])
+            draft, _ = phase4_rewrite.run(keyword, "")
+            final, score, passed, _ = phase5_quality.run(keyword, draft)
+            if passed:
+                # 新規投稿ではなく既存記事を上書き更新＋カテゴリ変更
+                phase6_publish.run_update(keyword, final, post_id)
+        except Exception as e:
+            print(f"auto_blog_rewrite error: {e}")
+    threading.Thread(target=_run, daemon=True).start()
 
 scheduler.add_job(auto_blog_new,     'cron', day_of_week='mon,thu', hour=8, minute=0)
 scheduler.add_job(auto_blog_rewrite, 'cron', day_of_week='wed,sat', hour=8, minute=0)
