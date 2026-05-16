@@ -1786,6 +1786,24 @@ def koharu_stock_status():
     })
 
 
+@app.route('/koharu-engine-writer-debug')
+def koharu_engine_writer_debug():
+    """ライターをフォアグラウンドで実行してエラーを直接確認（デバッグ用）"""
+    import traceback, io, sys
+    buf = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = buf
+    try:
+        koharu_writer()
+        output = buf.getvalue()
+        sys.stdout = old_stdout
+        return f'<pre>✅ 完了\n\n{output}</pre>'
+    except Exception as e:
+        output = buf.getvalue()
+        sys.stdout = old_stdout
+        return f'<pre>❌ エラー: {e}\n\n{traceback.format_exc()}\n\nログ:\n{output}</pre>', 500
+
+
 @app.route('/koharu-engine-writer-now')
 def koharu_engine_writer_now():
     """こはるままエンジン：②ライターを今すぐ実行（手動テスト）"""
