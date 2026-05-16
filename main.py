@@ -24,6 +24,16 @@ from sns_engine_koharu import (
     run_monitor   as koharu_monitor,
     handle_approval as koharu_handle_approval,
 )
+from sns_engine_mako import (
+    run_researcher as mako_researcher,
+    run_writer     as mako_writer,
+    run_poster_info as mako_poster_info,
+    run_poster_aff  as mako_poster_aff,
+    run_collector   as mako_collector,
+    run_analyst     as mako_analyst,
+    run_monitor     as mako_monitor,
+    handle_mako_approval,
+)
 from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 
@@ -1849,6 +1859,59 @@ def koharu_engine_analyst_now():
         return f'❌ {e}', 500
 
 
+@app.route('/mako-engine-writer-now')
+def mako_engine_writer_now():
+    """MAKOエンジン：②ライターを今すぐ実行（手動テスト）"""
+    try:
+        import threading
+        threading.Thread(target=mako_writer, daemon=True).start()
+        return '✅ MAKOライター起動！数分後にLINEに投稿案が届きます。'
+    except Exception as e:
+        return f'❌ {e}', 500
+
+
+@app.route('/mako-engine-researcher-now')
+def mako_engine_researcher_now():
+    """MAKOエンジン：①リサーチャーを今すぐ実行（手動テスト）"""
+    try:
+        mako_researcher()
+        return '✅ MAKOリサーチャー完了！'
+    except Exception as e:
+        return f'❌ {e}', 500
+
+
+@app.route('/mako-stock-status')
+def mako_stock_status():
+    """MAKO承認待ち・承認済みストックの状態確認"""
+    import json as _json
+    pending_path  = '/tmp/mako_stock_pending.json'
+    approved_path = '/tmp/mako_stock_approved.json'
+    def _read(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return _json.load(f)
+        except Exception:
+            return None
+    pending  = _read(pending_path)
+    approved = _read(approved_path)
+    return _json.dumps({
+        'pending':  {'count': len((pending  or {}).get('posts', [])), 'created_at': (pending  or {}).get('created_at')},
+        'approved': {'count': len((approved or {}).get('posts', [])), 'created_at': (approved or {}).get('created_at')},
+    }, ensure_ascii=False, indent=2)
+
+
+@app.route('/koharu-writer-log')
+def koharu_writer_log():
+    """こはるままライターの直近エラーログを表示"""
+    try:
+        with open('/tmp/koharu_writer_error.log', 'r', encoding='utf-8') as f:
+            return f'<pre>{f.read()}</pre>'
+    except FileNotFoundError:
+        return '✅ エラーログなし（ライターは正常終了しています）'
+    except Exception as e:
+        return f'❌ ログ読み取りエラー: {e}', 500
+
+
 @app.route('/post-koharu-threads-now')
 def post_koharu_threads_now():
     """今すぐこはるままのThreadsにアフィ投稿を送る（手動テスト用）"""
@@ -2838,6 +2901,12 @@ def handle_message(event):
     # こはるまま投稿承認コマンド
     if user_message.startswith('こはるまま'):
         if koharu_handle_approval(user_message):
+            return
+        # 未対応の場合はそのまま通常処理へ
+
+    # MAKO投稿承認コマンド
+    if user_message.upper().startswith('MAKO') or user_message.startswith('ＭＡＫＯ') or user_message.startswith('ｍａｋｏ'):
+        if handle_mako_approval(user_message):
             return
         # 未対応の場合はそのまま通常処理へ
 
@@ -5787,6 +5856,22 @@ scheduler.add_job(koharu_analyst, 'cron', day_of_week='sun', hour=20, minute=0)
 scheduler.add_job(koharu_monitor, 'cron', hour=7,  minute=0)
 scheduler.add_job(koharu_monitor, 'cron', hour=13, minute=0)
 scheduler.add_job(koharu_monitor, 'cron', hour=22, minute=0)
+# ========== MAKO SNSエンジン 6ロール（x:10 オフセット・こはるままと衝突回避）==========
+# ① リサーチャー：月曜 05:10
+scheduler.add_job(mako_researcher, 'cron', day_of_week='mon', hour=5, minute=10)
+# ② ライター：月曜 06:10
+scheduler.add_job(mako_writer, 'cron', day_of_week='mon', hour=6, minute=10)
+# ③ ポスター：承認済みストックから投稿（ストック切れ時はリアルタイム生成）
+scheduler.add_job(mako_poster_info, 'cron', hour=6, minute=40, jitter=7200)  # 6:40〜8:40のランダム
+scheduler.add_job(mako_poster_aff,  'cron', hour=19, minute=10, jitter=7200)  # 19:10〜21:10のランダム
+# ④ コレクター：毎日 23:10
+scheduler.add_job(mako_collector, 'cron', hour=23, minute=10)
+# ⑤ アナリスト：日曜 20:10
+scheduler.add_job(mako_analyst, 'cron', day_of_week='sun', hour=20, minute=10)
+# ⑥ モニター：毎日 07:10 / 13:10 / 22:10
+scheduler.add_job(mako_monitor, 'cron', hour=7,  minute=10)
+scheduler.add_job(mako_monitor, 'cron', hour=13, minute=10)
+scheduler.add_job(mako_monitor, 'cron', hour=22, minute=10)
 # MAKO Threads：1日2本（MAKO_THREADS_ACCESS_TOKEN設定後に自動稼働）
 # 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
 scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)

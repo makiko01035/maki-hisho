@@ -373,7 +373,15 @@ def run_writer():
         print(f"[koharu] writer done: {len(approved)} posts, {rejected} rejected")
 
     except Exception as e:
-        print(f"[koharu] run_writer error: {e}")
+        import traceback
+        err_msg = f"[koharu] run_writer error: {e}\n{traceback.format_exc()}"
+        print(err_msg)
+        try:
+            with open('/tmp/koharu_writer_error.log', 'w', encoding='utf-8') as f:
+                f.write(err_msg)
+        except Exception:
+            pass
+        _send_line(f"⚠️ こはるままライターでエラーが発生しました\n{type(e).__name__}: {e}\n\n詳細は /koharu-writer-log で確認できます")
 
 
 def _score_post(body, post_type, ai=None):
