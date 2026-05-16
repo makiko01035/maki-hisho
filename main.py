@@ -32,6 +32,8 @@ from sns_engine_mako import (
     run_collector   as mako_collector,
     run_analyst     as mako_analyst,
     run_monitor     as mako_monitor,
+    run_poster_morning_quote as mako_poster_morning_quote,
+    run_quote_generator      as mako_quote_generator,
     handle_mako_approval,
 )
 from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
@@ -1958,6 +1960,26 @@ def post_mako_x_now():
     try:
         mako_poster_info()
         return '✅ MAKO X＋Threads 情報投稿完了！両アプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@app.route('/post-mako-quote-now')
+def post_mako_quote_now():
+    """今すぐMAKOの朝格言をXに投稿（手動テスト用）"""
+    try:
+        mako_poster_morning_quote()
+        return '✅ MAKO格言投稿完了！Xアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@app.route('/generate-mako-quotes-now')
+def generate_mako_quotes_now():
+    """今すぐMAKO格言30本を生成してストックに追加（手動テスト用）"""
+    try:
+        mako_quote_generator()
+        return '✅ MAKO格言生成完了！LINEに結果が届きます。'
     except Exception as e:
         return f'❌ エラー: {e}', 500
 
@@ -5955,6 +5977,10 @@ scheduler.add_job(mako_analyst, 'cron', day_of_week='sun', hour=20, minute=10)
 scheduler.add_job(mako_monitor, 'cron', hour=7,  minute=10)
 scheduler.add_job(mako_monitor, 'cron', hour=13, minute=10)
 scheduler.add_job(mako_monitor, 'cron', hour=22, minute=10)
+# ⑦ 格言ポスター：毎朝 05:00〜05:15（X のみ・Threadsはまきさんが手動で貼る）
+scheduler.add_job(mako_poster_morning_quote, 'cron', hour=5, minute=0, jitter=900)
+# ⑧ 格言ジェネレーター：毎月1日 04:00（30本生成→LINEに通知）
+scheduler.add_job(mako_quote_generator, 'cron', day=1, hour=4, minute=0)
 # MAKO Threads：1日2本（MAKO_THREADS_ACCESS_TOKEN設定後に自動稼働）
 # 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
 scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)

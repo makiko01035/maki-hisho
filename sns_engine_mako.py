@@ -41,6 +41,7 @@ ANALYTICS_PATH      = '/tmp/mako_analytics.json'
 RESEARCH_PATH       = '/tmp/mako_research.json'
 POSTED_LOG_PATH     = '/tmp/mako_posted_log.json'
 FEEDBACK_PATH       = '/tmp/mako_feedback.json'
+QUOTE_STOCK_PATH    = '/tmp/mako_quote_stock.json'
 
 # フォールバック用定数（こはるままの MAKO_THREADS_MORNING と同内容）
 _FALLBACK_MORNING = [
@@ -862,3 +863,133 @@ def run_monitor():
 
     except Exception as e:
         print(f"[mako] run_monitor error: {e}")
+
+
+# ============================================================
+# ⑦ 格言ポスター  毎朝 05:00〜05:15（X のみ・Threadsは手動）
+# ============================================================
+
+def run_poster_morning_quote():
+    """格言ストックから1本選んでXに投稿。ストック切れ時はフォールバック文を投稿"""
+    try:
+        stock = _load(QUOTE_STOCK_PATH, {'quotes': []})
+        remaining = [q for q in stock.get('quotes', []) if not q.get('posted')]
+
+        if remaining:
+            quote = random.choice(remaining)
+            tweet_id = _post_x(quote['body'])
+            if tweet_id:
+                quote.update({'posted': True, 'posted_at': datetime.now().isoformat()})
+                _save(QUOTE_STOCK_PATH, stock)
+                print(f"[mako] morning quote posted: {quote['body'][:30]}")
+        else:
+            # ストック切れ：フォールバック
+            fallback = random.choice(_FALLBACK_QUOTES)
+            _post_x(fallback)
+            print(f"[mako] morning quote (fallback): {fallback[:30]}")
+
+    except Exception as e:
+        print(f"[mako] run_poster_morning_quote error: {e}")
+
+
+# フォールバック格言（ストック切れ時用）
+_FALLBACK_QUOTES = [
+    "眠れないのは意志が弱いからじゃない\n脳がまだ仕事してるだけかもしれない",
+    "回復中に「もっと頑張らなきゃ」は\n逆効果かもしれない",
+    "明日の自分は\n今夜ちゃんと眠った自分が作る",
+    "「疲れたな」と思ったとき\nそれは心より先に体が白旗を上げてる",
+    "ワーママの夜って\nやること終わってから\nやっと自分の時間が来る\n眠れないのはそのせいかもしれない",
+    "なにがあろうとオレはオレなんだ\n——水木しげる\n\nがんばりすぎる人ほど\n忘れてる感覚だと思う",
+    "どうして、自分を責めるんですか\n重要な時には他人がちゃんと\n責めてくれるんだから\n——アインシュタイン",
+    "\"向いてない\"んじゃなくて\n疲れてるだけのこともある",
+    "「ちゃんとしなきゃ」の前に\nまず今日を生き延びたことを\n認めていいかもしれない",
+    "10分でも、自分の体に戻る時間を作る\nそれが睡眠の質を変えることがある",
+]
+
+
+# ============================================================
+# ⑧ 格言ジェネレーター  毎月1日 04:00（スケジューラ経由）
+# ============================================================
+
+def run_quote_generator():
+    """毎月1日：過去の反応を踏まえて格言30本を生成しストックに追加"""
+    try:
+        # 過去のアナリストフィードバックを参照
+        feedback = _load(FEEDBACK_PATH, {})
+        pattern  = feedback.get('pattern', '')
+        advice   = feedback.get('advice', '')
+
+        # 残りストック数を確認
+        stock     = _load(QUOTE_STOCK_PATH, {'quotes': []})
+        remaining = len([q for q in stock.get('quotes', []) if not q.get('posted')])
+        print(f"[mako] quote generator: {remaining} remaining in stock")
+
+        feedback_section = ''
+        if pattern or advice:
+            feedback_section = (
+                f"\n\n【先月の反応を踏まえて】\n"
+                f"伸びたパターン：{pattern}\n"
+                f"来月への提言：{advice}\n"
+                f"これらの傾向を参考に、より刺さる言葉を生成してください。"
+            )
+
+        prompt = (
+            "MAKOというアカウント向けに、朝5時に投稿する格言・共感メモを30本作ってください。\n\n"
+            "【MAKOのキャラクター】\n"
+            "内科医ママ × 睡眠改善。医学×薬膳の両面から睡眠の悩みに寄り添う。\n"
+            "疲れたワーママ・更年期・自分責めしがちな人に向けて発信。\n\n"
+            "【絶対ルール】\n"
+            "・言い切りNG（「〜です」「〜効果あります」→「かもしれない」「という方もいます」「試す価値はある」）\n"
+            "・売り込み感NG\n"
+            "・医師として断言するのではなく、寄り添う視点で\n"
+            "・1投稿は4行以内・100字以内\n\n"
+            "【4タイプを均等に：各7〜8本】\n"
+            "①気づき：「〜じゃなくて、〜かもしれない」系\n"
+            "②許可：「〜しなくていい」「〜でいい」系\n"
+            "③言語化：「〜って、〜感覚がある」共感系\n"
+            "④未来：「〜すると、明日が変わる」希望系\n\n"
+            "【水木しげる・アインシュタインの実在引用を各1本混ぜる（計2本）】\n"
+            "引用形式：「言葉」\n——名前\n\nMAKOの一言（2行以内）\n\n"
+            "【出力形式】\n"
+            "各投稿を---で区切って、番号なし・説明なし・投稿文のみ出力。"
+            + feedback_section
+        )
+
+        resp = _client().messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=4000,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        raw = resp.content[0].text.strip()
+
+        # ---区切りでパース
+        new_quotes = []
+        for chunk in raw.split('---'):
+            body = chunk.strip()
+            if body and len(body) >= 10:
+                new_quotes.append({
+                    'body':       body,
+                    'posted':     False,
+                    'created_at': datetime.now().isoformat(),
+                })
+
+        if not new_quotes:
+            print("[mako] quote generator: parse failed, no quotes extracted")
+            return
+
+        stock['quotes'] = stock.get('quotes', []) + new_quotes
+        # 投稿済みが多くなりすぎたら古い投稿済みを削除（上限200件）
+        stock['quotes'] = stock['quotes'][-200:]
+        _save(QUOTE_STOCK_PATH, stock)
+
+        total_remaining = len([q for q in stock['quotes'] if not q.get('posted')])
+        print(f"[mako] quote generator: added {len(new_quotes)} quotes, total remaining {total_remaining}")
+        _send_line(
+            f"📖 MAKO格言ストック更新\n\n"
+            f"今月分：{len(new_quotes)}本追加\n"
+            f"残りストック：{total_remaining}本\n\n"
+            f"毎朝5時に1本ずつXに投稿されます"
+        )
+
+    except Exception as e:
+        print(f"[mako] run_quote_generator error: {e}")
