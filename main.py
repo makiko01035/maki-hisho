@@ -1952,6 +1952,16 @@ def post_mako_threads_morning_now():
         return f'❌ エラー: {e}', 500
 
 
+@app.route('/post-mako-x-now')
+def post_mako_x_now():
+    """今すぐMAKOのXにテスト投稿（情報系ストック or フォールバック）"""
+    try:
+        mako_poster_info()
+        return '✅ MAKO X＋Threads 情報投稿完了！両アプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @app.route('/post-threads-now')
 def post_threads_now():
     """今すぐThreadsに楽天アフィ投稿を1本送る（手動トリガー）"""

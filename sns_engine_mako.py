@@ -104,6 +104,46 @@ def _save(path, data):
         print(f"[mako] _save error ({path}): {e}")
 
 
+def _get_mako_x_client():
+    """MAKOのX（tweepy）クライアントを返す。キー未設定時はNone"""
+    try:
+        import tweepy
+        api_key    = (os.environ.get('MAKO_X_API_KEY') or '').strip()
+        api_secret = (os.environ.get('MAKO_X_API_SECRET') or '').strip()
+        access_tok = (os.environ.get('MAKO_X_ACCESS_TOKEN') or '').strip()
+        access_sec = (os.environ.get('MAKO_X_ACCESS_TOKEN_SECRET') or '').strip()
+        if not all([api_key, api_secret, access_tok, access_sec]):
+            return None
+        return tweepy.Client(
+            consumer_key=api_key, consumer_secret=api_secret,
+            access_token=access_tok, access_token_secret=access_sec
+        )
+    except Exception as e:
+        print(f"[mako] _get_mako_x_client error: {e}")
+        return None
+
+
+def _post_x(text, reply_to_id=None):
+    """MAKOのXに投稿。280字超は末尾省略。成功時はtweet_id、失敗時はNone"""
+    client = _get_mako_x_client()
+    if not client:
+        print("[mako] MAKO X keys not set, skipping X post")
+        return None
+    try:
+        if len(text) > 280:
+            text = text[:278] + '…'
+        kwargs = {'text': text}
+        if reply_to_id:
+            kwargs['in_reply_to_tweet_id'] = reply_to_id
+        resp = client.create_tweet(**kwargs)
+        tweet_id = resp.data['id']
+        print(f"[mako] X posted: {tweet_id}")
+        return tweet_id
+    except Exception as e:
+        print(f"[mako] _post_x error: {e}")
+        return None
+
+
 def _post_threads(text, reply_to_id=None):
     """MAKOのThreadsに投稿。成功時は post_id、失敗時は None"""
     access_token = os.environ.get('MAKO_THREADS_ACCESS_TOKEN', '').strip()
@@ -521,12 +561,16 @@ def run_poster_info():
                 _save(STOCK_APPROVED_PATH, approved)
                 _log_post(post)
                 print(f"[mako] poster info (stock): {post['body'][:30]}")
+                time.sleep(10)
+                _post_x(post['body'])
                 return
 
         # フォールバック
         text = random.choice(_FALLBACK_MORNING)
         _post_threads(text)
         print(f"[mako] poster info (fallback): {text[:30]}")
+        time.sleep(10)
+        _post_x(text)
 
     except Exception as e:
         print(f"[mako] run_poster_info error: {e}")
@@ -559,6 +603,11 @@ def run_poster_aff():
                 _save(STOCK_APPROVED_PATH, approved)
                 _log_post(post)
                 print(f"[mako] poster aff (stock): {post['body'][:30]}")
+                time.sleep(10)
+                tweet_id = _post_x(post['body'])
+                if tweet_id and post.get('url'):
+                    time.sleep(5)
+                    _post_x(f"気になる方はこちら\n{post['url']}\n[楽天PR]", reply_to_id=tweet_id)
                 return
 
         _fallback_aff()
@@ -593,6 +642,11 @@ def _fallback_aff():
             time.sleep(5)
             _post_threads(f"気になる方はこちら\n{item['url']}\n[楽天PR]", reply_to_id=post_id)
         print(f"[mako] fallback aff done: {body[:30]}")
+        time.sleep(10)
+        tweet_id = _post_x(body)
+        if tweet_id and item.get('url'):
+            time.sleep(5)
+            _post_x(f"気になる方はこちら\n{item['url']}\n[楽天PR]", reply_to_id=tweet_id)
     except Exception as e:
         print(f"[mako] _fallback_aff error: {e}")
 
@@ -777,6 +831,9 @@ def run_monitor():
                 issues.append(f"⚠️ MAKO Threads接続エラー: {str(e)[:40]}")
         else:
             issues.append("⚠️ MAKO_THREADS_ACCESS_TOKEN 未設定")
+
+        if not _get_mako_x_client():
+            issues.append("⚠️ MAKO X APIキー未設定（MAKO_X_API_KEY等）")
 
         if datetime.now().hour >= 22:
             log        = _load(POSTED_LOG_PATH, {'recent': []})
