@@ -1754,6 +1754,19 @@ def post_kvision_card_now():
         return f'❌ エラー: {e}', 500
 
 
+@app.route('/test-line-send')
+def test_line_send():
+    """LINEにテストメッセージを送信して動作確認"""
+    try:
+        user_id = os.environ.get('LINE_USER_ID', '')
+        if not user_id:
+            return '❌ LINE_USER_ID が未設定', 500
+        line_bot_api.push_message(user_id, TextSendMessage(text='🔔 LINEテスト送信成功！こはるままエンジンからのテストメッセージです。'))
+        return f'✅ LINE送信成功（宛先: {user_id[:8]}...）'
+    except Exception as e:
+        return f'❌ LINE送信エラー: {e}', 500
+
+
 @app.route('/koharu-stock-status')
 def koharu_stock_status():
     """こはるまま承認待ち・承認済みストックの状態確認"""
