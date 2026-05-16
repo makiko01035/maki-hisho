@@ -82,31 +82,30 @@ def load_font(paths, size):
                 pass
     return ImageFont.load_default()
 
-font_tag   = load_font(font_paths_goth, 20)
-font_title = load_font(font_paths_min,  64)
-font_sub   = load_font(font_paths_goth, 22)
-font_badge = load_font(font_paths_goth, 15)
-font_site  = load_font(font_paths_goth, 14)
+font_tag   = load_font(font_paths_goth, 18)
+font_title = load_font(font_paths_min,  52)
+font_sub   = load_font(font_paths_goth, 19)
+font_badge = load_font(font_paths_goth, 14)
+font_site  = load_font(font_paths_goth, 13)
 
-# --- テキスト（x=370からアイコン被り回避）---
+# --- テキスト（x=370・縦中央y=150〜340に集中）---
 tx = 370
 
 # タグ行
-draw.text((tx, 90), "まき｜医療職×3児ワンオペ", font=font_tag, fill=(160, 100, 140))
+draw.text((tx, 155), "まき｜医療職×3児ワンオペ", font=font_tag, fill=(160, 100, 140))
 
-# メインコピー（2行）
-draw.text((tx, 128), "AIで、毎日が",      font=font_title, fill=(90, 60, 100))
-draw.text((tx, 200), "ちょっと楽になった。", font=font_title, fill=(200, 100, 140))
+# メインコピー（1行にまとめてコンパクトに）
+draw.text((tx, 182), "AIで、毎日がちょっと楽になった。", font=font_title, fill=(200, 100, 140))
 
 # サブコピー
-draw.text((tx, 290), "「AIって何に使うの？」と思っていた私が、", font=font_sub, fill=(120, 80, 110))
-draw.text((tx, 322), "仕組みで日常を変えるまでのリアルな記録。",  font=font_sub, fill=(140, 100, 125))
+draw.text((tx, 248), "「AIって何に使うの？」と思っていた私が、",   font=font_sub, fill=(120, 80, 110))
+draw.text((tx, 274), "仕組みで日常を変えるまでのリアルな記録。",   font=font_sub, fill=(140, 100, 125))
 
 # バッジ
 badges = ["#ワーママ", "#AI秘書", "#子育て", "#プログラミングゼロ"]
 badge_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
 bdraw = ImageDraw.Draw(badge_layer)
-bx, by = tx, 370
+bx, by = tx, 310
 for b in badges:
     bw = int(font_badge.getlength(b)) + 28
     bdraw.rounded_rectangle([bx, by, bx + bw, by + 28], radius=14,
