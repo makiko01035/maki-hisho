@@ -5,7 +5,8 @@ import time
 import urllib.parse
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
+import random
 from linebot.models import TextSendMessage
 from clients import line_bot_api, anthropic_client
 
@@ -266,6 +267,8 @@ def _mercari_url(title: str) -> str:
 
 def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 400.0):
     """日本人セラーが売れた商品を取得（Finding API）。失敗時はNoneを返す"""
+    # 過去7日以内に売れた商品に絞る
+    end_time_from = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     url = (
         f"{FINDING_API_URL}"
         f"?OPERATION-NAME=findCompletedItems"
@@ -280,8 +283,9 @@ def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 40
         f"&itemFilter(3).paramName=Currency&itemFilter(3).paramValue=USD"
         f"&itemFilter(4).name=MaxPrice&itemFilter(4).value={max_usd}"
         f"&itemFilter(4).paramName=Currency&itemFilter(4).paramValue=USD"
-        f"&sortOrder=EndTimeSoonest"
-        f"&paginationInput.entriesPerPage=10"
+        f"&itemFilter(5).name=EndTimeFrom&itemFilter(5).value={end_time_from}"
+        f"&sortOrder=StartTimeNewest"
+        f"&paginationInput.entriesPerPage=20"
     )
     try:
         resp = requests.get(url, timeout=15)
@@ -506,9 +510,10 @@ def send_daily_purchase_candidates(user_id: str, debug: bool = False):
             line_bot_api.push_message(user_id, TextSendMessage(text=msg))
             return
 
-        # 仕入れ上限が大きい順にソートして上位5件
+        # 仕入れ上限が大きい順に並べて上位15件を候補にし、その中からランダムで5件選ぶ
         all_items.sort(key=lambda x: x["purchase_limit"], reverse=True)
-        top = all_items[:5]
+        pool = all_items[:15]
+        top = random.sample(pool, min(5, len(pool)))
 
         today = datetime.now().strftime("%-m/%-d")
         fallback_note = "※売れ筋APIが一時停止中のため現在出品中の商品を表示\n\n" if using_fallback else "\n"
