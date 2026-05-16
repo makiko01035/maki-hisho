@@ -3455,6 +3455,21 @@ def handle_message(event):
             threading.Thread(target=generate_note_draft_async, args=(user_id, note_type, target, worry, experience)).start()
             return
 
+    # note公開済み報告 → NOTE_PUBLISHED_TITLESを次のラインナップ記事で自動更新
+    if user_message in ['note公開した', 'note公開', '公開した']:
+        published_count = len(NOTE_PUBLISHED_TITLES)
+        if published_count < len(NOTE_LINEUP):
+            next_item = NOTE_LINEUP[published_count]
+            type_label = "無料" if next_item["type"] == "free" else "有料"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text=f"🎉 お疲れ様でした！\n\n次の記事はこれです👇\n▶ [{type_label}] {next_item['title']}\n\n「note書きたい」で下書きを作れます✨\n（NOTE_PUBLISHED_TITLESへの記録はClaude Codeで更新します）"
+            ))
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="🎉 全ラインナップ公開完了！すごい！\n次のシリーズ設計はClaude Codeに相談してください✨"
+            ))
+        return
+
     # noteキーワード
     note_keywords = ['note書きたい', 'note下書き', 'note記事', 'note作りたい', 'noteかきたい']
     if any(kw in user_message for kw in note_keywords):
@@ -3958,6 +3973,28 @@ def send_monthly_review_reminder():
 
 # ========== X（Twitter）自動投稿 ==========
 
+# ========== note ラインナップ管理 ==========
+
+# noteの投稿計画（セット単位：無料1〜2本＋有料1本 = 1セット、月2セット）
+NOTE_LINEUP = [
+    # セット1
+    {"set": 1, "type": "free", "title": "毎朝7時に予定が届くようになって、朝が変わった話"},
+    {"set": 1, "type": "free", "title": "学校のプリントに追われなくなった話"},
+    {"set": 1, "type": "paid", "title": "毎朝7時のLINE通知を作るまでの全手順（300円）"},
+    # セット2
+    {"set": 2, "type": "free", "title": "忘れるのは意志の問題じゃなかった話"},
+    {"set": 2, "type": "free", "title": "エラーが怖くなくなった日のこと"},
+    {"set": 2, "type": "paid", "title": "チラシ写真→カレンダー自動登録の作り方（300円）"},
+    # セット3
+    {"set": 3, "type": "free", "title": "AIに役割を与えたら使い方が変わった話"},
+    {"set": 3, "type": "paid", "title": "締切リマインダーを月0円で作る方法（300円）"},
+]
+
+# 公開済みnote記事（公開したら末尾に追加する）
+NOTE_PUBLISHED_TITLES = [
+    "秘書が欲しかった私が、プログラミングゼロでAIに話しかけたら毎日が変わった話（300円）",  # 2026-05-16
+]
+
 # 実績ベースのツイートストック（gitコミット履歴から生成）
 TWEET_STOCK = [
     # ── チラシ読み取り・カレンダー系 ──
@@ -4374,12 +4411,43 @@ def send_note_reminder():
 
 
 def send_note_weekly_reminder():
-    """毎週木曜9:05：note週次リマインダー"""
+    """毎週木曜9:05：noteネタ提案＋ラインナップ俯瞰リマインダー"""
     try:
         user_id = os.environ['LINE_USER_ID']
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="📝 【note週次リマインド】\n今週のnote記事、書きましたか？\n\n「note書きたい」と送るだけで下書きが作れます✨\n有料・無料どちらでもOK！"
-        ))
+        published_count = len(NOTE_PUBLISHED_TITLES)
+        next_item = NOTE_LINEUP[published_count] if published_count < len(NOTE_LINEUP) else None
+
+        # ラインナップ進捗
+        progress_lines = []
+        for i, item in enumerate(NOTE_LINEUP):
+            type_label = "無料" if item["type"] == "free" else "有料"
+            if i < published_count:
+                mark = "✅"
+            elif i == published_count:
+                mark = "👉"
+            else:
+                mark = "⬜"
+            progress_lines.append(f"{mark}[{type_label}] {item['title']}")
+
+        progress_text = "\n".join(progress_lines)
+
+        if next_item:
+            type_label = "無料" if next_item["type"] == "free" else "有料"
+            msg = (
+                f"📝 今週のnoteネタ提案\n\n"
+                f"▶ 次に書く記事（{type_label}）\n「{next_item['title']}」\n\n"
+                f"📊 ラインナップ進捗\n{progress_text}\n\n"
+                f"「note書きたい」で下書きが作れます✨\n"
+                f"公開したら「note公開した」と送ってください"
+            )
+        else:
+            msg = (
+                f"📝 ラインナップ全記事公開完了！おめでとうございます🎉\n\n"
+                f"{progress_text}\n\n"
+                f"次のラインナップを設計しましょう✨"
+            )
+
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
     except Exception as e:
         print(f"Note weekly reminder error: {e}")
 
