@@ -1754,6 +1754,38 @@ def post_kvision_card_now():
         return f'❌ エラー: {e}', 500
 
 
+@app.route('/koharu-stock-status')
+def koharu_stock_status():
+    """こはるまま承認待ち・承認済みストックの状態確認"""
+    import json as _json
+    pending_path  = '/tmp/koharu_stock_pending.json'
+    approved_path = '/tmp/koharu_stock_approved.json'
+    def _read(path):
+        try:
+            if os.path.exists(path):
+                with open(path, encoding='utf-8') as f:
+                    return _json.load(f)
+        except Exception:
+            pass
+        return {}
+    pending  = _read(pending_path)
+    approved = _read(approved_path)
+    p_posts  = pending.get('posts', [])
+    a_posts  = approved.get('posts', [])
+    return jsonify({
+        'pending': {
+            'count':        len(p_posts),
+            'created_at':   pending.get('created_at'),
+            'weekly_theme': pending.get('weekly_theme'),
+            'preview': [{'type': p.get('type'), 'body': p.get('body','')[:50], 'score': p.get('score')} for p in p_posts[:5]],
+        },
+        'approved': {
+            'count':    len(a_posts),
+            'unposted': len([p for p in a_posts if not p.get('posted')]),
+        },
+    })
+
+
 @app.route('/koharu-engine-writer-now')
 def koharu_engine_writer_now():
     """こはるままエンジン：②ライターを今すぐ実行（手動テスト）"""
