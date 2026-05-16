@@ -121,7 +121,7 @@ scoreは0〜20の整数、issuesは具体的な修正箇所（最大3件）"""
 def run_parallel_scoring(article_content):
     """5エージェントを並列で実行して採点する"""
     results = []
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = {
             executor.submit(score_by_agent, name, prompt, article_content): name
             for name, prompt in AGENTS.items()
