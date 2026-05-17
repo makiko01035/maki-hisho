@@ -5323,6 +5323,8 @@ MAKO_THREADS_MORNING = [
     "眠る前のスマホ、なんとなく分かっていてもやめられない…\n\nブルーライトがメラトニン（眠気を作るホルモン）の分泌を抑えるという研究があります。\n\n完全にやめなくても、画面を暗くする・ナイトモードにするだけで変わる方もいます。\n\n小さな工夫から始めてみませんか？",
 ]
 
+MAKO_GENRE_LOG_PATH = '/tmp/mako_genre_log.json'
+
 MAKO_THREADS_AFF_GENRES = [
     {'name': '睡眠サプリ（GABA）', 'keyword': 'GABA 睡眠 サプリ'},
     {'name': 'マグネシウムサプリ', 'keyword': 'マグネシウム サプリ 睡眠'},
@@ -5880,6 +5882,58 @@ def _fetch_mako_sleep_suggestion(genre):
     return body, url
 
 
+def _load_mako_genre_log():
+    try:
+        with open(MAKO_GENRE_LOG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_mako_genre_log(log):
+    try:
+        with open(MAKO_GENRE_LOG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(log, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"mako genre log save error: {e}")
+
+
+def _select_mako_least_used_genre():
+    """最後に使った日が最も古いMAKOジャンルを選ぶ（均等ローテーション）"""
+    log = _load_mako_genre_log()
+    return min(MAKO_THREADS_AFF_GENRES, key=lambda g: log.get(g['name'], ''))
+
+
+def _record_mako_genre_used(genre_name):
+    log = _load_mako_genre_log()
+    log[genre_name] = datetime.datetime.now().isoformat()
+    _save_mako_genre_log(log)
+
+
+def _check_mako_post_quality(body):
+    """MAKO投稿文を100点満点でAI採点。60点未満はNG"""
+    prompt = (
+        f"以下のThreads投稿文を100点満点で採点してください。\n\n"
+        f"投稿文：\n{body}\n\n"
+        f"採点基準：\n"
+        f"・「〜です」「〜効果があります」など言い切り表現がない：30点\n"
+        f"・宣伝・売る感じがなく共感・知識ベース：30点\n"
+        f"・悩みへの共感から自然に始まっている：20点\n"
+        f"・150文字以内・簡潔：20点\n\n"
+        f"数字だけ出力（例：75）"
+    )
+    try:
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=10,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        score_str = resp.content[0].text.strip()
+        return int(''.join(filter(str.isdigit, score_str)) or '100')
+    except Exception:
+        return 100
+
+
 def post_mako_threads_morning():
     """MAKO Threads朝8:00：睡眠共感ツイート"""
     import random
@@ -5892,13 +5946,22 @@ def post_mako_threads_morning():
 
 
 def post_mako_threads_aff_auto():
-    """MAKO Threads夜21:00：睡眠グッズ・サプリアフィ投稿（日付ローテーション）"""
+    """MAKO Threads夜21:00：睡眠グッズ・サプリアフィ投稿（均等ローテーション＋AIチェック）"""
     import time as _time
-    slot = datetime.datetime.now().day % len(MAKO_THREADS_AFF_GENRES)
-    genre = MAKO_THREADS_AFF_GENRES[slot]
+    genre = _select_mako_least_used_genre()
     try:
         body, url = _fetch_mako_sleep_suggestion(genre)
         if not body or not url:
+            return
+        score = _check_mako_post_quality(body)
+        if score < 60:
+            print(f"post_mako_threads_aff_auto: quality low ({score}pts), skipping")
+            try:
+                line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(
+                    text=f"⚠️ MAKO アフィ投稿品質低下（{score}点）でスキップ\nジャンル：{genre['name']}\n本文：{body[:100]}"
+                ))
+            except Exception:
+                pass
             return
         post_id = _post_to_mako_threads(body)
         if post_id and url:
@@ -5907,9 +5970,14 @@ def post_mako_threads_aff_auto():
                 f"気になる方はこちら\n{url}\n[楽天PR]",
                 reply_to_id=post_id
             )
-        print(f"mako threads aff post ({genre['name']}) successful")
+        _record_mako_genre_used(genre['name'])
+        print(f"mako threads aff post ({genre['name']}) successful [score:{score}]")
     except Exception as e:
         print(f"post_mako_threads_aff_auto error: {e}")
+        try:
+            line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(text=f"❌ MAKO アフィ投稿エラー（{genre['name']}）\n{str(e)[:200]}"))
+        except Exception:
+            pass
 
 
 scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
