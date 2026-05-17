@@ -1605,6 +1605,9 @@ def dashboard():
             ('物販ブースター', 'https://buppan-booster.com/list-sell', True),
             ('メルカリ', 'https://jp.mercari.com/', False),
             ('eBay出品中', 'https://www.ebay.com/mys/active', True),
+            ('eBay売上管理', '/ebay-dashboard', True),
+            ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
+            ('CPASS', 'https://cpass.ebay.com/order/paid', True),
         ]),
         ('まきの会社', [
             ('まるちゃんワールド', 'https://maki-hisho.onrender.com/game', True),
