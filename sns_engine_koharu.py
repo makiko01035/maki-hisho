@@ -800,8 +800,7 @@ def run_monitor():
                     issues.append(f"⚠️ Threads API異常（{r.status_code}）")
             except Exception as e:
                 issues.append(f"⚠️ Threads接続エラー: {str(e)[:40]}")
-        else:
-            issues.append("⚠️ Threadsトークン未設定（KOHARU_THREADS_ACCESS_TOKEN）")
+        # トークン未設定は想定内（未開始）のためアラートなし
 
         # 22時台のみ：当日投稿確認
         if datetime.now().hour >= 22:

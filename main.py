@@ -5452,6 +5452,10 @@ def post_kvision_morning_tweet():
         print(f"kvision morning tweet successful: {text[:30]}...")
     except Exception as e:
         print(f"post_kvision_morning_tweet error: {e}")
+        try:
+            line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(text=f"❌ @kvision_m 朝つぶやき投稿エラー\n{str(e)[:200]}"))
+        except Exception:
+            pass
 
 
 def post_kvision_travel_aff(slot_index):
@@ -5477,6 +5481,10 @@ def post_kvision_travel_aff(slot_index):
         print(f"kvision X thread post ({genre['name']}) successful")
     except Exception as e:
         print(f"post_kvision_travel_aff({slot_index}) error: {e}")
+        try:
+            line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(text=f"❌ @kvision_m アフィスレッド投稿エラー（{genre['name']}）\n{str(e)[:200]}"))
+        except Exception:
+            pass
 
 
 # ========== 月替わりジャンル・ジャンル管理 ==========

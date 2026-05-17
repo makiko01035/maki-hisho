@@ -830,8 +830,7 @@ def run_monitor():
                     issues.append(f"⚠️ MAKO Threads API異常（{r.status_code}）")
             except Exception as e:
                 issues.append(f"⚠️ MAKO Threads接続エラー: {str(e)[:40]}")
-        else:
-            issues.append("⚠️ MAKO_THREADS_ACCESS_TOKEN 未設定")
+        # トークン未設定は想定内（未開始）のためアラートなし
 
         if not _get_mako_x_client():
             issues.append("⚠️ MAKO X APIキー未設定（MAKO_X_API_KEY等）")
