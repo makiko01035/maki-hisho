@@ -4215,6 +4215,10 @@ TWEET_STOCK = [
     "LINEに日常をメモするだけで、自動でX投稿のネタになる仕組みを作った。メモ→AI変換→ストック追加→自動投稿まで全部つながった。やること：メモするだけ。 #ClaudeCode #ワーママ",
     "X投稿の方向性を整理した。AI副業系のストックがいっぱいあったけど、本当に届けたい人は『AIって何に使うの？』と思っているワーママだった。発信する前に『誰に届けたいか』を決めることの大切さを改めて実感した。 #ワーママ #AI",
     "「困っていることをそのまま話すだけでいい」という言葉で、AIを使い始めた。技術の話じゃなくて、困りごとの話でよかった。それが一番の入口だったと思う。 #ワーママ #AI #ClaudeCode",
+    # ── 2026-05-17追加 ──
+    "【修正済み】毎日同じeBayリサーチ結果が届く問題が直った。原因：日付フィルタなしで過去の売れ筋が繰り返し表示→常に同じ高額品がTOP5に。修正：「過去7日以内に売れた商品のみ」＋「上位15件からランダム5件選出」に変えた。使い続けて気づくバグが一番多い。自動化は「作って終わり」じゃなく「使って直す」サイクルが大事。 #AI副業 #eBay #自動化",
+    "物販の確認作業、全部ダッシュボードにまとめた📊 メルカリ・eBay出品一覧・売上管理・CPASS・利益計算シートまでボタン1つで飛べる。バラバラのタブを行き来してたのが1か所に集約。地味だけど毎日の心理的コストが確実に下がる。 #AI副業 #eBay #物販",
+    "以前：eBay管理のたびにブックマークを漁ってた。今：ダッシュボードを開くだけで必要なリンクが全部ある。売上管理・CPASS・利益計算シート・出品一覧が画面1枚に。物販ツールの動線を整えるだけで体感の作業量が変わる。 #AI副業 #eBay #物販",
 ]
 
 # 引用RT用テンプレート（バズってる投稿に引用するとき使う）
@@ -5265,6 +5269,8 @@ def send_threads_token_reminder():
 
 # --- こはるまま：@kvision_m 旅行×楽天アフィ X自動投稿（1日2本）---
 
+KVISION_GENRE_LOG_PATH = '/tmp/kvision_genre_log.json'
+
 TRAVEL_GENRES = [
     # 通年固定
     {'name': 'シアーパーカー・UVカット羽織り', 'keyword': 'シアーパーカー UVカット 羽織り レディース 冷房対策 薄手'},
@@ -5467,6 +5473,16 @@ def post_kvision_travel_aff(slot_index):
         body, url = _fetch_travel_suggestion(genre)
         if not body or not url:
             return
+        score = _check_kvision_post_quality(body)
+        if score < 60:
+            print(f"post_kvision_travel_aff: quality low ({score}pts), skipping")
+            try:
+                line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(
+                    text=f"⚠️ @kvision_m アフィスレッド品質低下（{score}点）でスキップ\nジャンル：{genre['name']}\n本文：{body[:100]}"
+                ))
+            except Exception:
+                pass
+            return
         client = _get_kvision_x_client()
         if not client:
             print("KVISION X API keys not configured, skipping")
@@ -5478,7 +5494,8 @@ def post_kvision_travel_aff(slot_index):
             text=f"↓ 商品はこちら\n{url}\n[楽天PR]",
             in_reply_to_tweet_id=tweet_id
         )
-        print(f"kvision X thread post ({genre['name']}) successful")
+        _record_genre_used(genre['name'])
+        print(f"kvision X thread post ({genre['name']}) successful [score:{score}]")
     except Exception as e:
         print(f"post_kvision_travel_aff({slot_index}) error: {e}")
         try:
@@ -5503,8 +5520,62 @@ def _get_monthly_kvision_genres():
 
 
 def _get_all_kvision_genres():
-    """固定ジャンル7種 + 今月の特集ジャンルを合わせたリスト"""
+    """固定ジャンル + 今月の特集ジャンルを合わせたリスト"""
     return TRAVEL_GENRES + _get_monthly_kvision_genres()
+
+
+def _load_genre_log():
+    try:
+        with open(KVISION_GENRE_LOG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _save_genre_log(log):
+    try:
+        with open(KVISION_GENRE_LOG_PATH, 'w', encoding='utf-8') as f:
+            json.dump(log, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"genre log save error: {e}")
+
+
+def _select_least_used_genre():
+    """最後に使った日が最も古いジャンルを選ぶ（均等ローテーション）"""
+    all_genres = _get_all_kvision_genres()
+    log = _load_genre_log()
+    return min(all_genres, key=lambda g: log.get(g['name'], ''))
+
+
+def _record_genre_used(genre_name):
+    """ジャンルの使用日時をログに記録"""
+    log = _load_genre_log()
+    log[genre_name] = datetime.datetime.now().isoformat()
+    _save_genre_log(log)
+
+
+def _check_kvision_post_quality(body):
+    """投稿文を100点満点でAI採点。60点未満はNG"""
+    prompt = (
+        f"以下のX投稿文を100点満点で採点してください。\n\n"
+        f"投稿文：\n{body}\n\n"
+        f"採点基準：\n"
+        f"・口語・自然体で宣伝臭くない：30点\n"
+        f"・30〜40代子連れワーママに刺さる言葉：30点\n"
+        f"・3行以内・簡潔：20点\n"
+        f"・冒頭が自然につながっている：20点\n\n"
+        f"数字だけ出力（例：75）"
+    )
+    try:
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=10,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        score_str = resp.content[0].text.strip()
+        return int(''.join(filter(str.isdigit, score_str)) or '100')
+    except Exception:
+        return 100  # エラー時は通過させる
 
 
 # まきが選んだ固定アフィ商品ストック（URL直指定・投稿文もまきのコメントベース）
@@ -5540,7 +5611,7 @@ def _post_kvision_fixed_aff(post, client, time_module):
 
 
 def post_kvision_travel_aff_auto():
-    """日付ベースでローテーション。3日に1回は固定アフィストックから投稿"""
+    """最長未使用ジャンルを優先選択。3日に1回は固定アフィストックから投稿"""
     import time as _time
     day = datetime.datetime.now().day
     if FIXED_AFF_POSTS and day % 3 == 0:
@@ -5553,9 +5624,14 @@ def post_kvision_travel_aff_auto():
             _post_kvision_fixed_aff(post, client, _time)
         except Exception as e:
             print(f"post_kvision_fixed_aff error: {e}")
+            try:
+                line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(text=f"❌ @kvision_m 固定アフィ投稿エラー\n{str(e)[:200]}"))
+            except Exception:
+                pass
     else:
+        genre = _select_least_used_genre()
         all_genres = _get_all_kvision_genres()
-        slot = day % len(all_genres)
+        slot = next((i for i, g in enumerate(all_genres) if g['name'] == genre['name']), 0)
         post_kvision_travel_aff(slot)
 
 
