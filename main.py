@@ -1609,6 +1609,9 @@ def dashboard():
             ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
             ('CPASS', 'https://cpass.ebay.com/order/paid', True),
         ]),
+        ('Amazon', [
+            ('Amazon教材', 'https://utage-system.com/members/iMHiJSHzmtIn/login', True),
+        ]),
         ('まきの会社', [
             ('まるちゃんワールド', 'https://maki-hisho.onrender.com/game', True),
             ('会社組織図', 'https://maki-hisho.onrender.com/office', False),
@@ -2451,7 +2454,7 @@ def check_threads_app():
 
 @app.route('/auth/threads')
 def auth_threads():
-    app_id = os.environ.get('THREADS_APP_ID', '')
+    app_id = os.environ.get('THREADS_APP_ID', '').strip()
     if not app_id:
         return 'THREADS_APP_ID が設定されていません。Renderに設定してください。', 400
     redirect_uri = 'https://maki-hisho.onrender.com/auth/threads/callback'
