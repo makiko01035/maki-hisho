@@ -5484,7 +5484,7 @@ def post_kvision_travel_aff(slot_index):
 def _get_monthly_kvision_genres():
     """今月の特集ジャンルをkvision_monthly_genres.jsonから取得"""
     import json
-    month_key = datetime.now().strftime('%m')
+    month_key = datetime.datetime.now().strftime('%m')
     try:
         with open('kvision_monthly_genres.json', 'r', encoding='utf-8') as f:
             data = json.load(f)
@@ -5534,7 +5534,7 @@ def _post_kvision_fixed_aff(post, client, time_module):
 def post_kvision_travel_aff_auto():
     """日付ベースでローテーション。3日に1回は固定アフィストックから投稿"""
     import time as _time
-    day = datetime.now().day
+    day = datetime.datetime.now().day
     if FIXED_AFF_POSTS and day % 3 == 0:
         post = FIXED_AFF_POSTS[(day // 3) % len(FIXED_AFF_POSTS)]
         client = _get_kvision_x_client()
@@ -5672,7 +5672,7 @@ def post_koharu_threads_morning():
 def post_koharu_threads_aff_auto():
     """こはるまま Threads夜20:00：旅行グッズアフィ投稿（日付ローテーション・Xとずらす）3日に1回は固定ストック"""
     import time as _time
-    day = datetime.now().day
+    day = datetime.datetime.now().day
     if FIXED_AFF_POSTS and (day + 1) % 3 == 0:
         post = FIXED_AFF_POSTS[((day + 1) // 3) % len(FIXED_AFF_POSTS)]
         try:
@@ -5810,7 +5810,7 @@ def post_mako_threads_morning():
 def post_mako_threads_aff_auto():
     """MAKO Threads夜21:00：睡眠グッズ・サプリアフィ投稿（日付ローテーション）"""
     import time as _time
-    slot = datetime.now().day % len(MAKO_THREADS_AFF_GENRES)
+    slot = datetime.datetime.now().day % len(MAKO_THREADS_AFF_GENRES)
     genre = MAKO_THREADS_AFF_GENRES[slot]
     try:
         body, url = _fetch_mako_sleep_suggestion(genre)
