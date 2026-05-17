@@ -19,8 +19,8 @@ FINDING_API_URL = "https://svcs.ebay.com/services/search/FindingService/v1"
 # 毎日の仕入れ候補リサーチ用キーワード（メルカリで仕入れやすいカテゴリ）
 DAILY_RESEARCH_KEYWORDS = [
     "Sanrio Japan figure",
-    "Hello Kitty Japan lot",
-    "Japan anime figure lot",
+    "Hello Kitty Japan figure",
+    "Japan anime figure",
     "Japan toy capsule",
     "Murakami Takashi card",
     "Japan kumano makeup brush",
@@ -34,6 +34,7 @@ DAILY_RESEARCH_KEYWORDS = [
 EXCLUDE_TITLE_KEYWORDS = [
     "suit", "jacket", "coat", "dress", "shoes", "guitar", "camera",
     "lens", "furniture", "umbrella", "bag set lot", "ski",
+    " lot",
 ]
 
 # ウォッチセラーリスト（seller_usernameをここに追加するとご毎日自動チェック対象になる）
