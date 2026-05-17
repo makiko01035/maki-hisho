@@ -2439,6 +2439,24 @@ def auth_pinterest_boards():
     return f'エラー: {res.status_code} {res.text}', 400
 
 
+@app.route('/get-koharu-threads-uid')
+def get_koharu_threads_uid():
+    token = os.environ.get('KOHARU_THREADS_ACCESS_TOKEN', '').strip()
+    if not token:
+        return 'KOHARU_THREADS_ACCESS_TOKEN が未設定です', 400
+    res = requests.get('https://graph.threads.net/v1.0/me', params={'fields': 'id,username', 'access_token': token}, timeout=10)
+    return res.json()
+
+
+@app.route('/get-mako-threads-uid')
+def get_mako_threads_uid():
+    token = os.environ.get('MAKO_THREADS_ACCESS_TOKEN', '').strip()
+    if not token:
+        return 'MAKO_THREADS_ACCESS_TOKEN が未設定です', 400
+    res = requests.get('https://graph.threads.net/v1.0/me', params={'fields': 'id,username', 'access_token': token}, timeout=10)
+    return res.json()
+
+
 @app.route('/check-threads-app')
 def check_threads_app():
     """THREADS_APP_IDが正しく設定されているか確認するデバッグ用"""
