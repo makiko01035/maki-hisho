@@ -1723,6 +1723,8 @@ def dashboard():
         ]),
         ('Amazon', [
             ('Amazon教材', 'https://utage-system.com/members/iMHiJSHzmtIn/login', True),
+            ('TikTok×アフィ教材', 'https://utage-system.com/members/EfonMROIkXSq/login', True),
+            ('AI×note教材', 'https://utage-system.com/members/hkhySPyvCE3y/login', True),
         ]),
         ('まきの会社', [
             ('まるちゃんワールド', 'https://maki-hisho.onrender.com/game', True),
