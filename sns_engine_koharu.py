@@ -455,14 +455,36 @@ def _norm(s):
     return unicodedata.normalize('NFKC', s).lower()
 
 
+# こはるまま系接頭辞（長い順：先にこはるままをマッチさせる）
+_KOHARU_PREFIXES = ['こはるまま', 'コハルママ', 'こはる', 'コハル']
+# _norm後のOK/NG認識集合
+# おｋ→NFKC→おk、んｇ→NFKC→んg
+_KOHARU_OK_SET = {'ok', 'おk'}
+_KOHARU_NG_SET = {'ng', 'んg'}
+
+
+def _strip_koharu_prefix(msg):
+    """こはるまま系接頭辞を除去してnorm済みsuffixを返す。なければNone"""
+    for p in _KOHARU_PREFIXES:
+        if msg.startswith(p):
+            return _norm(msg[len(p):])
+    return None
+
+
 def handle_approval(message):
     """
     戻り値: True = 処理済み / False = 未対応メッセージ
     """
-    msg      = message.strip()
-    msg_norm = _norm(msg)
+    msg    = message.strip()
+    suffix = _strip_koharu_prefix(msg)
 
-    if msg == 'こはるまま確認':
+    if suffix is None:
+        return False
+
+    suffix = suffix.strip()
+
+    # 確認コマンド：「こはるまま確認」「こはる確認」「コハル確認」等
+    if suffix == '確認':
         pending  = _load(STOCK_PENDING_PATH, {})
         approved = _load(STOCK_APPROVED_PATH, {'posts': []})
         p_posts  = pending.get('posts', [])
@@ -478,8 +500,9 @@ def handle_approval(message):
         )
         return True
 
-    # OK承認：「こはるままOK」「こはるままok」「こはるままＯＫ」等すべて対応
-    if msg.startswith('こはるまま') and _norm(msg.replace('こはるまま', '', 1)).strip() == 'ok':
+    # OK承認：「こはるままOK」「こはるままok」「こはるままＯＫ」「こはるままおｋ」
+    #          「こはるOK」「コハルok」等すべて対応
+    if suffix in _KOHARU_OK_SET:
         pending = _load(STOCK_PENDING_PATH, {})
         posts = pending.get('posts', [])
         if not posts:
@@ -498,19 +521,22 @@ def handle_approval(message):
         )
         return True
 
-    m = re.match(r'こはるまま([0-9,、\s]+)はNG$', msg)
-    if m:
-        ng_str = re.sub(r'[、\s]', ',', m.group(1))
-        ng_idx = {int(n) - 1 for n in ng_str.split(',') if n.strip().isdigit()}
-        pending = _load(STOCK_PENDING_PATH, {})
-        posts   = pending.get('posts', [])
-        kept = [p for i, p in enumerate(posts) if i not in ng_idx]
-        approved = _load(STOCK_APPROVED_PATH, {'posts': []})
-        approved['posts'].extend(kept)
-        _save(STOCK_APPROVED_PATH, approved)
-        _save(STOCK_PENDING_PATH, {})
-        _send_line(f"✅ {len(kept)}本を承認（{len(ng_idx)}本を除外）しました。")
-        return True
+    # NG番号除外：「こはるまま2,4はNG」「こはる2はng」「こはる2はんｇ」等
+    # suffix はnorm済み（小文字・半角）なのでNG/ng/んｇはすべてng/んgになっている
+    for ng_var in _KOHARU_NG_SET:
+        m = re.match(rf'^([0-9,、\s]+)は{re.escape(ng_var)}$', suffix)
+        if m:
+            ng_str = re.sub(r'[、\s]', ',', m.group(1))
+            ng_idx = {int(n) - 1 for n in ng_str.split(',') if n.strip().isdigit()}
+            pending = _load(STOCK_PENDING_PATH, {})
+            posts   = pending.get('posts', [])
+            kept = [p for i, p in enumerate(posts) if i not in ng_idx]
+            approved = _load(STOCK_APPROVED_PATH, {'posts': []})
+            approved['posts'].extend(kept)
+            _save(STOCK_APPROVED_PATH, approved)
+            _save(STOCK_PENDING_PATH, {})
+            _send_line(f"✅ {len(kept)}本を承認（{len(ng_idx)}本を除外）しました。")
+            return True
 
     return False
 

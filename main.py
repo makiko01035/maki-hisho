@@ -2955,13 +2955,17 @@ def handle_message(event):
     user_id = event.source.user_id
 
     # こはるまま投稿承認コマンド
-    if user_message.startswith('こはるまま'):
+    # 「こはるまま」「こはる」「コハルママ」「コハル」すべて受け付ける
+    if (user_message.startswith('こはるまま') or user_message.startswith('こはる') or
+            user_message.startswith('コハルママ') or user_message.startswith('コハル')):
         if koharu_handle_approval(user_message):
             return
         # 未対応の場合はそのまま通常処理へ
 
     # MAKO投稿承認コマンド
-    if user_message.upper().startswith('MAKO') or user_message.startswith('ＭＡＫＯ') or user_message.startswith('ｍａｋｏ'):
+    # 「MAKO」「mako」「ＭＡＫＯ」「ｍａｋｏ」「まこ」すべて受け付ける
+    if (user_message.upper().startswith('MAKO') or user_message.startswith('ＭＡＫＯ') or
+            user_message.startswith('ｍａｋｏ') or user_message.startswith('まこ')):
         if handle_mako_approval(user_message):
             return
         # 未対応の場合はそのまま通常処理へ

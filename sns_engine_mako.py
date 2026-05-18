@@ -481,14 +481,36 @@ def _norm(s):
     return unicodedata.normalize('NFKC', s).lower()
 
 
+# _norm後のOK/NG認識集合
+# おｋ→NFKC→おk、んｇ→NFKC→んg
+_MAKO_OK_SET = {'ok', 'おk'}
+_MAKO_NG_SET = {'ng', 'んg'}
+
+
+def _strip_mako_prefix(msg):
+    """まこ/mako系接頭辞を除去してnorm済みsuffixを返す。なければNone"""
+    if msg.startswith('まこ'):
+        return _norm(msg[2:])
+    n = _norm(msg)
+    if n.startswith('mako'):
+        return n[4:]
+    return None
+
+
 def handle_mako_approval(message):
     """
     戻り値: True = 処理済み / False = 未対応メッセージ
     """
-    msg      = message.strip()
-    msg_norm = _norm(msg)
+    msg    = message.strip()
+    suffix = _strip_mako_prefix(msg)
 
-    if msg == 'MAKO確認':
+    if suffix is None:
+        return False
+
+    suffix = suffix.strip()
+
+    # 確認コマンド：「MAKO確認」「mako確認」「まこ確認」等
+    if suffix == '確認':
         pending  = _load(STOCK_PENDING_PATH, {})
         approved = _load(STOCK_APPROVED_PATH, {'posts': []})
         p_posts  = pending.get('posts', [])
@@ -500,9 +522,8 @@ def handle_mako_approval(message):
         )
         return True
 
-    # OK承認（MAKO ok / MAKOok / MAKOＯＫ 等）
-    suffix = _norm(msg.replace('MAKO', '', 1)).strip()
-    if msg.upper().startswith('MAKO') and suffix == 'ok':
+    # OK承認：「MAKO OK」「makoOK」「まこok」「MAKOおｋ」等すべて対応
+    if suffix in _MAKO_OK_SET:
         pending = _load(STOCK_PENDING_PATH, {})
         posts   = pending.get('posts', [])
         if not posts:
@@ -521,19 +542,22 @@ def handle_mako_approval(message):
         )
         return True
 
-    m = re.match(r'MAKO([0-9,、\s]+)はNG$', msg, re.IGNORECASE)
-    if m:
-        ng_str = re.sub(r'[、\s]', ',', m.group(1))
-        ng_idx = {int(n) - 1 for n in ng_str.split(',') if n.strip().isdigit()}
-        pending = _load(STOCK_PENDING_PATH, {})
-        posts   = pending.get('posts', [])
-        kept    = [p for i, p in enumerate(posts) if i not in ng_idx]
-        approved = _load(STOCK_APPROVED_PATH, {'posts': []})
-        approved['posts'].extend(kept)
-        _save(STOCK_APPROVED_PATH, approved)
-        _save(STOCK_PENDING_PATH, {})
-        _send_line(f"✅ MAKO {len(kept)}本を承認（{len(ng_idx)}本を除外）しました。")
-        return True
+    # NG番号除外：「MAKO2,4はNG」「まこ2はng」「まこ2はんｇ」等
+    # suffix はnorm済みなのでNG/ng/んｇはすべてng/んgになっている
+    for ng_var in _MAKO_NG_SET:
+        m = re.match(rf'^([0-9,、\s]+)は{re.escape(ng_var)}$', suffix)
+        if m:
+            ng_str = re.sub(r'[、\s]', ',', m.group(1))
+            ng_idx = {int(n) - 1 for n in ng_str.split(',') if n.strip().isdigit()}
+            pending = _load(STOCK_PENDING_PATH, {})
+            posts   = pending.get('posts', [])
+            kept    = [p for i, p in enumerate(posts) if i not in ng_idx]
+            approved = _load(STOCK_APPROVED_PATH, {'posts': []})
+            approved['posts'].extend(kept)
+            _save(STOCK_APPROVED_PATH, approved)
+            _save(STOCK_PENDING_PATH, {})
+            _send_line(f"✅ MAKO {len(kept)}本を承認（{len(ng_idx)}本を除外）しました。")
+            return True
 
     return False
 
