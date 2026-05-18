@@ -1011,7 +1011,7 @@ def debug_image():
 
 @app.route('/diary-debug')
 def diary_debug():
-    """日記追記のデバッグ用エンドポイント（ブラウザから直接テスト可能）"""
+    """日記追記のフルテスト用エンドポイント"""
     import requests as req
     lines = []
     notion_token = os.environ.get('NOTION_TOKEN', '')
@@ -1024,23 +1024,84 @@ def diary_debug():
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json"
     }
-    # 検索テスト
+
+    # ① 検索テスト
     r = req.post("https://api.notion.com/v1/search",
         headers=headers,
         json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 5}
     )
-    lines.append(f"search status: {r.status_code}")
+    lines.append(f"[1] search status: {r.status_code}")
+
+    db_id = None
+    title_prop_name = None
+    date_prop_name = None
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    today_page_id = None
+
     if r.status_code == 200:
         results = r.json().get("results", [])
-        lines.append(f"search results count: {len(results)}")
-        for i, page in enumerate(results[:3]):
+        lines.append(f"[1] search results count: {len(results)}")
+        for i, page in enumerate(results[:5]):
             parent = page.get("parent", {})
             props = page.get("properties", {})
-            prop_summary = {k: v.get("type") for k, v in props.items()}
-            lines.append(f"  page[{i}] id={page['id'][:8]}... parent_type={parent.get('type')} db_id={parent.get('database_id','N/A')[:8] if parent.get('database_id') else 'N/A'}...")
-            lines.append(f"  page[{i}] props={prop_summary}")
+            full_db_id = parent.get('database_id', '')
+            if full_db_id and db_id is None:
+                db_id = full_db_id
+            for pname, pval in props.items():
+                if pval.get("type") == "title" and title_prop_name is None:
+                    title_prop_name = pname
+                if pval.get("type") == "date" and date_prop_name is None:
+                    date_prop_name = pname
+            date_val = props.get(date_prop_name or "日付", {}).get("date") or {}
+            is_today = date_val.get("start") == today_str
+            lines.append(f"  page[{i}] id={page['id'][:8]}... date={date_val.get('start','?')} is_today={is_today}")
+            if is_today:
+                today_page_id = page["id"]
     else:
-        lines.append(f"search error: {r.text[:500]}")
+        lines.append(f"[1] search error: {r.text[:300]}")
+        return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+    lines.append(f"[1] detected: db_id={db_id}, title_prop={title_prop_name}, date_prop={date_prop_name}")
+    lines.append(f"[1] today ({today_str}) page exists: {today_page_id is not None}")
+
+    # ② 今日のページがなければ作成テスト
+    if not today_page_id:
+        use_db_id = db_id or "323f8d6d-41de-8082-9c88-e476d05c2a0a"
+        use_title = title_prop_name or "名前"
+        use_date = date_prop_name or "日付"
+        lines.append(f"[2] creating page in db={use_db_id}, title_prop={use_title}, date_prop={use_date}")
+        r2 = req.post("https://api.notion.com/v1/pages",
+            headers=headers,
+            json={
+                "parent": {"database_id": use_db_id},
+                "properties": {
+                    use_title: {"title": [{"text": {"content": "日記"}}]},
+                    use_date: {"date": {"start": today_str}}
+                }
+            }
+        )
+        lines.append(f"[2] create status: {r2.status_code}")
+        if r2.status_code == 200:
+            today_page_id = r2.json()["id"]
+            lines.append(f"[2] created page id={today_page_id[:8]}...")
+        else:
+            lines.append(f"[2] create error: {r2.text[:500]}")
+            return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+    else:
+        lines.append(f"[2] using existing page id={today_page_id[:8]}...")
+
+    # ③ テストメモ追記
+    r3 = req.patch(
+        f"https://api.notion.com/v1/blocks/{today_page_id}/children",
+        headers=headers,
+        json={"children": [{"object": "block", "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "【デバッグテスト】diary-debugエンドポイントからの書き込みテスト"}}]}}]}
+    )
+    lines.append(f"[3] append status: {r3.status_code}")
+    if r3.status_code != 200:
+        lines.append(f"[3] append error: {r3.text[:500]}")
+    else:
+        lines.append("[3] SUCCESS: メモの追記に成功しました！")
 
     return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
