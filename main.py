@@ -4028,6 +4028,30 @@ def send_zaitage_reminder():
         print(f"Zaitage reminder error: {e}")
 
 
+def send_may28_finance_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        msg = (
+            "💰【家計整理 月末確認】\n\n"
+            "🔴 急ぎ：できてる？\n"
+            "① 常陽→りそな 自動振込設定（常陽銀行アプリ）\n"
+            "② Apple Music解約\n"
+            "③ Googleフォト→iCloud転送開始\n\n"
+            "🟡 今月中にやりたいこと\n"
+            "④ JAL View引き落とし→りそなに変更（viewcard.jp）\n"
+            "⑤ 習い事の引き落とし→りそなに変更（各窓口）\n"
+            "⑥ Payoneer→楽天銀行への出金設定\n\n"
+            "📦 6月からAmazon物販スタート！\n"
+            "→ Amazon売上の振込先を楽天銀行に設定した？\n"
+            "　（セラーセントラル→設定→口座情報）\n\n"
+            "📋 全体確認はこちら\n"
+            "https://notion.so/364f8d6d41de811bbac5e914538b85ec"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"May28 finance reminder error: {e}")
+
+
 def send_may25_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -6218,6 +6242,8 @@ scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
 scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minute=10)
+# 2026-05-28 朝9時：家計整理月末確認リマインド（一回限り）
+scheduler.add_job(send_may28_finance_reminder, 'date', run_date='2026-05-28 09:00:00')
 # 2026-05-25 朝9時：MAKOのX実装 + こはるままThreads連携リマインド（一回限り）
 scheduler.add_job(send_may25_reminder, 'date', run_date='2026-05-25 09:00:00')
 # 2026-05-30 朝9時：MAKOのThreads連携リマインド（一回限り）
