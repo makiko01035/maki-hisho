@@ -4749,11 +4749,16 @@ def find_or_create_diary_page(notion_token, today_str):
     )
     print(f"[diary] search status={r.status_code}")
 
+    db_id = None
     title_prop_name = None
     date_prop_name = None
 
     if r.status_code == 200:
         for page in r.json().get("results", []):
+            # 既存ページの親DB IDを自動検出
+            parent = page.get("parent", {})
+            if parent.get("type") == "database_id" and db_id is None:
+                db_id = parent.get("database_id")
             props = page.get("properties", {})
             # 既存ページからプロパティ名を自動検出
             for pname, pval in props.items():
@@ -4771,12 +4776,12 @@ def find_or_create_diary_page(notion_token, today_str):
         print(f"[diary] search error: {r.text[:300]}")
 
     # 検出できなかった場合はデフォルト値にフォールバック
+    db_id = db_id or "323f8d6d-41de-8082-9c88-e476d05c2a0a"
     title_prop_name = title_prop_name or "名前"
     date_prop_name = date_prop_name or "日付"
-    print(f"[diary] creating page: title_prop={title_prop_name}, date_prop={date_prop_name}")
+    print(f"[diary] creating page: db={db_id}, title_prop={title_prop_name}, date_prop={date_prop_name}")
 
     # 見つからなければDBに新規作成
-    db_id = "323f8d6d-41de-8082-9c88-e476d05c2a0a"
     r2 = req.post("https://api.notion.com/v1/pages",
         headers=headers,
         json={
