@@ -4748,15 +4748,32 @@ def find_or_create_diary_page(notion_token, today_str):
         json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 20}
     )
     print(f"[diary] search status={r.status_code}")
+
+    title_prop_name = None
+    date_prop_name = None
+
     if r.status_code == 200:
         for page in r.json().get("results", []):
             props = page.get("properties", {})
-            date_val = props.get("日付", {}).get("date") or {}
+            # 既存ページからプロパティ名を自動検出
+            for pname, pval in props.items():
+                if pval.get("type") == "title" and title_prop_name is None:
+                    title_prop_name = pname
+                if pval.get("type") == "date" and date_prop_name is None:
+                    date_prop_name = pname
+            # 今日の日記ページかチェック
+            date_key = date_prop_name or "日付"
+            date_val = props.get(date_key, {}).get("date") or {}
             if date_val.get("start") == today_str:
                 print(f"[diary] found existing page id={page['id']}")
                 return page["id"]
     else:
         print(f"[diary] search error: {r.text[:300]}")
+
+    # 検出できなかった場合はデフォルト値にフォールバック
+    title_prop_name = title_prop_name or "名前"
+    date_prop_name = date_prop_name or "日付"
+    print(f"[diary] creating page: title_prop={title_prop_name}, date_prop={date_prop_name}")
 
     # 見つからなければDBに新規作成
     db_id = "323f8d6d-41de-8082-9c88-e476d05c2a0a"
@@ -4765,8 +4782,8 @@ def find_or_create_diary_page(notion_token, today_str):
         json={
             "parent": {"database_id": db_id},
             "properties": {
-                "今日やること": {"title": [{"text": {"content": "日記"}}]},
-                "日付": {"date": {"start": today_str}}
+                title_prop_name: {"title": [{"text": {"content": "日記"}}]},
+                date_prop_name: {"date": {"start": today_str}}
             }
         }
     )
