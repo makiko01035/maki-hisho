@@ -1009,6 +1009,42 @@ def debug_image():
         return {'error': str(e)}, 500
 
 
+@app.route('/diary-debug')
+def diary_debug():
+    """日記追記のデバッグ用エンドポイント（ブラウザから直接テスト可能）"""
+    import requests as req
+    lines = []
+    notion_token = os.environ.get('NOTION_TOKEN', '')
+    if not notion_token:
+        return "NOTION_TOKEN is NOT set in environment variables", 500
+    lines.append(f"NOTION_TOKEN: set (length={len(notion_token)})")
+
+    headers = {
+        "Authorization": f"Bearer {notion_token}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    # 検索テスト
+    r = req.post("https://api.notion.com/v1/search",
+        headers=headers,
+        json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 5}
+    )
+    lines.append(f"search status: {r.status_code}")
+    if r.status_code == 200:
+        results = r.json().get("results", [])
+        lines.append(f"search results count: {len(results)}")
+        for i, page in enumerate(results[:3]):
+            parent = page.get("parent", {})
+            props = page.get("properties", {})
+            prop_summary = {k: v.get("type") for k, v in props.items()}
+            lines.append(f"  page[{i}] id={page['id'][:8]}... parent_type={parent.get('type')} db_id={parent.get('database_id','N/A')[:8] if parent.get('database_id') else 'N/A'}...")
+            lines.append(f"  page[{i}] props={prop_summary}")
+    else:
+        lines.append(f"search error: {r.text[:500]}")
+
+    return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
 @app.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
