@@ -4847,67 +4847,48 @@ def add_study_memo(memo_text):
 
 
 def find_or_create_diary_page(notion_token, today_str):
-    """今日の日記ページをNotionで探す。なければ作成して返す"""
+    """今日の日記ページをNotionで探す。なければ最新ページにフォールバック"""
     import requests as req
     headers = {
         "Authorization": f"Bearer {notion_token}",
-        "Notion-Version": "2025-09-03",
+        "Notion-Version": "2022-06-28",
         "Content-Type": "application/json"
     }
-    # 検索APIで今日の日記ページを探す
+    # 検索APIで日記ページを探す（最新順）
     r = req.post("https://api.notion.com/v1/search",
         headers=headers,
         json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 20}
     )
     print(f"[diary] search status={r.status_code}")
 
-    db_id = None
-    title_prop_name = None
     date_prop_name = None
+    latest_page_id = None
 
     if r.status_code == 200:
         for page in r.json().get("results", []):
-            # 既存ページの親DB IDを自動検出
-            parent = page.get("parent", {})
-            if parent.get("type") == "database_id" and db_id is None:
-                db_id = parent.get("database_id")
             props = page.get("properties", {})
-            # 既存ページからプロパティ名を自動検出
             for pname, pval in props.items():
-                if pval.get("type") == "title" and title_prop_name is None:
-                    title_prop_name = pname
                 if pval.get("type") == "date" and date_prop_name is None:
                     date_prop_name = pname
-            # 今日の日記ページかチェック
+            # 今日のページかチェック
             date_key = date_prop_name or "日付"
             date_val = props.get(date_key, {}).get("date") or {}
             if date_val.get("start") == today_str:
-                print(f"[diary] found existing page id={page['id']}")
+                print(f"[diary] found today's page id={page['id']}")
                 return page["id"]
+            # 最新ページを保持（今日のがなければフォールバック用）
+            if latest_page_id is None:
+                latest_page_id = page["id"]
     else:
         print(f"[diary] search error: {r.text[:300]}")
+        return None
 
-    # 検出できなかった場合はデフォルト値にフォールバック
-    db_id = db_id or "323f8d6d-41de-8082-9c88-e476d05c2a0a"
-    title_prop_name = title_prop_name or "名前"
-    date_prop_name = date_prop_name or "日付"
-    print(f"[diary] creating page: db={db_id}, title_prop={title_prop_name}, date_prop={date_prop_name}")
+    # 今日のページがない場合：最新ページにフォールバック（日付プレフィックス付きで追記）
+    if latest_page_id:
+        print(f"[diary] today's page not found, using latest page id={latest_page_id}")
+        return latest_page_id
 
-    # 見つからなければDBに新規作成
-    r2 = req.post("https://api.notion.com/v1/pages",
-        headers=headers,
-        json={
-            "parent": {"database_id": db_id},
-            "properties": {
-                title_prop_name: {"title": [{"text": {"content": "日記"}}]},
-                date_prop_name: {"date": {"start": today_str}}
-            }
-        }
-    )
-    print(f"[diary] create page status={r2.status_code}")
-    if r2.status_code == 200:
-        return r2.json()["id"]
-    print(f"[diary] create page error: {r2.text[:300]}")
+    print("[diary] no diary page found at all")
     return None
 
 
@@ -5063,18 +5044,20 @@ def add_diary_memo(memo_text):
     if not page_id:
         print("[diary] page_id is None, cannot append")
         return False
+    # 今日のページでない場合は日付プレフィックスをつける
+    content_text = f"{today_str} {time_str} {memo_text}"
     r = req.patch(
         f"https://api.notion.com/v1/blocks/{page_id}/children",
         headers={
             "Authorization": f"Bearer {notion_token}",
-            "Notion-Version": "2025-09-03",
+            "Notion-Version": "2022-06-28",
             "Content-Type": "application/json"
         },
         json={"children": [{
             "object": "block",
             "type": "bulleted_list_item",
             "bulleted_list_item": {
-                "rich_text": [{"type": "text", "text": {"content": f"{time_str} {memo_text}"}}]
+                "rich_text": [{"type": "text", "text": {"content": content_text}}]
             }
         }]}
     )
