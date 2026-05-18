@@ -140,7 +140,7 @@ def save_newsletter_to_notion(email):
     notion_token = os.environ.get('NOTION_TOKEN', '')
     headers = {
         "Authorization": f"Bearer {notion_token}",
-        "Notion-Version": "2022-06-28",
+        "Notion-Version": "2025-09-03",
         "Content-Type": "application/json"
     }
     today = datetime.datetime.now(JST).strftime('%Y-%m-%d')
@@ -1021,7 +1021,7 @@ def diary_debug():
 
     headers = {
         "Authorization": f"Bearer {notion_token}",
-        "Notion-Version": "2022-06-28",
+        "Notion-Version": "2025-09-03",
         "Content-Type": "application/json"
     }
 
@@ -2151,7 +2151,7 @@ def add_task():
             notion_token = os.environ.get('NOTION_TOKEN', '')
             notion_headers = {
                 "Authorization": f"Bearer {notion_token}",
-                "Notion-Version": "2022-06-28",
+                "Notion-Version": "2025-09-03",
                 "Content-Type": "application/json"
             }
             body = {
@@ -4836,7 +4836,7 @@ def find_or_create_diary_page(notion_token, today_str):
     import requests as req
     headers = {
         "Authorization": f"Bearer {notion_token}",
-        "Notion-Version": "2022-06-28",
+        "Notion-Version": "2025-09-03",
         "Content-Type": "application/json"
     }
     # 検索APIで今日の日記ページを探す
@@ -4904,7 +4904,7 @@ def fetch_diary_memos_from_notion(days=7):
         return ""
     headers = {
         "Authorization": f"Bearer {notion_token}",
-        "Notion-Version": "2022-06-28",
+        "Notion-Version": "2025-09-03",
         "Content-Type": "application/json"
     }
     # 直近N日間の日付リストを作成
@@ -5052,7 +5052,7 @@ def add_diary_memo(memo_text):
         f"https://api.notion.com/v1/blocks/{page_id}/children",
         headers={
             "Authorization": f"Bearer {notion_token}",
-            "Notion-Version": "2022-06-28",
+            "Notion-Version": "2025-09-03",
             "Content-Type": "application/json"
         },
         json={"children": [{
