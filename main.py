@@ -1064,28 +1064,43 @@ def diary_debug():
     lines.append(f"[1] detected: db_id={db_id}, title_prop={title_prop_name}, date_prop={date_prop_name}")
     lines.append(f"[1] today ({today_str}) page exists: {today_page_id is not None}")
 
-    # ② 今日のページがなければ作成テスト
+    # ② 今日のページがなければ作成テスト（child_data_source_ids にフォールバック）
     if not today_page_id:
-        use_db_id = db_id or "323f8d6d-41de-8082-9c88-e476d05c2a0a"
-        use_title = title_prop_name or "名前"
+        use_title = title_prop_name or "今日やること"
         use_date = date_prop_name or "日付"
-        lines.append(f"[2] creating page in db={use_db_id}, title_prop={use_title}, date_prop={use_date}")
-        r2 = req.post("https://api.notion.com/v1/pages",
-            headers=headers,
-            json={
-                "parent": {"database_id": use_db_id},
-                "properties": {
-                    use_title: {"title": [{"text": {"content": "日記"}}]},
-                    use_date: {"date": {"start": today_str}}
+        # 試すDBのIDリスト：親DB → child IDs の順で試す
+        candidate_db_ids = [
+            db_id or "323f8d6d-41de-8082-9c88-e476d05c2a0a",
+            "323f8d6d-41de-809c-9d88-000b8eb19cbb",
+            "323f8d6d-41de-80ff-80f3-000b5b69f8b7"
+        ]
+        for attempt_db_id in candidate_db_ids:
+            lines.append(f"[2] trying db={attempt_db_id}, title_prop={use_title}, date_prop={use_date}")
+            r2 = req.post("https://api.notion.com/v1/pages",
+                headers=headers,
+                json={
+                    "parent": {"database_id": attempt_db_id},
+                    "properties": {
+                        use_title: {"title": [{"text": {"content": "日記"}}]},
+                        use_date: {"date": {"start": today_str}}
+                    }
                 }
-            }
-        )
-        lines.append(f"[2] create status: {r2.status_code}")
-        if r2.status_code == 200:
-            today_page_id = r2.json()["id"]
-            lines.append(f"[2] created page id={today_page_id[:8]}...")
-        else:
-            lines.append(f"[2] create error: {r2.text[:500]}")
+            )
+            lines.append(f"[2] create status: {r2.status_code}")
+            if r2.status_code == 200:
+                today_page_id = r2.json()["id"]
+                lines.append(f"[2] created page id={today_page_id[:8]}... with db={attempt_db_id}")
+                break
+            else:
+                err = r2.json()
+                lines.append(f"[2] create error: {err.get('message','?')}")
+                # child_data_source_ids が返ってきたら追加
+                extra_ids = err.get("additional_data", {}).get("child_data_source_ids", [])
+                for eid in extra_ids:
+                    if eid not in candidate_db_ids:
+                        candidate_db_ids.append(eid)
+        if not today_page_id:
+            lines.append("[2] FAILED: 全候補DBで作成失敗")
             return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
     else:
         lines.append(f"[2] using existing page id={today_page_id[:8]}...")
