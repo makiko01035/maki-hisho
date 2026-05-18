@@ -137,5 +137,5 @@ if categories:
     print(f"カテゴリーID: {categories}")
 if tags:
     print(f"タグ: {tags}")
-r = requests.post(RENDER_URL, data=payload.encode("utf-8"), headers=headers, timeout=120)
+r = requests.post(RENDER_URL, data=payload.encode("utf-8"), headers=headers, timeout=120, verify=False)
 print(r.status_code, r.text[:300])
