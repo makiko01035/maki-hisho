@@ -3298,7 +3298,10 @@ def handle_message(event):
                 ok = add_diary_memo(memo_text)
                 uid = os.environ.get('LINE_USER_ID', '')
                 if uid:
-                    msg = "✅ 日記に追記しました！" if ok else "❌ 追記に失敗しました（NOTION_TOKENを確認）"
+                    if ok:
+                        msg = "✅ 日記に追記しました！"
+                    else:
+                        msg = "❌ 追記に失敗しました\nRenderログで [diary] を検索して原因を確認してください"
                     line_bot_api.push_message(uid, TextSendMessage(text=msg))
             threading.Thread(target=_add_diary).start()
         else:
@@ -4744,12 +4747,16 @@ def find_or_create_diary_page(notion_token, today_str):
         headers=headers,
         json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 20}
     )
+    print(f"[diary] search status={r.status_code}")
     if r.status_code == 200:
         for page in r.json().get("results", []):
             props = page.get("properties", {})
             date_val = props.get("日付", {}).get("date") or {}
             if date_val.get("start") == today_str:
+                print(f"[diary] found existing page id={page['id']}")
                 return page["id"]
+    else:
+        print(f"[diary] search error: {r.text[:300]}")
 
     # 見つからなければDBに新規作成
     db_id = "323f8d6d-41de-8082-9c88-e476d05c2a0a"
@@ -4763,8 +4770,10 @@ def find_or_create_diary_page(notion_token, today_str):
             }
         }
     )
+    print(f"[diary] create page status={r2.status_code}")
     if r2.status_code == 200:
         return r2.json()["id"]
+    print(f"[diary] create page error: {r2.text[:300]}")
     return None
 
 
@@ -4911,12 +4920,14 @@ def add_diary_memo(memo_text):
     import requests as req
     notion_token = os.environ.get('NOTION_TOKEN', '')
     if not notion_token:
+        print("[diary] NOTION_TOKEN is not set")
         return False
     now = datetime.datetime.now(JST)
     today_str = now.strftime('%Y-%m-%d')
     time_str = now.strftime('%H:%M')
     page_id = find_or_create_diary_page(notion_token, today_str)
     if not page_id:
+        print("[diary] page_id is None, cannot append")
         return False
     r = req.patch(
         f"https://api.notion.com/v1/blocks/{page_id}/children",
@@ -4933,6 +4944,9 @@ def add_diary_memo(memo_text):
             }
         }]}
     )
+    print(f"[diary] append status={r.status_code}")
+    if r.status_code != 200:
+        print(f"[diary] append error: {r.text[:300]}")
     return r.status_code == 200
 
 
