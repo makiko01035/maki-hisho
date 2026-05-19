@@ -1578,7 +1578,8 @@ def company_dashboard():
       <tbody>
         <tr><td>毎朝 7:00</td><td>秘書部</td><td>今日の予定をLINEに自動送信</td></tr>
         <tr><td>毎週日曜 20:00</td><td>秘書部</td><td>3日以内の予定リマインド</td></tr>
-        <tr><td>火曜日</td><td>ブログ部</td><td>薬膳ブログ リライト2本 + Pinterestピン</td></tr>
+        <tr><td>月・木 8:00</td><td>ブログ部</td><td>薬膳ブログ 新規記事自動投稿 + SNS投稿セット送信</td></tr>
+        <tr><td>水・土 8:00</td><td>ブログ部</td><td>薬膳ブログ リライト自動投稿 + SNS投稿セット送信</td></tr>
         <tr><td>木曜日</td><td>ブログ部</td><td>セキスイブログ 記事投稿</td></tr>
         <tr><td>随時</td><td>物販部</td><td>eBayタイトル生成・出品サポート</td></tr>
       </tbody>
@@ -4123,14 +4124,6 @@ def send_famm_deadline_reminder():
         print(f"Famm deadline reminder error: {e}")
 
 
-def send_yakuzen_blog_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="✍️ 【薬膳ブログ更新日・火曜日】\n今日は薬膳ブログ＋Pinterest投稿の日です！\n\nClaudeに👇と声かけしてね\n「Pinterest今週分お願い」"
-        ))
-    except Exception as e:
-        print(f"Yakuzen blog reminder error: {e}")
 
 
 def send_sekisui_blog_reminder():
@@ -6237,8 +6230,6 @@ def auto_blog_rewrite():
 
 scheduler.add_job(auto_blog_new,     'cron', day_of_week='mon,thu', hour=8, minute=0)
 scheduler.add_job(auto_blog_rewrite, 'cron', day_of_week='wed,sat', hour=8, minute=0)
-# 毎週火曜朝9時：薬膳ブログ更新リマインダー（手動対応用）
-scheduler.add_job(send_yakuzen_blog_reminder, 'cron', day_of_week='tue', hour=9, minute=0)
 # 毎週木曜朝9時：セキスイブログ更新リマインダー
 scheduler.add_job(send_sekisui_blog_reminder, 'cron', day_of_week='thu', hour=9, minute=0)
 # 毎週土曜朝9時：eBayチェックリマインダー

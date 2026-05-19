@@ -39,15 +39,32 @@ def detect_category(keyword: str) -> int:
     return CATEGORY_SLEEP
 
 
+def _get_featured_image_url(wp_url: str, wp_user: str, wp_pass: str, post_id: int) -> str | None:
+    """WP記事のアイキャッチ画像URLを返す"""
+    try:
+        res = requests.get(
+            f"{wp_url}/wp-json/wp/v2/posts/{post_id}",
+            auth=(wp_user, wp_pass),
+            params={"_embed": 1},
+            timeout=10
+        )
+        if res.status_code == 200:
+            images = res.json().get("_embedded", {}).get("wp:featuredmedia", [])
+            if images:
+                return images[0].get("source_url")
+    except Exception as e:
+        print(f"  アイキャッチURL取得エラー: {e}")
+    return None
+
+
 def send_line_notification(title: str, post_url: str, keyword: str):
     """投稿完了をLINEに通知する"""
     message = (
         f"✅ ブログ投稿完了\n"
         f"「{title}」\n"
-        f"{post_url}\n\n"
-        f"Instagramへの投稿をお願いします📸"
+        f"{post_url}"
     )
-    task = f"Instagram投稿: {title[:30]}"
+    task = f"SNS投稿: {title[:30]}"
     try:
         res = requests.post(
             NOTIFY_URL,
@@ -94,6 +111,14 @@ def run_update(keyword: str, article_md: str, post_id: int) -> tuple:
         post_url = post.get("link", "")
         print(f"  更新完了 カテゴリID:{category_id}")
         send_line_notification(title, post_url, keyword)
+        image_url = _get_featured_image_url(wp_url, wp_user, wp_pass, post_id)
+        user_id = os.getenv("LINE_USER_ID", "")
+        if user_id:
+            try:
+                from blog_yakuzen import send_sns_messages
+                send_sns_messages(user_id, title, post_url, image_url, content_md)
+            except Exception as e:
+                print(f"  SNSセット送信エラー: {e}")
         print(f"\n[Phase 6] 完了 ✅  {post_url}")
         return post_id, post_url
     else:
@@ -126,6 +151,17 @@ def run(keyword: str, article_md: str, output_dir: str = "articles") -> tuple:
     if post_id:
         print(f"  カテゴリID: {category_id}")
         send_line_notification(title, post_url, keyword)
+        wp_url_env = os.getenv("YAKUZEN_WP_URL", "https://foodmakehealth.com")
+        wp_user_env = os.getenv("YAKUZEN_WP_USER", "makiko01035")
+        wp_pass_env = os.getenv("YAKUZEN_WP_APP_PASSWORD", "")
+        image_url = _get_featured_image_url(wp_url_env, wp_user_env, wp_pass_env, post_id)
+        user_id = os.getenv("LINE_USER_ID", "")
+        if user_id:
+            try:
+                from blog_yakuzen import send_sns_messages
+                send_sns_messages(user_id, title, post_url, image_url, content)
+            except Exception as e:
+                print(f"  SNSセット送信エラー: {e}")
         print(f"\n[Phase 6] 完了 ✅  {post_url}")
     else:
         print(f"\n[Phase 6] 投稿失敗 ⚠️")
