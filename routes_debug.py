@@ -1,9 +1,12 @@
 import os
+import re
 import json
 import random
 import threading
 import time
-from flask import Blueprint, jsonify, request, send_from_directory
+import requests
+import feedparser
+from flask import Blueprint, jsonify, request, send_from_directory, Response
 from linebot.models import TextSendMessage
 
 from clients import line_bot_api
@@ -636,4 +639,37 @@ def auth_threads_callback():
 <textarea rows="1" cols="80">{user_id_val}</textarea></p>
 <p><small>トークンは60日間有効。期限切れになったら /auth/threads?account={account} に再アクセスしてください。</small></p>
 </body></html>'''
+
+
+@debug_bp.route('/rakuten-room-rss')
+def rakuten_room_rss():
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'}
+        raw = requests.get('https://room.rakuten.co.jp/makiko01035/items/feed/rss', headers=headers, timeout=10)
+        feed = feedparser.parse(raw.text)
+        items_xml = ''
+        for entry in feed.entries:
+            title = entry.get('title', '')
+            link = entry.get('link', '')
+            summary = entry.get('summary', entry.get('description', ''))
+            img_match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', summary)
+            img_url = img_match.group(1) if img_match else ''
+            summary_clean = re.sub(r'<[^>]+>', '', summary).strip()
+            items_xml += f'''  <item>
+    <title><![CDATA[{title}]]></title>
+    <link>{link}</link>
+    <description><![CDATA[{summary_clean}]]></description>
+    <enclosure url="{img_url}" type="image/jpeg" length="0"/>
+  </item>\n'''
+        rss_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>まきの楽天room</title>
+    <link>https://room.rakuten.co.jp/makiko01035/items</link>
+    <description>まきの楽天roomコレクション</description>
+{items_xml}  </channel>
+</rss>'''
+        return Response(rss_xml, mimetype='application/rss+xml; charset=utf-8')
+    except Exception as e:
+        return str(e), 500
 
