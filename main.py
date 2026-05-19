@@ -39,6 +39,17 @@ from sns_engine_mako import (
 from blog_yakuzen import auto_rewrite_yakuzen, process_yakuzen_new_article, process_yakuzen_rewrite, rewrite_yakuzen_by_slug, rewrite_yakuzen_by_keyword, get_pinterest_access_token, check_old_yakuzen_post, delete_yakuzen_post, kw_auto_rewrite, kw_auto_new_article
 from blog_sekisui import suggest_sekisui_themes, process_sekisui_article
 from ebay_dashboard import ebay_bp
+from calendar_manager import (
+    get_calendar_service,
+    get_or_create_maybe_calendar,
+    get_upcoming_events,
+    format_events,
+    check_deadline_reminders,
+)
+from room_tagger import load_room_tag_sessions, save_room_tag_sessions, generate_room_tags
+from newsletter_manager import load_newsletter_sessions, save_newsletter_sessions, save_newsletter_to_notion
+from note_generator import load_note_sessions, save_note_sessions, send_long_message, generate_note_draft_async
+from print_manager import load_prints, save_prints, load_print_sessions, save_print_sessions
 
 app = Flask(__name__)
 app.register_blueprint(ebay_bp)
@@ -46,12 +57,7 @@ app.register_blueprint(ebay_bp)
 PENDING_FILE = '/tmp/pending_events.json'
 SEKISUI_SESSION_FILE = '/tmp/sekisui_sessions.json'
 YAKUZEN_SESSION_FILE = '/tmp/yakuzen_sessions.json'
-PRINTS_FILE = '/tmp/school_prints.json'
-PRINT_SESSION_FILE = '/tmp/print_sessions.json'
 MORNING_SENT_FILE = '/tmp/morning_sent_date.txt'
-NOTE_SESSION_FILE = '/tmp/note_sessions.json'
-ROOM_TAG_SESSION_FILE = '/tmp/room_tag_sessions.json'
-NEWSLETTER_SESSION_FILE = '/tmp/newsletter_sessions.json'
 
 _morning_sent_date = None
 _morning_sent_lock = threading.Lock()
@@ -105,178 +111,6 @@ def save_yakuzen_sessions(data):
         print(f"yakuzen_sessions save error: {e}")
 
 
-def load_note_sessions():
-    try:
-        with open(NOTE_SESSION_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_note_sessions(data):
-    try:
-        with open(NOTE_SESSION_FILE, 'w') as f:
-            json.dump(data, f, ensure_ascii=False)
-    except Exception as e:
-        print(f"note_sessions save error: {e}")
-
-
-def load_newsletter_sessions():
-    try:
-        with open(NEWSLETTER_SESSION_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_newsletter_sessions(data):
-    try:
-        with open(NEWSLETTER_SESSION_FILE, 'w') as f:
-            json.dump(data, f, ensure_ascii=False)
-    except Exception as e:
-        print(f"newsletter_sessions save error: {e}")
-
-
-def save_newsletter_to_notion(email):
-    """メルマガ1件をNotionのメルマガDBに保存"""
-    notion_token = os.environ.get('NOTION_TOKEN', '')
-    headers = {
-        "Authorization": f"Bearer {notion_token}",
-        "Notion-Version": "2025-09-03",
-        "Content-Type": "application/json"
-    }
-    today = datetime.datetime.now(JST).strftime('%Y-%m-%d')
-    title = f"[{email.get('category', '')}] {email.get('from_name', email.get('from', ''))}"
-    content = f"件名：{email.get('subject', '')}\n\n{email.get('summary', '')}"
-    body = {
-        "after": "323f8d6d-41de-809d-9e98-f9a5da8556a8",
-        "children": [{
-            "object": "block",
-            "type": "to_do",
-            "to_do": {
-                "rich_text": [{"type": "text", "text": {"content": f"📧 {today} {title}\n{content}"}}],
-                "checked": False
-            }
-        }]
-    }
-    requests.patch(
-        "https://api.notion.com/v1/blocks/323f8d6d41de80dea66efad500806f69/children",
-        headers=headers,
-        json=body
-    )
-
-
-def load_room_tag_sessions():
-    try:
-        with open(ROOM_TAG_SESSION_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_room_tag_sessions(data):
-    try:
-        with open(ROOM_TAG_SESSION_FILE, 'w') as f:
-            json.dump(data, f, ensure_ascii=False)
-    except Exception as e:
-        print(f"room_tag_sessions save error: {e}")
-
-
-def generate_room_tags(text=None, image_base64=None, media_type=None):
-    """楽天Room用ハッシュタグを生成する"""
-    content = []
-    if image_base64:
-        content.append({
-            'type': 'image',
-            'source': {'type': 'base64', 'media_type': media_type, 'data': image_base64}
-        })
-    prompt = (
-        f"商品名：{text}\n\n" if text else "この商品画像を見て、\n\n"
-    ) + (
-        "楽天Roomの投稿に使うハッシュタグを15個生成してください。\n"
-        "条件：\n"
-        "- #を先頭につけたハッシュタグ形式\n"
-        "- 日本語で\n"
-        "- 楽天Roomで検索されやすいキーワード（商品カテゴリ・用途・ブランド・特徴など）\n"
-        "- 1行に並べてスペース区切りで出力\n"
-        "- ハッシュタグのみ出力（説明文不要）"
-    )
-    content.append({'type': 'text', 'text': prompt})
-    response = anthropic_client.messages.create(
-        model='claude-sonnet-4-6',
-        max_tokens=300,
-        messages=[{'role': 'user', 'content': content}]
-    )
-    return response.content[0].text.strip()
-
-
-def send_long_message(user_id, text, chunk_size=4000):
-    """長いテキストを分割してLINEにpush送信"""
-    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
-    for i, chunk in enumerate(chunks):
-        prefix = f"【{i+1}/{len(chunks)}】\n" if len(chunks) > 1 else ""
-        line_bot_api.push_message(user_id, TextSendMessage(text=prefix + chunk))
-
-
-def generate_note_draft_async(user_id, note_type, target=None, worry=None, experience=None):
-    """note下書きをClaude APIで生成してLINEに分割送信"""
-    try:
-        type_label = "有料" if note_type == "paid" else "無料"
-        if note_type == "paid":
-            type_instruction = (
-                "有料記事として書いてください。\n"
-                "- 無料部分：導入・共感・この記事でわかること（全体の1/3程度）\n"
-                "- 「ここから有料記事です（300円）」という区切りを入れる\n"
-                "- 有料部分：再現性のある具体的な手順・プロンプト・実例を含める\n"
-                "- 目標文字数：3,000〜4,000文字"
-            )
-        else:
-            type_instruction = (
-                "無料記事として書いてください。\n"
-                "- 読みごたえがあり、SNSでシェアされるような内容\n"
-                "- 体験談ベースで共感を呼ぶ構成\n"
-                "- 目標文字数：1,500〜2,000文字"
-            )
-
-        design_info = ""
-        if target:
-            design_info += f"\n【届けたい読者】{target}"
-        if worry:
-            design_info += f"\n【読者の悩み】{worry}"
-        if experience:
-            design_info += f"\n【まきの体験エピソード】{experience}"
-
-        response = anthropic_client.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=4000,
-            system=(
-                "あなたはAI×日常生活×ワーママ実体験を発信する「まき」として書きます。\n"
-                "プロフィール：医療職・3児ワンオペ・夫急逝後にプログラミングゼロからAIで毎日を仕組み化した\n"
-                "読者：「AIって何に使うの？」と思っているワーママ・AI初心者・日常を楽にしたい人\n"
-                "文体：ですます調・親しみやすい・体験談ベース・専門用語を使わない\n"
-                "重要：読者の悩みへの共感から入り、まきの実体験を通じて「私にもできる」と感じてもらう構成にする\n"
-                + type_instruction
-            ),
-            messages=[{
-                'role': 'user',
-                'content': f'以下の設計情報に基づいてnote{type_label}記事の下書きを書いてください。タイトルも含めて。\n{design_info}'
-            }]
-        )
-
-        draft = response.content[0].text
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text=f"📝 note{type_label}記事の下書きができました！\n↓をそのままnoteにコピペしてください👇"
-        ))
-        send_long_message(user_id, draft)
-        if note_type == "paid":
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="✅ コピペ後、noteで「有料ライン」を「ここから有料記事です」の行に設定してから公開してください🎉"
-            ))
-
-    except Exception as e:
-        line_bot_api.push_message(user_id, TextSendMessage(text=f"❌ 下書き生成エラー: {str(e)[:200]}"))
-
-
 def _start_old_check(user_id, skip_ids):
     """古い記事チェックを開始してセッションにpost_idを保存"""
     yakuzen_sessions = load_yakuzen_sessions()
@@ -322,156 +156,6 @@ def rewrite_yakuzen_by_post_id(user_id, post_id):
         print(f"rewrite_yakuzen_by_post_id error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"😢 エラーが発生しました。\n{str(e)[:150]}"))
 
-
-def load_prints():
-    try:
-        with open(PRINTS_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_prints(data):
-    try:
-        with open(PRINTS_FILE, 'w') as f:
-            json.dump(data, f, ensure_ascii=False)
-    except Exception as e:
-        print(f"prints save error: {e}")
-
-
-def load_print_sessions():
-    try:
-        with open(PRINT_SESSION_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_print_sessions(data):
-    try:
-        with open(PRINT_SESSION_FILE, 'w') as f:
-            json.dump(data, f, ensure_ascii=False)
-    except Exception as e:
-        print(f"print_sessions save error: {e}")
-
-
-# ========== カレンダー ==========
-
-def get_calendar_service():
-    from google.auth.transport.requests import Request
-    creds_info = json.loads(os.environ['GOOGLE_CREDENTIALS'])
-    creds = Credentials(
-        token=None,
-        refresh_token=creds_info.get('refresh_token'),
-        token_uri='https://oauth2.googleapis.com/token',
-        client_id=creds_info.get('client_id'),
-        client_secret=creds_info.get('client_secret'),
-        scopes=creds_info.get('scopes'),
-    )
-    creds.refresh(Request())
-    return build('calendar', 'v3', credentials=creds)
-
-
-def get_or_create_maybe_calendar(service):
-    """「気になるイベント」カレンダーを取得または作成"""
-    calendars = service.calendarList().list().execute().get('items', [])
-    for cal in calendars:
-        if cal.get('summary') == '気になるイベント':
-            return cal['id']
-    new_cal = service.calendars().insert(body={
-        'summary': '気になるイベント',
-        'timeZone': 'Asia/Tokyo'
-    }).execute()
-    return new_cal['id']
-
-
-def get_upcoming_events(days=7):
-    service = get_calendar_service()
-    now = datetime.datetime.now(JST)
-    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end = now + datetime.timedelta(days=days)
-
-    calendars = service.calendarList().list().execute().get('items', [])
-    all_events = []
-    for cal in calendars:
-        try:
-            result = service.events().list(
-                calendarId=cal['id'],
-                timeMin=start.isoformat(),
-                timeMax=end.isoformat(),
-                maxResults=20,
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
-            for event in result.get('items', []):
-                event['_calendar_name'] = cal.get('summary', '')
-            all_events.extend(result.get('items', []))
-        except Exception:
-            pass
-
-    all_events.sort(key=lambda e: e['start'].get('dateTime', e['start'].get('date', '')))
-    return all_events
-
-
-def format_events(events):
-    if not events:
-        return "予定はありません。"
-    lines = []
-    for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        if 'T' in start:
-            dt = datetime.datetime.fromisoformat(start).astimezone(JST)
-            start_str = dt.strftime('%m/%d %H:%M')
-        else:
-            start_str = start
-        cal_name = event.get('_calendar_name', '')
-        cal_label = f"[{cal_name}] " if cal_name else ""
-        lines.append(f"・{start_str} {cal_label}{event['summary']}")
-    return '\n'.join(lines)
-
-
-def check_deadline_reminders():
-    """申込期限の1週間前・3日前・前日・当日、申込開始日の当日にLINE通知を送る"""
-    try:
-        service = get_calendar_service()
-        cal_id = get_or_create_maybe_calendar(service)
-        now = datetime.datetime.now(JST)
-        today = now.date()
-        user_id = os.environ['LINE_USER_ID']
-
-        notify_days = {
-            0: ("⚠️", "今日", "まだ申し込んでいなければ急いでください！"),
-            1: ("📢", "明日", "忘れずに申し込んでください！"),
-            3: ("📌", "3日後", "早めに準備を始めてください！"),
-            7: ("📅", "1週間後", "早めに確認しておきましょう！"),
-        }
-
-        for days_ahead, (icon, label, action) in notify_days.items():
-            target_date = today + datetime.timedelta(days=days_ahead)
-            start = datetime.datetime.combine(target_date, datetime.time.min).astimezone(JST)
-            end = datetime.datetime.combine(target_date, datetime.time.max).astimezone(JST)
-
-            result = service.events().list(
-                calendarId=cal_id,
-                timeMin=start.isoformat(),
-                timeMax=end.isoformat(),
-                maxResults=20,
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
-
-            for e in result.get('items', []):
-                summary = e.get('summary', '')
-                if '【申込期限】' in summary:
-                    title = summary.replace('【申込期限】', '').strip()
-                    msg = f"{icon} 【申込期限 {label}！】\n「{title}」の申し込み期限は{label}です！\n{action}"
-                    line_bot_api.push_message(user_id, TextSendMessage(text=msg))
-                elif '【申込開始】' in summary and days_ahead == 0:
-                    title = summary.replace('【申込開始】', '').strip()
-                    msg = f"🟢 【申込開始 今日！】\n「{title}」の申し込みが今日から始まりました！\n忘れずに申し込んでください！"
-                    line_bot_api.push_message(user_id, TextSendMessage(text=msg))
-    except Exception as e:
-        print(f"Deadline reminder error: {e}")
 
 
 @app.route('/rakuten-room-rss')
