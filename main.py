@@ -817,11 +817,12 @@ def post_sekisui_direct():
 def notify_ig():
     """記事タイトルとURLを受け取りInstagramネタをLINEに送信"""
     secret = request.headers.get('X-Secret', '')
-    if secret != os.environ.get('LINE_USER_ID', ''):
+    allowed = {os.environ.get('LINE_USER_ID', ''), os.environ.get('NOTIFY_SECRET', '')}
+    if not secret or secret not in allowed:
         return {'error': 'unauthorized'}, 401
     data = request.json or {}
     title = data.get('title', '')
-    url = data.get('url', '')
+    url = data.get('url', '') or data.get('post_url', '')
     content_md = data.get('content_md', '')
     image_url = data.get('image_url', None)
     if not title or not url:
@@ -5513,14 +5514,17 @@ MAKO_THREADS_AFF_GENRES = [
     {'name': 'ホットアイマスク',      'keyword': 'ホットアイマスク 蒸気 睡眠'},
     {'name': 'なつめ（薬膳）',        'keyword': 'なつめ 薬膳 乾燥'},
     {'name': 'カモミールハーブティー', 'keyword': 'カモミール ハーブティー 安眠'},
-    {'name': '加味逍遙散',            'keyword': '加味逍遙散 漢方 ストレス'},
+    {'name': '加味逍遙散',            'keyword': '加味逍遙散 漢方 更年期'},
     {'name': 'クコの実（薬膳）',      'keyword': 'クコの実 薬膳 乾燥'},
     {'name': '睡眠枕',                'keyword': '枕 睡眠 低反発'},
     {'name': '加味帰脾湯',            'keyword': '加味帰脾湯 漢方 不眠'},
     {'name': 'マグネシウムサプリ',    'keyword': 'マグネシウム サプリ 睡眠'},
+    {'name': '竜眼肉（薬膳）',        'keyword': '竜眼肉 りゅうがんにく 薬膳'},
     {'name': 'ラベンダーアロマ',      'keyword': 'ラベンダー アロマオイル 安眠'},
     {'name': '酸棗仁湯',              'keyword': '酸棗仁湯 漢方 不眠'},
+    {'name': '抑肝散',                'keyword': '抑肝散 漢方 神経 不眠'},
     {'name': '睡眠ハーブティー',      'keyword': '睡眠茶 ハーブ パッションフラワー'},
+    {'name': '黒ごま・黒豆（薬膳）', 'keyword': '黒ごま 黒豆 薬膳 腎'},
 ]
 
 TRAVEL_MORNING_TWEETS = [
