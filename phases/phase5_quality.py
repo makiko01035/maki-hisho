@@ -182,8 +182,8 @@ def run(keyword, draft_md, output_dir="articles"):
     final_score = 0
     passed = False
 
-    for cycle in range(1, 4):
-        print(f"\n  サイクル {cycle}/3 — 5エージェントが並列採点中...")
+    for cycle in range(1, 11):
+        print(f"\n  サイクル {cycle}/10 — 5エージェントが並列採点中...")
         total, results, priority_issues = run_parallel_scoring(article)
         final_score = total
 
@@ -209,7 +209,7 @@ def run(keyword, draft_md, output_dir="articles"):
                     print(f"    - {issue}")
                 article = fix_article(article, priority_issues)
             else:
-                print(f"  ⚠️ 3サイクル後も{total}点 → まきさんに確認を依頼します")
+                print(f"  ⚠️ 10サイクル後も{total}点 → まきさんに確認を依頼します")
 
     # 結果をファイルに保存
     quality_result = {

@@ -934,8 +934,28 @@ def post_yakuzen_direct():
             if res.status_code in (200, 201):
                 post = res.json()
                 post_url = post['link']
+                returned_post_id = post['id']
+                # アイキャッチ画像をバックグラウンドで設定
+                def _set_eyecatch_bg(_pid, _title, _wp_url, _wp_user, _wp_pass):
+                    try:
+                        from blog_yakuzen import generate_pexels_keyword, fetch_pexels_image_url, upload_image_to_yakuzen_wp
+                        kw = generate_pexels_keyword(_title)
+                        img_url = fetch_pexels_image_url(kw)
+                        if img_url:
+                            media_id = upload_image_to_yakuzen_wp(img_url, _title)
+                            if media_id:
+                                requests.post(f'{_wp_url}/wp-json/wp/v2/posts/{_pid}',
+                                              auth=(_wp_user, _wp_pass),
+                                              json={'featured_media': media_id}, timeout=30)
+                                print(f'アイキャッチ設定完了 post_id={_pid} media_id={media_id}')
+                    except Exception as e:
+                        print(f'アイキャッチ設定エラー: {e}')
+                import threading
+                threading.Thread(target=_set_eyecatch_bg,
+                                 args=(returned_post_id, title, wp_url, wp_user, wp_pass),
+                                 daemon=True).start()
                 _notify_line_ig(title, post_url, content_md)
-                return {'status': 'ok', 'post_id': post['id'], 'url': post_url}, res.status_code
+                return {'status': 'ok', 'post_id': returned_post_id, 'url': post_url}, res.status_code
             return {'error': res.text[:200]}, 500
         from blog_yakuzen import post_to_yakuzen_wp
         post_id, post_url = post_to_yakuzen_wp(title, content_md, post_id=pid, status='publish')
@@ -948,6 +968,42 @@ def post_yakuzen_direct():
                      auth=(wp_user, wp_pass), json={'slug': slug}, timeout=15)
         _notify_line_ig(title, post_url, content_md)
         return {'status': 'ok', 'post_id': post_id, 'url': post_url}, 201
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
+@app.route('/set-eyecatch', methods=['POST'])
+def set_eyecatch():
+    """既存の薬膳記事にアイキャッチ画像を後付け設定する"""
+    secret = request.headers.get('X-Secret', '')
+    if secret != os.environ.get('LINE_USER_ID', ''):
+        return {'error': 'unauthorized'}, 401
+    data = request.json or {}
+    post_id = data.get('post_id')
+    title = data.get('title', '')
+    if not post_id:
+        return {'error': 'post_id required'}, 400
+    try:
+        from blog_yakuzen import generate_pexels_keyword, fetch_pexels_image_url, upload_image_to_yakuzen_wp
+        wp_url = os.environ.get('YAKUZEN_WP_URL', 'https://foodmakehealth.com')
+        wp_user = os.environ.get('YAKUZEN_WP_USER', 'makiko01035')
+        wp_pass = os.environ['YAKUZEN_WP_APP_PASSWORD']
+        keyword = generate_pexels_keyword(title) if title else 'sleep nature calm'
+        img_url = fetch_pexels_image_url(keyword)
+        if not img_url:
+            return {'error': 'Pexels画像が見つかりませんでした'}, 500
+        media_id = upload_image_to_yakuzen_wp(img_url, title or f'post_{post_id}')
+        if not media_id:
+            return {'error': 'WPメディアアップロード失敗'}, 500
+        res = requests.post(
+            f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
+            auth=(wp_user, wp_pass),
+            json={'featured_media': media_id},
+            timeout=30
+        )
+        if res.status_code == 200:
+            return {'status': 'ok', 'post_id': post_id, 'media_id': media_id}, 200
+        return {'error': res.text[:200]}, 500
     except Exception as e:
         return {'error': str(e)}, 500
 
@@ -1546,7 +1602,7 @@ def company_dashboard():
       <div class="dept-name">Blog &amp; SEO</div>
       <div class="dept-target">月収目標 <strong>数万円（蓄積型）</strong></div>
       <ul class="dept-items">
-        <li>薬膳ブログ：約120記事</li>
+        <li>睡眠ブログ：約120記事</li>
         <li>セキスイブログ：34記事</li>
         <li>アフィリエイト収益化進行中</li>
         <li>Search Console流入増が目標</li>
@@ -1579,8 +1635,8 @@ def company_dashboard():
       <tbody>
         <tr><td>毎朝 7:00</td><td>秘書部</td><td>今日の予定をLINEに自動送信</td></tr>
         <tr><td>毎週日曜 20:00</td><td>秘書部</td><td>3日以内の予定リマインド</td></tr>
-        <tr><td>月・木 8:00</td><td>ブログ部</td><td>薬膳ブログ 新規記事自動投稿 + SNS投稿セット送信</td></tr>
-        <tr><td>水・土 8:00</td><td>ブログ部</td><td>薬膳ブログ リライト自動投稿 + SNS投稿セット送信</td></tr>
+        <tr><td>月・木 8:00</td><td>ブログ部</td><td>睡眠ブログ 新規記事自動投稿 + SNS投稿セット送信</td></tr>
+        <tr><td>水・土 8:00</td><td>ブログ部</td><td>睡眠ブログ リライト自動投稿 + SNS投稿セット送信</td></tr>
         <tr><td>木曜日</td><td>ブログ部</td><td>セキスイブログ 記事投稿</td></tr>
         <tr><td>随時</td><td>物販部</td><td>eBayタイトル生成・出品サポート</td></tr>
       </tbody>
@@ -3669,7 +3725,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
         return
 
-    # 薬膳ブログ：セッションチェック
+    # 睡眠ブログ：セッションチェック
     yakuzen_sessions = load_yakuzen_sessions()
     if user_id in yakuzen_sessions:
         session = yakuzen_sessions[user_id]
@@ -3804,7 +3860,7 @@ def handle_message(event):
             return
 
 
-    # 睡眠記事（薬膳ブログ）：キーワード検出
+    # 睡眠記事（睡眠ブログ）：キーワード検出
     yakuzen_keywords = ['睡眠記事', '薬膳記事', '薬膳ブログ', '薬膳 記事', '薬膳リライト', 'foodmakehealth', '薬膳の記事']
     if any(kw in user_message for kw in yakuzen_keywords):
         yakuzen_sessions[user_id] = {'state': 'waiting_for_mode'}
