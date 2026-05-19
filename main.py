@@ -993,10 +993,24 @@ def set_eyecatch():
         keyword = generate_pexels_keyword(title) if title else 'sleep nature calm'
         img_url = fetch_pexels_image_url(keyword)
         if not img_url:
-            return {'error': 'Pexels画像が見つかりませんでした'}, 500
-        media_id = upload_image_to_yakuzen_wp(img_url, title or f'post_{post_id}')
-        if not media_id:
-            return {'error': 'WPメディアアップロード失敗'}, 500
+            return {'error': 'Pexels画像が見つかりませんでした', 'keyword': keyword}, 500
+        # WPメディアに直接アップロード（詳細エラー取得のためインライン実装）
+        img_data = requests.get(img_url, timeout=15).content
+        filename = f"eyecatch-{post_id}.jpg"
+        upload_res = requests.post(
+            f'{wp_url}/wp-json/wp/v2/media',
+            auth=(wp_user, wp_pass),
+            headers={
+                'Content-Disposition': f'attachment; filename="{filename}"',
+                'Content-Type': 'image/jpeg',
+            },
+            data=img_data,
+            timeout=30
+        )
+        if upload_res.status_code != 201:
+            return {'error': 'WPメディアアップロード失敗', 'status': upload_res.status_code,
+                    'detail': upload_res.text[:300]}, 500
+        media_id = upload_res.json()['id']
         res = requests.post(
             f'{wp_url}/wp-json/wp/v2/posts/{post_id}',
             auth=(wp_user, wp_pass),
@@ -1004,7 +1018,7 @@ def set_eyecatch():
             timeout=30
         )
         if res.status_code == 200:
-            return {'status': 'ok', 'post_id': post_id, 'media_id': media_id}, 200
+            return {'status': 'ok', 'post_id': post_id, 'media_id': media_id, 'keyword': keyword}, 200
         return {'error': res.text[:200]}, 500
     except Exception as e:
         return {'error': str(e)}, 500
