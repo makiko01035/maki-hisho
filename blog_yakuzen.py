@@ -963,6 +963,52 @@ def _resolve_font_path():
         return None
 
 
+def build_slide1_color(title: str) -> bytes:
+    """Pexels画像なし時のフォールバック：グラデーション背景でタイトルスライドを生成"""
+    from PIL import Image, ImageDraw, ImageFont
+    from io import BytesIO
+
+    W, H = 1080, 1080
+    img = Image.new('RGB', (W, H))
+    draw = ImageDraw.Draw(img)
+    for y in range(H):
+        r = int(20 + 40 * y / H)
+        g = int(30 + 30 * y / H)
+        b = int(60 + 40 * y / H)
+        draw.line([(0, y), (W, y)], fill=(r, g, b))
+
+    font_path = _resolve_font_path()
+    if not font_path:
+        raise RuntimeError("Font not available")
+
+    font_title = ImageFont.truetype(font_path, 60)
+    font_footer = ImageFont.truetype(font_path, 34)
+
+    max_chars = 14
+    lines, t = [], title
+    while len(t) > max_chars:
+        lines.append(t[:max_chars])
+        t = t[max_chars:]
+    lines.append(t)
+
+    line_height = 72
+    y_start = (H - line_height * len(lines)) // 2 - 40
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font_title)
+        x = (W - (bbox[2] - bbox[0])) // 2
+        draw.text((x + 2, y_start + 2), line, font=font_title, fill=(0, 0, 0, 180))
+        draw.text((x, y_start), line, font=font_title, fill=(255, 255, 255, 255))
+        y_start += line_height
+
+    footer = "@foodmakehealth"
+    bbox_f = draw.textbbox((0, 0), footer, font=font_footer)
+    draw.text(((W - (bbox_f[2] - bbox_f[0])) // 2, H - 80), footer, font=font_footer, fill=(200, 180, 150))
+
+    buf = BytesIO()
+    img.save(buf, format='JPEG', quality=90)
+    return buf.getvalue()
+
+
 def build_slide1_image(title: str, img_url: str) -> bytes:
     """1枚目スライド：Pexels画像にタイトルオーバーレイを合成してJPEGバイト列を返す"""
     from PIL import Image, ImageDraw, ImageFont
@@ -1089,21 +1135,25 @@ def build_carousel_images(title, content_md, slide1_url):
     urls = []
     slug = re.sub(r'[^a-z0-9-]', '-', title[:20].encode('ascii', 'ignore').decode())[:20] or 'yakuzen'
 
-    # 1枚目：タイトルオーバーレイ画像
-    if slide1_url:
-        try:
+    # 1枚目：タイトルオーバーレイ画像（Pexels失敗時は色背景フォールバック）
+    try:
+        if slide1_url:
             img1 = build_slide1_image(title, slide1_url)
-            url1 = upload_bytes_to_yakuzen_wp(img1, f"slide1-{slug}.jpg")
-            urls.append(url1 if url1 else slide1_url)
-            if not url1:
-                errors.append("slide1: WPアップロード失敗（元画像を使用）")
-            else:
-                print(f"[Carousel] slide1 url: {url1}")
-        except Exception as e:
-            tb = traceback.format_exc()
+        else:
+            img1 = build_slide1_color(title)
+            errors.append("slide1: Pexels画像なし→色背景で生成")
+        url1 = upload_bytes_to_yakuzen_wp(img1, f"slide1-{slug}.jpg")
+        urls.append(url1 if url1 else slide1_url or '')
+        if not url1:
+            errors.append("slide1: WPアップロード失敗")
+        else:
+            print(f"[Carousel] slide1 url: {url1}")
+    except Exception as e:
+        tb = traceback.format_exc()
+        if slide1_url:
             urls.append(slide1_url)
-            errors.append(f"slide1: {e}")
-            print(f"[Carousel] slide1 error: {e}\n{tb}")
+        errors.append(f"slide1: {e}")
+        print(f"[Carousel] slide1 error: {e}\n{tb}")
 
     # 2・3枚目：悩み・改善tipsスライド
     try:
@@ -1218,7 +1268,7 @@ def fetch_pexels_image_url(keyword):
         res = requests.get(
             'https://api.pexels.com/v1/search',
             headers={'Authorization': pexels_key},
-            params={'query': keyword, 'per_page': 1, 'orientation': 'landscape'},
+            params={'query': keyword, 'per_page': 1, 'orientation': 'squarish'},
             timeout=10
         )
         photos = res.json().get('photos', [])
