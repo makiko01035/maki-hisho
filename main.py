@@ -241,75 +241,6 @@ def ping():
     return 'OK'
 
 
-@app.route('/test-x-post')
-def test_x_post():
-    import tweepy
-    try:
-        client = _get_x_client()
-        if not client:
-            return 'Error: client is None (keys missing)', 500
-        post_text = generate_x_post(0)
-        resp = client.create_tweet(text=post_text)
-        return f'Success: {resp}', 200
-    except tweepy.errors.Unauthorized as e:
-        return f'401 Unauthorized - response: {e.response.text if hasattr(e, "response") else str(e)}', 401
-    except tweepy.errors.Forbidden as e:
-        return f'403 Forbidden - response: {e.response.text if hasattr(e, "response") else str(e)}', 403
-    except Exception as e:
-        return f'Error ({type(e).__name__}): {e}', 500
-
-
-@app.route('/test-threads')
-def test_threads():
-    """Threads接続テスト＆テスト投稿"""
-    access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
-    user_id = os.environ.get('THREADS_USER_ID', '')
-    if not access_token or not user_id:
-        missing = []
-        if not access_token:
-            missing.append('THREADS_ACCESS_TOKEN')
-        if not user_id:
-            missing.append('THREADS_USER_ID')
-        return f'❌ Render環境変数が未設定です: {", ".join(missing)}', 400
-    post_id = post_to_threads('【テスト投稿】まきの秘書ボットからThreads連携テスト中🧵')
-    if post_id:
-        import time; time.sleep(3)
-        reply_to_threads(post_id, '🛒 コチラ！\nhttps://room.rakuten.co.jp/makiko01035\n[楽天PR]')
-        return '✅ Threads投稿成功！（本文＋コメントURLの2段構え）Threadsアプリで確認してください。'
-    return '❌ 投稿失敗。Renderのログを確認してください。', 500
-
-
-@app.route('/debug-x-auth')
-def debug_x_auth():
-    import requests
-    from requests_oauthlib import OAuth1
-    api_key = os.environ.get('X_API_KEY', '')
-    api_secret = os.environ.get('X_API_SECRET', '')
-    access_token = os.environ.get('X_ACCESS_TOKEN', '')
-    access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET', '')
-    try:
-        auth = OAuth1(api_key, api_secret, access_token, access_token_secret)
-        r = requests.post(
-            'https://api.twitter.com/2/tweets',
-            json={'text': 'テスト投稿（自動）🤖 #AI副業'},
-            auth=auth
-        )
-        return {'status': r.status_code, 'body': r.json()}, 200
-    except Exception as e:
-        return {'error': str(e)}, 500
-
-
-@app.route('/debug-x-keys')
-def debug_x_keys():
-    def mask(v):
-        return (v[:6] + '...' + v[-4:]) if v and len(v) > 10 else ('(empty)' if not v else v)
-    return {
-        'X_API_KEY': mask(os.environ.get('X_API_KEY')),
-        'X_API_SECRET': mask(os.environ.get('X_API_SECRET')),
-        'X_ACCESS_TOKEN': mask(os.environ.get('X_ACCESS_TOKEN')),
-        'X_ACCESS_TOKEN_SECRET': mask(os.environ.get('X_ACCESS_TOKEN_SECRET')),
-    }
-
 
 def _build_overlay_jpeg(img_url: str, title: str) -> bytes:
     """アイキャッチ画像にタイトルを重ねてJPEGバイト列を返す"""
@@ -1519,6 +1450,7 @@ def dashboard():
             ('eBay売上管理', '/ebay-dashboard', True),
             ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
             ('CPASS', 'https://cpass.ebay.com/order/paid', True),
+            ('ハピタス', 'https://hapitas.jp/', True),
         ]),
         ('教材', [
             ('Amazon教材', 'https://utage-system.com/members/iMHiJSHzmtIn/login', True),
