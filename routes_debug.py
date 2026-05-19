@@ -2,7 +2,8 @@ import os
 import json
 import random
 import threading
-from flask import Blueprint, jsonify, request
+import time
+from flask import Blueprint, jsonify, request, send_from_directory
 from linebot.models import TextSendMessage
 
 from clients import line_bot_api
@@ -27,9 +28,80 @@ from sns_direct_poster import (
     post_mako_threads_morning,
     post_mako_threads_aff_auto,
 )
-from threads_room import send_room_suggestion_slot, ROOM_GENRES
+from threads_room import send_room_suggestion_slot, ROOM_GENRES, post_to_threads, reply_to_threads
+from x_poster import _get_x_client, generate_x_post
 
 debug_bp = Blueprint('debug', __name__)
+
+
+@debug_bp.route('/test-x-post')
+def test_x_post():
+    import tweepy
+    try:
+        client = _get_x_client()
+        if not client:
+            return 'Error: client is None (keys missing)', 500
+        post_text = generate_x_post(0)
+        resp = client.create_tweet(text=post_text)
+        return f'Success: {resp}', 200
+    except tweepy.errors.Unauthorized as e:
+        return f'401 Unauthorized - response: {e.response.text if hasattr(e, "response") else str(e)}', 401
+    except tweepy.errors.Forbidden as e:
+        return f'403 Forbidden - response: {e.response.text if hasattr(e, "response") else str(e)}', 403
+    except Exception as e:
+        return f'Error ({type(e).__name__}): {e}', 500
+
+
+@debug_bp.route('/test-threads')
+def test_threads():
+    """Threads接続テスト＆テスト投稿"""
+    access_token = os.environ.get('THREADS_ACCESS_TOKEN', '')
+    user_id = os.environ.get('THREADS_USER_ID', '')
+    if not access_token or not user_id:
+        missing = []
+        if not access_token:
+            missing.append('THREADS_ACCESS_TOKEN')
+        if not user_id:
+            missing.append('THREADS_USER_ID')
+        return f'❌ Render環境変数が未設定です: {", ".join(missing)}', 400
+    post_id = post_to_threads('【テスト投稿】まきの秘書ボットからThreads連携テスト中🧵')
+    if post_id:
+        time.sleep(3)
+        reply_to_threads(post_id, '🛒 コチラ！\nhttps://room.rakuten.co.jp/makiko01035\n[楽天PR]')
+        return '✅ Threads投稿成功！（本文＋コメントURLの2段構え）Threadsアプリで確認してください。'
+    return '❌ 投稿失敗。Renderのログを確認してください。', 500
+
+
+@debug_bp.route('/debug-x-auth')
+def debug_x_auth():
+    import requests
+    from requests_oauthlib import OAuth1
+    api_key = os.environ.get('X_API_KEY', '')
+    api_secret = os.environ.get('X_API_SECRET', '')
+    access_token = os.environ.get('X_ACCESS_TOKEN', '')
+    access_token_secret = os.environ.get('X_ACCESS_TOKEN_SECRET', '')
+    try:
+        auth = OAuth1(api_key, api_secret, access_token, access_token_secret)
+        r = requests.post(
+            'https://api.twitter.com/2/tweets',
+            json={'text': 'テスト投稿（自動）🤖 #AI副業'},
+            auth=auth
+        )
+        return {'status': r.status_code, 'body': r.json()}, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
+@debug_bp.route('/debug-x-keys')
+def debug_x_keys():
+    def mask(v):
+        return (v[:6] + '...' + v[-4:]) if v and len(v) > 10 else ('(empty)' if not v else v)
+    return {
+        'X_API_KEY': mask(os.environ.get('X_API_KEY')),
+        'X_API_SECRET': mask(os.environ.get('X_API_SECRET')),
+        'X_ACCESS_TOKEN': mask(os.environ.get('X_ACCESS_TOKEN')),
+        'X_ACCESS_TOKEN_SECRET': mask(os.environ.get('X_ACCESS_TOKEN_SECRET')),
+    }
 
 @debug_bp.route('/threads-guide')
 def threads_guide():
@@ -315,4 +387,253 @@ def post_threads_now():
         return f'✅ Threads投稿完了！ジャンル：{ROOM_GENRES[slot]["name"]}　Threadsアプリで確認してください。'
     except Exception as e:
         return f'❌ エラー: {e}', 500
+
+
+
+@debug_bp.route('/debug-image')
+def debug_image():
+    """画像URLの取得状態をデバッグするエンドポイント"""
+    img_url = request.args.get('url', '')
+    if not img_url:
+        return 'url param required', 400
+    try:
+        r = requests.get(img_url, timeout=15, headers={'User-Agent': 'Mozilla/5.0'}, allow_redirects=True)
+        ct = r.headers.get('Content-Type', 'unknown')
+        first_bytes = r.content[:16].hex()
+        return {'status': r.status_code, 'content_type': ct, 'size': len(r.content), 'first_bytes_hex': first_bytes}
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
+@debug_bp.route('/diary-debug')
+def diary_debug():
+    """日記追記のフルテスト用エンドポイント"""
+    import requests as req
+    lines = []
+    notion_token = os.environ.get('NOTION_TOKEN', '')
+    if not notion_token:
+        return "NOTION_TOKEN is NOT set in environment variables", 500
+    lines.append(f"NOTION_TOKEN: set (length={len(notion_token)})")
+
+    headers = {
+        "Authorization": f"Bearer {notion_token}",
+        "Notion-Version": "2025-09-03",
+        "Content-Type": "application/json"
+    }
+
+    # ① 検索テスト
+    r = req.post("https://api.notion.com/v1/search",
+        headers=headers,
+        json={"query": "日記", "filter": {"value": "page", "property": "object"}, "page_size": 5}
+    )
+    lines.append(f"[1] search status: {r.status_code}")
+
+    db_id = None
+    title_prop_name = None
+    date_prop_name = None
+    today_str = datetime.date.today().strftime('%Y-%m-%d')
+    today_page_id = None
+
+    if r.status_code == 200:
+        results = r.json().get("results", [])
+        lines.append(f"[1] search results count: {len(results)}")
+        for i, page in enumerate(results[:5]):
+            parent = page.get("parent", {})
+            props = page.get("properties", {})
+            full_db_id = parent.get('database_id', '')
+            if full_db_id and db_id is None:
+                db_id = full_db_id
+            for pname, pval in props.items():
+                if pval.get("type") == "title" and title_prop_name is None:
+                    title_prop_name = pname
+                if pval.get("type") == "date" and date_prop_name is None:
+                    date_prop_name = pname
+            date_val = props.get(date_prop_name or "日付", {}).get("date") or {}
+            is_today = date_val.get("start") == today_str
+            lines.append(f"  page[{i}] id={page['id'][:8]}... date={date_val.get('start','?')} is_today={is_today}")
+            if is_today:
+                today_page_id = page["id"]
+    else:
+        lines.append(f"[1] search error: {r.text[:300]}")
+        return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+    lines.append(f"[1] detected: db_id={db_id}, title_prop={title_prop_name}, date_prop={date_prop_name}")
+    lines.append(f"[1] today ({today_str}) page exists: {today_page_id is not None}")
+
+    # ② 今日のページがなければ作成テスト（child_data_source_ids にフォールバック）
+    if not today_page_id:
+        use_title = title_prop_name or "今日やること"
+        use_date = date_prop_name or "日付"
+        # 試すDBのIDリスト：親DB → child IDs の順で試す
+        candidate_db_ids = [
+            db_id or "323f8d6d-41de-8082-9c88-e476d05c2a0a",
+            "323f8d6d-41de-809c-9d88-000b8eb19cbb",
+            "323f8d6d-41de-80ff-80f3-000b5b69f8b7"
+        ]
+        for attempt_db_id in candidate_db_ids:
+            lines.append(f"[2] trying db={attempt_db_id}, title_prop={use_title}, date_prop={use_date}")
+            r2 = req.post("https://api.notion.com/v1/pages",
+                headers=headers,
+                json={
+                    "parent": {"database_id": attempt_db_id},
+                    "properties": {
+                        use_title: {"title": [{"text": {"content": "日記"}}]},
+                        use_date: {"date": {"start": today_str}}
+                    }
+                }
+            )
+            lines.append(f"[2] create status: {r2.status_code}")
+            if r2.status_code == 200:
+                today_page_id = r2.json()["id"]
+                lines.append(f"[2] created page id={today_page_id[:8]}... with db={attempt_db_id}")
+                break
+            else:
+                err = r2.json()
+                lines.append(f"[2] create error: {err.get('message','?')}")
+                # child_data_source_ids が返ってきたら追加
+                extra_ids = err.get("additional_data", {}).get("child_data_source_ids", [])
+                for eid in extra_ids:
+                    if eid not in candidate_db_ids:
+                        candidate_db_ids.append(eid)
+        if not today_page_id:
+            lines.append("[2] FAILED: 全候補DBで作成失敗")
+            return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+    else:
+        lines.append(f"[2] using existing page id={today_page_id[:8]}...")
+
+    # ③ テストメモ追記
+    r3 = req.patch(
+        f"https://api.notion.com/v1/blocks/{today_page_id}/children",
+        headers=headers,
+        json={"children": [{"object": "block", "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": "【デバッグテスト】diary-debugエンドポイントからの書き込みテスト"}}]}}]}
+    )
+    lines.append(f"[3] append status: {r3.status_code}")
+    if r3.status_code != 200:
+        lines.append(f"[3] append error: {r3.text[:500]}")
+    else:
+        lines.append("[3] SUCCESS: メモの追記に成功しました！")
+
+    return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+@debug_bp.route('/check-creds')
+def check_creds():
+    """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
+    try:
+        raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+        parsed = json.loads(raw)
+        keys = list(parsed.keys())
+        scopes = parsed.get('scopes', [])
+        has_refresh = bool(parsed.get('refresh_token'))
+        return f"OK\nkeys: {keys}\nscopes: {scopes}\nhas_refresh_token: {has_refresh}\nfirst_30_chars: {raw[:30]}"
+    except Exception as e:
+        raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+        return f"JSON parse error: {e}\nfirst_80_chars: {raw[:80]}", 500
+
+
+@debug_bp.route('/get-koharu-threads-uid')
+def get_koharu_threads_uid():
+    token = os.environ.get('KOHARU_THREADS_ACCESS_TOKEN', '').strip()
+    if not token:
+        return 'KOHARU_THREADS_ACCESS_TOKEN が未設定です', 400
+    res = requests.get('https://graph.threads.net/v1.0/me', params={'fields': 'id,username', 'access_token': token}, timeout=10)
+    return res.json()
+
+
+@debug_bp.route('/get-mako-threads-uid')
+def get_mako_threads_uid():
+    token = os.environ.get('MAKO_THREADS_ACCESS_TOKEN', '').strip()
+    if not token:
+        return 'MAKO_THREADS_ACCESS_TOKEN が未設定です', 400
+    res = requests.get('https://graph.threads.net/v1.0/me', params={'fields': 'id,username', 'access_token': token}, timeout=10)
+    return res.json()
+
+
+@debug_bp.route('/check-threads-app')
+def check_threads_app():
+    """THREADS_APP_IDが正しく設定されているか確認するデバッグ用"""
+    app_id = os.environ.get('THREADS_APP_ID', '')
+    app_secret = os.environ.get('THREADS_APP_SECRET', '')
+    return {
+        'THREADS_APP_ID_先頭6桁': app_id[:6] + '...' if len(app_id) > 6 else f'({len(app_id)}文字)',
+        'THREADS_APP_ID_桁数': len(app_id),
+        'THREADS_APP_ID_数字のみか': app_id.isdigit(),
+        'THREADS_APP_SECRET_先頭4文字': app_secret[:4] + '...' if len(app_secret) > 4 else f'({len(app_secret)}文字)',
+    }
+
+
+@debug_bp.route('/auth/threads')
+def auth_threads():
+    app_id = os.environ.get('THREADS_APP_ID', '').strip()
+    if not app_id:
+        return 'THREADS_APP_ID が設定されていません。Renderに設定してください。', 400
+    redirect_uri = 'https://maki-hisho.onrender.com/auth/threads/callback'
+    auth_url = (
+        f"https://www.threads.net/oauth/authorize"
+        f"?client_id={app_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=threads_basic,threads_content_publish"
+        f"&response_type=code"
+    )
+    return f'''<html><body>
+<h2>Threads認証</h2>
+<p><a href="{auth_url}" style="font-size:20px;padding:10px;background:#000;color:#fff;text-decoration:none;border-radius:6px;">
+Threadsで認証する</a></p>
+</body></html>'''
+
+
+@debug_bp.route('/auth/threads/callback')
+def auth_threads_callback():
+    code = request.args.get('code')
+    if not code:
+        return f'エラー: codeが取得できませんでした。{request.args}', 400
+    app_id = os.environ.get('THREADS_APP_ID')
+    app_secret = os.environ.get('THREADS_APP_SECRET')
+    redirect_uri = 'https://maki-hisho.onrender.com/auth/threads/callback'
+    res = requests.post(
+        'https://graph.threads.net/oauth/access_token',
+        data={
+            'client_id': app_id,
+            'client_secret': app_secret,
+            'grant_type': 'authorization_code',
+            'redirect_uri': redirect_uri,
+            'code': code,
+        },
+        timeout=15
+    )
+    if res.status_code != 200:
+        return f'短期トークン取得エラー: {res.status_code} {res.text}', 400
+    short_token = res.json().get('access_token')
+    long_res = requests.get(
+        'https://graph.threads.net/access_token',
+        params={
+            'grant_type': 'th_exchange_token',
+            'client_secret': app_secret,
+            'access_token': short_token,
+        },
+        timeout=15
+    )
+    if long_res.status_code != 200:
+        return f'長期トークン取得エラー: {long_res.status_code} {long_res.text}', 400
+    long_token = long_res.json().get('access_token')
+    user_id_val = res.json().get('user_id', '（取得できませんでした）')
+    account = request.args.get('account', 'koharu')
+    if account == 'mako':
+        token_key = 'MAKO_THREADS_ACCESS_TOKEN'
+        uid_key = 'MAKO_THREADS_USER_ID'
+        label = 'MAKO'
+    else:
+        token_key = 'KOHARU_THREADS_ACCESS_TOKEN'
+        uid_key = 'KOHARU_THREADS_USER_ID'
+        label = 'こはるまま'
+    return f'''<html><body>
+<h2>✅ {label} Threads認証成功！</h2>
+<p>以下2つをRenderの環境変数にコピペしてください：</p>
+<p><b>{token_key}:</b><br>
+<textarea rows="4" cols="80">{long_token}</textarea></p>
+<p><b>{uid_key}:</b><br>
+<textarea rows="1" cols="80">{user_id_val}</textarea></p>
+<p><small>トークンは60日間有効。期限切れになったら /auth/threads?account={account} に再アクセスしてください。</small></p>
+</body></html>'''
 
