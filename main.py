@@ -6199,10 +6199,31 @@ def auto_blog_new():
             design = f"# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。"
             draft, _ = phase4_write.run(keyword, design)
             final, score, passed, _ = phase5_quality.run(keyword, draft)
+            uid = os.environ.get('LINE_USER_ID', '')
             if passed:
                 phase6_publish.run(keyword, final)
+            elif score >= 80:
+                # 95点未達でも80点以上なら投稿（LINEに通知）
+                if uid:
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"⚠️ 品質チェック {score}点（95点未達）でも投稿しました\n「{keyword}」"
+                    ))
+                phase6_publish.run(keyword, final)
+            else:
+                if uid:
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"❌ 自動投稿スキップ（品質{score}点）\nキーワード：「{keyword}」\n手動で確認が必要です"
+                    ))
         except Exception as e:
             print(f"auto_blog_new error: {e}")
+            uid = os.environ.get('LINE_USER_ID', '')
+            if uid:
+                try:
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"❌ 自動投稿エラー（新規）\n{str(e)[:200]}"
+                    ))
+                except Exception:
+                    pass
     threading.Thread(target=_run, daemon=True).start()
 
 # 水・土 8:00：7stepパイプラインで旧レシピ記事を自動リライト
@@ -6230,11 +6251,30 @@ def auto_blog_rewrite():
             keyword = ' '.join(title.split()[:5])
             draft, _ = phase4_rewrite.run(keyword, "")
             final, score, passed, _ = phase5_quality.run(keyword, draft)
+            uid = os.environ.get('LINE_USER_ID', '')
             if passed:
-                # 新規投稿ではなく既存記事を上書き更新＋カテゴリ変更
                 phase6_publish.run_update(keyword, final, post_id)
+            elif score >= 80:
+                if uid:
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"⚠️ 品質チェック {score}点（95点未達）でも投稿しました\n「{keyword}」"
+                    ))
+                phase6_publish.run_update(keyword, final, post_id)
+            else:
+                if uid:
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"❌ 自動リライトスキップ（品質{score}点）\n記事ID:{post_id}「{title}」\n手動で確認が必要です"
+                    ))
         except Exception as e:
             print(f"auto_blog_rewrite error: {e}")
+            uid = os.environ.get('LINE_USER_ID', '')
+            if uid:
+                try:
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"❌ 自動投稿エラー（リライト）\n{str(e)[:200]}"
+                    ))
+                except Exception:
+                    pass
     threading.Thread(target=_run, daemon=True).start()
 
 scheduler.add_job(auto_blog_new,     'cron', day_of_week='mon,thu', hour=8, minute=0)
