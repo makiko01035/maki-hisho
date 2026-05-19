@@ -5884,10 +5884,10 @@ scheduler.add_job(mako_quote_generator, 'cron', day=1, hour=4, minute=0)
 # 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
 scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)
 scheduler.add_job(post_mako_threads_aff_auto, 'cron', hour=21, minute=0)
-# 毎朝6:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
+# 毎朝5:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
 scheduler.add_job(
     lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
-    'cron', hour=6, minute=30,
+    'cron', hour=5, minute=30,
 )
 def _delayed_scheduler_start():
     time.sleep(120)
