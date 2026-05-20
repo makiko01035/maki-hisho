@@ -121,7 +121,7 @@ def auto_rewrite_yakuzen(user_id):
     try:
         posts = get_all_yakuzen_posts()
         if not posts:
-            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の取得に失敗しました。"))
+            _push_silent(user_id, "😢 記事の取得に失敗しました。")
             return
 
         selected = auto_select_yakuzen_post(posts)
@@ -1373,24 +1373,25 @@ def _fetch_sleep_kw_data(creds, days=90, limit=100):
     return sleep_rows + other_rows
 
 
+def _push_silent(user_id: str, text: str) -> None:
+    try:
+        line_bot_api.push_message(user_id, TextSendMessage(text=text))
+    except Exception:
+        pass
+
+
 def kw_auto_rewrite(user_id, creds):
     """KW選定→リライト全自動：Search Consoleで睡眠系11〜30位の伸びしろ記事を選んでリライト"""
     try:
         if not creds:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="😢 Google認証情報が取得できませんでした。"
-            ))
+            _push_silent(user_id, "😢 Google認証情報が取得できませんでした。")
             return
 
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="🔍 Search Consoleで睡眠系KWを分析中...\nリライト対象を自動選定します！"
-        ))
+        _push_silent(user_id, "🔍 Search Consoleで睡眠系KWを分析中...\nリライト対象を自動選定します！")
 
         rows = _fetch_sleep_kw_data(creds)
         if not rows:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="😢 Search Consoleのデータが取得できませんでした。"
-            ))
+            _push_silent(user_id, "😢 Search Consoleのデータが取得できませんでした。")
             return
 
         fall_zone = [r for r in rows if 11 <= r.get('position', 0) <= 30]
@@ -1402,7 +1403,7 @@ def kw_auto_rewrite(user_id, creds):
 
         posts = get_all_yakuzen_posts()
         if not posts:
-            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事の取得に失敗しました。"))
+            _push_silent(user_id, "😢 記事の取得に失敗しました。")
             return
 
         post_list_text = '\n'.join([
@@ -1432,7 +1433,7 @@ def kw_auto_rewrite(user_id, creds):
         raw = response.content[0].text.strip()
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if not match:
-            line_bot_api.push_message(user_id, TextSendMessage(text="😢 記事選定に失敗しました。"))
+            _push_silent(user_id, "😢 記事選定に失敗しました。")
             return
 
         selected = json.loads(match.group())
@@ -1455,9 +1456,7 @@ def kw_auto_rewrite(user_id, creds):
         post_title = post['title']['rendered']
         post_content = post['content']['rendered']
 
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text=f"🎯 狙うKW：「{keyword}」\n📄 「{post_title}」をリライト開始！\n理由：{reason}\n\n少しお待ちください！"
-        ))
+        _push_silent(user_id, f"🎯 狙うKW：「{keyword}」\n📄 「{post_title}」をリライト開始！\n理由：{reason}\n\n少しお待ちください！")
 
         instruction = f"「{keyword}」で検索上位を狙うようにリライトしてください。"
         process_yakuzen_rewrite(user_id, post_id, post_title, post_content, instruction)
@@ -1465,29 +1464,21 @@ def kw_auto_rewrite(user_id, creds):
     except Exception as e:
         print(f"kw_auto_rewrite error: {e}")
         import traceback; traceback.print_exc()
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text=f"😢 KW選定中にエラーが発生しました。\n{str(e)[:150]}"
-        ))
+        _push_silent(user_id, f"😢 KW選定中にエラーが発生しました。\n{str(e)[:150]}")
 
 
 def kw_auto_new_article(user_id, creds):
     """KW選定→新規記事全自動：Search Consoleで未開拓の睡眠系KWを選んで新規作成"""
     try:
         if not creds:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="😢 Google認証情報が取得できませんでした。"
-            ))
+            _push_silent(user_id, "😢 Google認証情報が取得できませんでした。")
             return
 
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="🔍 Search Consoleで未開拓の睡眠系KWを分析中...\n新規記事テーマを自動選定します！"
-        ))
+        _push_silent(user_id, "🔍 Search Consoleで未開拓の睡眠系KWを分析中...\n新規記事テーマを自動選定します！")
 
         rows = _fetch_sleep_kw_data(creds)
         if not rows:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="😢 Search Consoleのデータが取得できませんでした。"
-            ))
+            _push_silent(user_id, "😢 Search Consoleのデータが取得できませんでした。")
             return
 
         untapped = [r for r in rows if r.get('impressions', 0) >= 100 and r.get('clicks', 0) <= 3]
@@ -1534,16 +1525,14 @@ def kw_auto_new_article(user_id, creds):
         raw = response.content[0].text.strip()
         match = re.search(r'\{.*\}', raw, re.DOTALL)
         if not match:
-            line_bot_api.push_message(user_id, TextSendMessage(text="😢 テーマ選定に失敗しました。"))
+            _push_silent(user_id, "😢 テーマ選定に失敗しました。")
             return
 
         selected = json.loads(match.group())
         keyword = selected.get('keyword', '')
         title = selected.get('title', '')
 
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text=f"🎯 狙うKW：「{keyword}」\n📝 テーマ：「{title}」\n\n記事作成中...少しお待ちください！（1〜2分かかります）"
-        ))
+        _push_silent(user_id, f"🎯 狙うKW：「{keyword}」\n📝 テーマ：「{title}」\n\n記事作成中...少しお待ちください！（1〜2分かかります）")
 
         process_yakuzen_new_article(user_id, topic=title)
 
