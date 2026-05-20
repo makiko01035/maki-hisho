@@ -1340,12 +1340,12 @@ _SLEEP_KW_PRIORITY = [
 def _fetch_sleep_kw_data(creds, days=90, limit=100):
     """Search Consoleから睡眠系優先でKWデータを取得（睡眠系を先頭に並べる）"""
     import concurrent.futures
-    from googleapiclient.discovery import build
-    service = build('searchconsole', 'v1', credentials=creds)
     end_date = datetime.date.today()
     start_date = end_date - datetime.timedelta(days=days)
 
     def _call():
+        from googleapiclient.discovery import build
+        service = build('searchconsole', 'v1', credentials=creds)
         return service.searchanalytics().query(
             siteUrl='https://foodmakehealth.com/',
             body={
