@@ -1357,12 +1357,15 @@ def _fetch_sleep_kw_data(creds, days=90, limit=100):
             }
         ).execute()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_call)
-        try:
-            result = future.result(timeout=30)
-        except concurrent.futures.TimeoutError:
-            raise TimeoutError("Search Console API が30秒以内に応答しませんでした")
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(_call)
+    try:
+        result = future.result(timeout=30)
+    except concurrent.futures.TimeoutError:
+        executor.shutdown(wait=False)  # ハングスレッドを待たずに解放
+        raise TimeoutError("Search Console API が30秒以内に応答しませんでした")
+    finally:
+        executor.shutdown(wait=False)
 
     rows = result.get('rows', [])
     sleep_rows = [r for r in rows if any(kw in r['keys'][0] for kw in _SLEEP_KW_PRIORITY)]
