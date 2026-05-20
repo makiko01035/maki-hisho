@@ -1339,20 +1339,31 @@ _SLEEP_KW_PRIORITY = [
 
 def _fetch_sleep_kw_data(creds, days=90, limit=100):
     """Search Consoleから睡眠系優先でKWデータを取得（睡眠系を先頭に並べる）"""
+    import concurrent.futures
     from googleapiclient.discovery import build
     service = build('searchconsole', 'v1', credentials=creds)
     end_date = datetime.date.today()
     start_date = end_date - datetime.timedelta(days=days)
-    result = service.searchanalytics().query(
-        siteUrl='https://foodmakehealth.com/',
-        body={
-            'startDate': start_date.isoformat(),
-            'endDate': end_date.isoformat(),
-            'dimensions': ['query'],
-            'rowLimit': limit,
-            'orderBy': [{'fieldName': 'impressions', 'sortOrder': 'DESCENDING'}],
-        }
-    ).execute()
+
+    def _call():
+        return service.searchanalytics().query(
+            siteUrl='https://foodmakehealth.com/',
+            body={
+                'startDate': start_date.isoformat(),
+                'endDate': end_date.isoformat(),
+                'dimensions': ['query'],
+                'rowLimit': limit,
+                'orderBy': [{'fieldName': 'impressions', 'sortOrder': 'DESCENDING'}],
+            }
+        ).execute()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_call)
+        try:
+            result = future.result(timeout=30)
+        except concurrent.futures.TimeoutError:
+            raise TimeoutError("Search Console API が30秒以内に応答しませんでした")
+
     rows = result.get('rows', [])
     sleep_rows = [r for r in rows if any(kw in r['keys'][0] for kw in _SLEEP_KW_PRIORITY)]
     other_rows = [r for r in rows if r not in sleep_rows]
