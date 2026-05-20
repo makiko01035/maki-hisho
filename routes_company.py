@@ -593,11 +593,11 @@ def dashboard():
             ('eBay売上管理', '/ebay-dashboard', True),
             ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
             ('CPASS', 'https://cpass.ebay.com/order/paid', True),
-            ('ハピタス', 'https://hapitas.jp/', True),
         ]),
         ('Amazon', [
             ('Amazon.co.jp', 'https://www.amazon.co.jp/', False),
             ('セラーセントラル', 'https://sellercentral.amazon.co.jp/home', True),
+            ('ハピタス', 'https://hapitas.jp/', True),
         ]),
         ('教材', [
             ('Amazon教材', 'https://utage-system.com/members/iMHiJSHzmtIn/login', True),
