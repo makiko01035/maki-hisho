@@ -124,7 +124,7 @@ scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
 scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
 scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
 # 毎週月・水・金 朝9時20分：X エンゲージメントリマインダー
-scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon,wed,fri', hour=9, minute=20)
+scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon', hour=9, minute=20)  # 月水金→月曜のみ（通数削減）
 # 毎週月曜朝9時30分：週次SEOレポート（薬膳・セキスイ・X）
 scheduler.add_job(send_weekly_seo_report, 'cron', day_of_week='mon', hour=9, minute=30)
 # 毎月末日朝9時：noteリマインド
@@ -132,8 +132,8 @@ scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
 scheduler.add_job(send_note_weekly_reminder, 'cron', day_of_week='thu', hour=9, minute=5)
 # 毎週月曜9時40分：週次Xパフォーマンスレポート（PDCA用）
 scheduler.add_job(send_x_weekly_report, 'cron', day_of_week='mon', hour=9, minute=40)
-# 毎日18時：業務ログ（今日のコミット・X投稿・AIの一言）
-scheduler.add_job(send_daily_work_log, 'cron', hour=18, minute=0)
+# 毎週月曜18時：業務ログ（毎日→月曜のみに変更・通数削減）
+scheduler.add_job(send_daily_work_log, 'cron', day_of_week='mon', hour=18, minute=0)
 # 毎日5本：楽天アフィ→Threads自動投稿（朝1・昼1・夕1・夜2、1時間以上間隔）
 # ジャンルは7種ローテーション（slot % 7）
 scheduler.add_job(send_room_suggestion_slot, 'cron', hour=7, minute=30, args=[0])   # UV・日焼け止め
