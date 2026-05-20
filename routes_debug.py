@@ -673,3 +673,65 @@ def rakuten_room_rss():
     except Exception as e:
         return str(e), 500
 
+
+
+@debug_bp.route('/test-kw-debug')
+def test_kw_debug():
+    """KWフロー診断：Search Console接続・push_message・Anthropic APIを順番に確認"""
+    import traceback
+    results = {}
+    user_id = os.environ.get('LINE_USER_ID', '')
+
+    # 1. push_message テスト
+    try:
+        line_bot_api.push_message(user_id, TextSendMessage(text='[診断] push_message テスト OK'))
+        results['push_message'] = 'OK'
+    except Exception as e:
+        results['push_message'] = f'ERROR: {e}'
+
+    # 2. get_google_creds テスト
+    try:
+        from x_analytics import get_google_creds
+        creds = get_google_creds()
+        results['creds'] = 'OK' if creds else 'None'
+        results['creds_bool'] = bool(creds)
+    except Exception as e:
+        results['creds'] = f'ERROR: {e}'
+
+    # 3. Search Console API テスト（10秒タイムアウト）
+    try:
+        import concurrent.futures
+        from x_analytics import get_google_creds
+        creds = get_google_creds()
+        def _sc_test():
+            from googleapiclient.discovery import build
+            svc = build('searchconsole', 'v1', credentials=creds)
+            return svc.searchanalytics().query(
+                siteUrl='https://foodmakehealth.com/',
+                body={'startDate': '2026-05-01', 'endDate': '2026-05-10',
+                      'dimensions': ['query'], 'rowLimit': 1}
+            ).execute()
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(_sc_test)
+        try:
+            r = future.result(timeout=10)
+            results['search_console'] = f"OK rows={len(r.get('rows',[]))}"
+        except concurrent.futures.TimeoutError:
+            results['search_console'] = 'TIMEOUT (10s)'
+        finally:
+            executor.shutdown(wait=False)
+    except Exception as e:
+        results['search_console'] = f'ERROR: {e}\n{traceback.format_exc()[:300]}'
+
+    # 4. Anthropic API テスト
+    try:
+        from clients import anthropic_client
+        resp = anthropic_client.messages.create(
+            model='claude-haiku-4-5-20251001', max_tokens=10,
+            messages=[{'role': 'user', 'content': 'hi'}]
+        )
+        results['anthropic'] = f'OK: {resp.content[0].text[:30]}'
+    except Exception as e:
+        results['anthropic'] = f'ERROR: {e}'
+
+    return jsonify(results)
