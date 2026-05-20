@@ -189,7 +189,7 @@ scheduler.add_job(mako_monitor, 'cron', hour=7,  minute=10)
 scheduler.add_job(mako_monitor, 'cron', hour=13, minute=10)
 scheduler.add_job(mako_monitor, 'cron', hour=22, minute=10)
 # ⑦ 格言ポスター：毎朝 05:00〜05:15（X のみ・Threadsはまきさんが手動で貼る）
-scheduler.add_job(mako_poster_morning_quote, 'cron', hour=5, minute=0, jitter=900)
+scheduler.add_job(mako_poster_morning_quote, 'cron', hour=22, minute=0)
 # ⑧ 格言ジェネレーター：毎月1日 04:00（30本生成→LINEに通知）
 scheduler.add_job(mako_quote_generator, 'cron', day=1, hour=4, minute=0)
 # MAKO Threads：1日2本（MAKO_THREADS_ACCESS_TOKEN設定後に自動稼働）

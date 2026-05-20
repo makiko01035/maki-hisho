@@ -132,6 +132,81 @@ def _get_mako_x_client():
         return None
 
 
+def _get_mako_x_api():
+    """tweepy.API（v1.1）- メディアアップロード専用"""
+    try:
+        import tweepy
+        api_key    = (os.environ.get('MAKO_X_API_KEY') or '').strip()
+        api_secret = (os.environ.get('MAKO_X_API_SECRET') or '').strip()
+        access_tok = (os.environ.get('MAKO_X_ACCESS_TOKEN') or '').strip()
+        access_sec = (os.environ.get('MAKO_X_ACCESS_TOKEN_SECRET') or '').strip()
+        if not all([api_key, api_secret, access_tok, access_sec]):
+            return None
+        auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_tok, access_sec)
+        return tweepy.API(auth)
+    except Exception as e:
+        print(f"[mako] _get_mako_x_api error: {e}")
+        return None
+
+
+def _generate_quote_image(text):
+    """格言テキストからチャコール×ゴールドの画像を生成してBytesIOを返す"""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        from io import BytesIO
+
+        img = Image.new('RGB', (1080, 1080))
+        draw = ImageDraw.Draw(img)
+        for y in range(1080):
+            r = int(25 + 30 * y / 1080)
+            g = int(25 + 30 * y / 1080)
+            b = int(30 + 35 * y / 1080)
+            draw.line([(0, y), (1080, y)], fill=(r, g, b))
+
+        font_path = os.path.join(os.path.dirname(__file__), 'fonts', 'NotoSansJP-Bold.otf')
+        font_quote = ImageFont.truetype(font_path, 220)
+        font_main  = ImageFont.truetype(font_path, 76)
+        font_sub   = ImageFont.truetype(font_path, 32)
+
+        gold  = '#c8a96e'
+        white = '#f0f0f0'
+
+        draw.text((60, 50), '“', font=font_quote, fill=gold)
+
+        lines   = text.split('\n')
+        y_start = 350
+        for i, line in enumerate(lines):
+            draw.text((100, y_start + i * 100), line, font=font_main, fill=white)
+
+        draw.rectangle([100, 770, 300, 776], fill=gold)
+        draw.text((100, 820), 'MAKO / @MAKOhealthcare', font=font_sub, fill=gold)
+
+        buf = BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"[mako] _generate_quote_image error: {e}")
+        return None
+
+
+def _post_x_with_image(text, image_buf):
+    """画像付きXポスト。失敗時はテキストのみにフォールバック"""
+    try:
+        api    = _get_mako_x_api()
+        client = _get_mako_x_client()
+        if not api or not client:
+            return _post_x(text)
+        media    = api.media_upload(filename='quote.png', file=image_buf)
+        resp     = client.create_tweet(text=text, media_ids=[media.media_id])
+        tweet_id = resp.data['id']
+        print(f"[mako] X posted with image: {tweet_id}")
+        return tweet_id
+    except Exception as e:
+        print(f"[mako] _post_x_with_image error: {e}, fallback to text")
+        return _post_x(text)
+
+
 def _post_x(text, reply_to_id=None):
     """MAKOのXに投稿。280字超は末尾省略。成功時はtweet_id、失敗時はNone"""
     client = _get_mako_x_client()
@@ -897,27 +972,30 @@ def run_monitor():
 
 
 # ============================================================
-# ⑦ 格言ポスター  毎朝 05:00〜05:15（X のみ・Threadsは手動）
+# ⑦ 格言ポスター  毎夜 22:00（画像付きX投稿）
 # ============================================================
 
 def run_poster_morning_quote():
-    """格言ストックから1本選んでXに投稿。ストック切れ時はフォールバック文を投稿"""
+    """格言ストックから1本選んで画像付きでXに投稿。ストック切れ時はフォールバック"""
     try:
         stock = _load(QUOTE_STOCK_PATH, {'quotes': []})
         remaining = [q for q in stock.get('quotes', []) if not q.get('posted')]
 
-        if remaining:
-            quote = random.choice(remaining)
-            tweet_id = _post_x(quote['body'])
-            if tweet_id:
-                quote.update({'posted': True, 'posted_at': datetime.now().isoformat()})
-                _save(QUOTE_STOCK_PATH, stock)
-                print(f"[mako] morning quote posted: {quote['body'][:30]}")
+        text = random.choice(remaining)['body'] if remaining else random.choice(_FALLBACK_QUOTES)
+
+        image_buf = _generate_quote_image(text)
+        if image_buf:
+            tweet_id = _post_x_with_image(text, image_buf)
         else:
-            # ストック切れ：フォールバック
-            fallback = random.choice(_FALLBACK_QUOTES)
-            _post_x(fallback)
-            print(f"[mako] morning quote (fallback): {fallback[:30]}")
+            tweet_id = _post_x(text)
+
+        if tweet_id and remaining:
+            next(q for q in stock['quotes'] if q['body'] == text).update(
+                {'posted': True, 'posted_at': datetime.now().isoformat()}
+            )
+            _save(QUOTE_STOCK_PATH, stock)
+
+        print(f"[mako] quote posted: {text[:30]}")
 
     except Exception as e:
         print(f"[mako] run_poster_morning_quote error: {e}")
