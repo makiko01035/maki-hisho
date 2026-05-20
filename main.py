@@ -50,6 +50,7 @@ from sns_direct_poster import (
     post_kvision_morning_tweet, post_kvision_travel_aff_auto, post_kvision_card_tweet,
     post_koharu_threads_card,
     post_mako_threads_morning, post_mako_threads_aff_auto,
+    post_mako_x_morning_tweet,
 )
 from routes_debug import debug_bp
 from routes_company import company_bp
@@ -195,6 +196,8 @@ scheduler.add_job(mako_quote_generator, 'cron', day=1, hour=4, minute=0)
 # 朝8:00 睡眠共感投稿、夜21:00 アフィスレッド（言い切りNG・共感ベース）
 scheduler.add_job(post_mako_threads_morning, 'cron', hour=8, minute=0)
 scheduler.add_job(post_mako_threads_aff_auto, 'cron', hour=21, minute=0)
+# MAKO X：朝7:30 えまたまスタイルのツリー投稿（医学×睡眠・日付ベースローテーション）
+scheduler.add_job(post_mako_x_morning_tweet, 'cron', hour=7, minute=30)
 # 毎朝5:30：eBay日本人セラー売れ筋から仕入れ候補をLINEに送信
 scheduler.add_job(
     lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
