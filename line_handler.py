@@ -873,6 +873,19 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"タグ生成エラー: {str(e)[:100]}"))
         return
 
+    # eBayヘルプ
+    if user_message in ['eBayヘルプ', 'ebayヘルプ', 'eBay ヘルプ', '物販ヘルプ']:
+        msg = (
+            "【eBayコマンド一覧】\n\n"
+            "・ebayリサーチ\n　→ 今日の仕入れ候補5件\n\n"
+            "・仕入れ候補\n　→ 同上\n\n"
+            "・ebay サンリオ（ジャンル指定）\n　→ そのジャンルの売れ筋を検索\n\n"
+            "・セラーチェック：username\n　→ セラーの売れた商品を確認\n\n"
+            "・eBayタイトル作って：商品名\n　→ 英語タイトルを生成"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+        return
+
     # 仕入れ候補 即時実行（テスト・デバッグ兼用）
     if user_message in ['仕入れ候補', '仕入れ候補テスト', '仕入れリサーチ']:
         threading.Thread(

@@ -862,7 +862,7 @@ def setup_rich_menu():
         "chatBarText": "メニュー",
         "areas": [
             {"bounds": {"x": 0,    "y": 0,   "width": 833, "height": 421},
-             "action": {"type": "uri", "uri": "https://www.ebay.com/sh/research"}},
+             "action": {"type": "message", "text": "ebayリサーチ"}},
             {"bounds": {"x": 833,  "y": 0,   "width": 834, "height": 421},
              "action": {"type": "message", "text": "roomタグ"}},
             {"bounds": {"x": 1667, "y": 0,   "width": 833, "height": 421},
