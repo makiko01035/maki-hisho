@@ -28,6 +28,11 @@ DAILY_RESEARCH_KEYWORDS = [
     "Japan eraser iwako",
     "Precure card Japan",
     "Japan vintage brooch",
+    "Pokemon card Japan",
+    "Japan furoshiki",
+    "Nendoroid Japan figure",
+    "Japan vintage postcard",
+    "Japan washi tape",
 ]
 
 # 除外キーワード（重い・大きい・仕入れ困難なもの）
@@ -182,69 +187,71 @@ def search_and_score(token, keyword, min_price, max_price):
 
 def run_ebay_research(user_id, user_query=None):
     try:
-        if user_query:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text=f"🤖 「{user_query}」の条件でキーワードを生成中...\n結果まで2〜3分お待ちください！"
-            ))
-            claude_result = generate_keywords_with_claude(user_query)
-            if claude_result:
-                keywords = claude_result.get("keywords", DEFAULT_KEYWORDS)
-                min_price = claude_result.get("min_price", 10)
-                max_price = claude_result.get("max_price", 100)
-                label = claude_result.get("research_label", user_query)
-            else:
-                keywords = DEFAULT_KEYWORDS
-                min_price, max_price = 10, 100
-                label = "デフォルト（軽量・小物）"
+        if not user_query:
+            # キーワード指定なし → 仕入れ候補と同じ処理
+            send_daily_purchase_candidates(user_id)
+            return
+
+        # キーワード指定あり → Finding APIで実際の売れ筋を検索
+        line_bot_api.push_message(user_id, TextSendMessage(
+            text=f"🔍 「{user_query}」の売れ筋を検索中...\n2〜3分お待ちください！"
+        ))
+        claude_result = generate_keywords_with_claude(user_query)
+        if claude_result:
+            keywords = claude_result.get("keywords", [user_query])
+            label = claude_result.get("research_label", user_query)
         else:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text="🔍 eBayリサーチ中です...2〜3分かかります、そのままお待ちください！"
-            ))
-            keywords = DEFAULT_KEYWORDS
-            min_price, max_price = 10, 100
-            label = "軽量・小物カテゴリ"
+            keywords = [user_query]
+            label = user_query
 
-        token = get_ebay_token()
-        if not token:
-            line_bot_api.push_message(user_id, TextSendMessage(text="❌ eBay APIの認証に失敗しました"))
+        all_items = []
+        seen_titles = set()
+        for kw in keywords:
+            items = _search_jp_sold_one(kw)
+            time.sleep(1.2)
+            for it in (items or []):
+                try:
+                    title = it["title"][0]
+                    price = float(it["sellingStatus"][0]["convertedCurrentPrice"][0]["__value__"])
+                    end_time = it["listingInfo"][0]["endTime"][0][:10]
+                    title_lower = title.lower()
+                    if any(ex in title_lower for ex in EXCLUDE_TITLE_KEYWORDS):
+                        continue
+                    if title[:30] in seen_titles:
+                        continue
+                    seen_titles.add(title[:30])
+                    purchase_limit = _calc_purchase_limit(price)
+                    if purchase_limit < 10000:
+                        continue
+                    all_items.append({
+                        "title": title,
+                        "price_usd": price,
+                        "sold_date": end_time,
+                        "purchase_limit": purchase_limit,
+                        "mercari_url": _mercari_url(title),
+                    })
+                except Exception:
+                    continue
+
+        if not all_items:
+            line_bot_api.push_message(user_id, TextSendMessage(
+                text=f"「{label}」で条件に合う売れ筋が見つかりませんでした😢\n別のキーワードで試してみてください。"
+            ))
             return
 
-        # 並列で全キーワードを同時検索
-        results = []
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {
-                executor.submit(search_and_score, token, kw, min_price, max_price): kw
-                for kw in keywords
-            }
-            for future in as_completed(futures):
-                result = future.result()
-                if result:
-                    results.append(result)
+        all_items.sort(key=lambda x: x["purchase_limit"], reverse=True)
+        top = all_items[:5]
 
-        results.sort(key=lambda x: x["score"], reverse=True)
-
-        if not results:
-            line_bot_api.push_message(user_id, TextSendMessage(
-                text=f"今回は「{label}」でおすすめ候補が見つかりませんでした😢\n条件を変えて再試行してみてください。"
-            ))
-            return
-
-        msg = f"📦 eBayリサーチ結果（{label}）\n\n"
-        for i, r in enumerate(results[:5], 1):
-            msg += f"{i}位 {r['keyword']}\n"
-            msg += f"   競合: {r['total']}件 / 平均${r['avg']}\n"
-            msg += f"   👀 平均ウォッチ: {r['avg_watch']}件\n"
-            msg += f"   {r['judge']}\n\n"
-
-        msg += "💡 次のステップ：\n"
-        msg += "① eBayで上記キーワードを検索\n"
-        msg += "② Sold Listings（販売済み）でフィルター\n"
-        msg += "③ 30日で売れてるか確認してから仕入れ！\n"
-        msg += "④ eBayタイトルは「eBayタイトル作って：商品名」で作れます。"
+        msg = f"【{label}】売れ筋リサーチ\n\n"
+        for i, r in enumerate(top, 1):
+            msg += f"{i}. ${r['price_usd']:.0f} | {r['title'][:38]}\n"
+            msg += f"   仕入れ上限: ¥{r['purchase_limit']:,}以下\n"
+            msg += f"   {r['mercari_url']}\n\n"
+        msg += "→ URLをタップしてメルカリで相場確認してね"
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
 
     except Exception as e:
-        print(f"eBay research error: {e}")
+        print(f"run_ebay_research error: {e}")
         line_bot_api.push_message(user_id, TextSendMessage(text=f"❌ リサーチ中にエラーが発生しました: {str(e)[:100]}"))
 
 
