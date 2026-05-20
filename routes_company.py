@@ -585,7 +585,7 @@ def dashboard():
             ('CareNet', 'https://www.carenet.com/', False),
             ('MedPeer', 'https://medpeer.jp/keymessage/list/point3', False),
         ]),
-        ('Sales', [
+        ('eBay', [
             ('メルハント', 'https://auction2024.com/admin/main.php', True),
             ('物販ブースター', 'https://buppan-booster.com/list-sell', True),
             ('メルカリ', 'https://jp.mercari.com/', False),
@@ -594,6 +594,10 @@ def dashboard():
             ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
             ('CPASS', 'https://cpass.ebay.com/order/paid', True),
             ('ハピタス', 'https://hapitas.jp/', True),
+        ]),
+        ('Amazon', [
+            ('Amazon.co.jp', 'https://www.amazon.co.jp/', False),
+            ('セラーセントラル', 'https://sellercentral.amazon.co.jp/home', True),
         ]),
         ('教材', [
             ('Amazon教材', 'https://utage-system.com/members/iMHiJSHzmtIn/login', True),
