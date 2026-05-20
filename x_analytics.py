@@ -388,7 +388,7 @@ def add_study_memo(memo_text):
 
 
 def find_or_create_diary_page(notion_token, today_str):
-    """今日の日記ページをNotionで探す。なければ最新ページにフォールバック"""
+    """今日の日記ページをNotionで探す。なければ新規作成する"""
     import requests as req
     headers = {
         "Authorization": f"Bearer {notion_token}",
@@ -403,6 +403,8 @@ def find_or_create_diary_page(notion_token, today_str):
     print(f"[diary] search status={r.status_code}")
 
     date_prop_name = None
+    title_prop_name = None
+    parent_info = None
     latest_page_id = None
 
     if r.status_code == 200:
@@ -411,22 +413,53 @@ def find_or_create_diary_page(notion_token, today_str):
             for pname, pval in props.items():
                 if pval.get("type") == "date" and date_prop_name is None:
                     date_prop_name = pname
+                if pval.get("type") == "title" and title_prop_name is None:
+                    title_prop_name = pname
             # 今日のページかチェック
             date_key = date_prop_name or "日付"
             date_val = props.get(date_key, {}).get("date") or {}
             if date_val.get("start") == today_str:
                 print(f"[diary] found today's page id={page['id']}")
                 return page["id"]
-            # 最新ページを保持（今日のがなければフォールバック用）
+            # 最新ページの情報を保持（新規作成の親情報として使用）
             if latest_page_id is None:
                 latest_page_id = page["id"]
+                parent_info = page.get("parent")
     else:
         print(f"[diary] search error: {r.text[:300]}")
         return None
 
-    # 今日のページがない場合：最新ページにフォールバック（日付プレフィックス付きで追記）
-    if latest_page_id:
-        print(f"[diary] today's page not found, using latest page id={latest_page_id}")
+    # 今日のページがない場合：Notionに新規ページを作成
+    if parent_info and parent_info.get("type") == "database_id":
+        db_id = parent_info["database_id"]
+        import datetime as dt_mod
+        parsed = dt_mod.datetime.strptime(today_str, "%Y-%m-%d")
+        page_title = parsed.strftime("%Y年%m月%d日の日記")
+
+        create_props = {}
+        if date_prop_name:
+            create_props[date_prop_name] = {"date": {"start": today_str}}
+        tname = title_prop_name or "Name"
+        create_props[tname] = {"title": [{"type": "text", "text": {"content": page_title}}]}
+
+        r2 = req.post("https://api.notion.com/v1/pages",
+            headers=headers,
+            json={"parent": {"database_id": db_id}, "properties": create_props}
+        )
+        print(f"[diary] create new page status={r2.status_code}")
+        if r2.status_code == 200:
+            new_id = r2.json()["id"]
+            print(f"[diary] created today's page id={new_id}")
+            return new_id
+        else:
+            print(f"[diary] create error: {r2.text[:300]}")
+            # 作成失敗時のみ最新ページにフォールバック
+            if latest_page_id:
+                print(f"[diary] fallback to latest page id={latest_page_id}")
+                return latest_page_id
+    elif latest_page_id:
+        # 親がデータベースでない場合（通常ページ直下など）はフォールバック
+        print(f"[diary] parent is not database, fallback to latest page id={latest_page_id}")
         return latest_page_id
 
     print("[diary] no diary page found at all")
@@ -585,8 +618,7 @@ def add_diary_memo(memo_text):
     if not page_id:
         print("[diary] page_id is None, cannot append")
         return False
-    # 今日のページでない場合は日付プレフィックスをつける
-    content_text = f"{today_str} {time_str} {memo_text}"
+    content_text = f"{time_str} {memo_text}"
     r = req.patch(
         f"https://api.notion.com/v1/blocks/{page_id}/children",
         headers={

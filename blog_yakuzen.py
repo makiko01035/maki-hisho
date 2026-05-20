@@ -688,15 +688,21 @@ def _extract_rakuten_keywords_multi(title, content_md):
     try:
         response = anthropic_client.messages.create(
             model='claude-haiku-4-5-20251001',
-            max_tokens=80,
+            max_tokens=100,
             messages=[{
                 'role': 'user',
-                'content': f"""この薬膳・睡眠ブログ記事に登場する食材・商品から、楽天市場で検索できるものを2〜3件選んでください。
-食材だけでなく、枕・アイマスク・アロマオイル・ナイトウェアなど寝具・グッズも記事に出ていれば含めてください。
-タイトル：{title}
-記事：{content_md[:800]}
+                'content': f"""この睡眠・薬膳ブログ記事の「解決策・おすすめ商品」として紹介している商品を2〜3件選んでください。
 
-カンマ区切りで商品名のみ答えてください（例：カモミールティー,温熱アイマスク,なつめ茶）。説明不要。"""
+ルール：
+- 記事タイトルのメインテーマ（更年期×睡眠・不眠・冷えなど）と直接関係する商品のみ
+- 記事で「おすすめ・効果的・試してほしい」として紹介されている食材・グッズのみ
+- みそ・醤油・砂糖・塩・酢・油など汎用調味料は絶対に除外
+- 記事テーマと無関係な食材も除外
+
+タイトル：{title}
+記事：{content_md[:1200]}
+
+カンマ区切りで商品名のみ（例：冷感枕カバー,カモミールティー,なつめ茶）。説明不要。"""
             }]
         )
         raw = response.content[0].text.strip()
@@ -707,15 +713,28 @@ def _extract_rakuten_keywords_multi(title, content_md):
         return [title.replace('薬膳', '').strip()[:20] or title]
 
 
+_RAKUTEN_NG_WORDS = ['みそ', '味噌', '醤油', '砂糖', '塩', '酢', '小麦粉', '片栗粉', '料理酒', '白だし', 'めんつゆ']
+
+
+def _is_relevant_rakuten_item(item_name, title):
+    """楽天商品が記事テーマと無関係でないかチェック"""
+    if any(ng in item_name for ng in _RAKUTEN_NG_WORDS):
+        return False
+    return True
+
+
 def _build_rakuten_section(title, content_md=''):
     keywords = _extract_rakuten_keywords_multi(title, content_md)
     cards = ''
     found_labels = []
     for kw in keywords:
-        items = search_rakuten_items(kw, hits=1)
-        if items:
-            cards += _build_item_card(items[0])
-            found_labels.append(kw)
+        items = search_rakuten_items(kw, hits=3)
+        relevant = [it for it in items if _is_relevant_rakuten_item(it['name'], title)]
+        if not relevant:
+            print(f"楽天フィルタ：「{kw}」の検索結果が全てNG（スキップ）")
+            continue
+        cards += _build_item_card(relevant[0])
+        found_labels.append(kw)
     if not cards:
         return ''
     intro = _build_rakuten_natural_intro(title, content_md, found_labels[0] if found_labels else keywords[0])
@@ -757,7 +776,9 @@ def detect_category_id(title, content=''):
 def post_to_yakuzen_wp(title, content_md, post_id=None, status='draft', featured_media_id=None, categories=None, tags=None):
     wp_url, wp_user, wp_pass = get_yakuzen_wp_creds()
     html = md_lib.markdown(content_md, extensions=['tables', 'nl2br'])
-    html = html.replace('<!-- yakuzen-affiliate-cta -->', _build_affiliate_cta(title, content_md))
+    affiliate_cta = _build_affiliate_cta(title, content_md)
+    html = html.replace('<!-- yakuzen-affiliate-cta -->', affiliate_cta, 1)
+    html = html.replace('<!-- yakuzen-affiliate-cta -->', '')  # 重複分を除去
     try:
         rakuten_section = _build_rakuten_section(title, content_md)
         if rakuten_section:
