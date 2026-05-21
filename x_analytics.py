@@ -430,21 +430,37 @@ def find_or_create_diary_page(notion_token, today_str):
         return None
 
     # 今日のページがない場合：Notionに新規ページを作成
-    if parent_info and parent_info.get("type") == "database_id":
-        db_id = parent_info["database_id"]
-        import datetime as dt_mod
-        parsed = dt_mod.datetime.strptime(today_str, "%Y-%m-%d")
-        page_title = parsed.strftime("%Y年%m月%d日の日記")
+    import datetime as dt_mod
+    parsed = dt_mod.datetime.strptime(today_str, "%Y-%m-%d")
+    page_title = parsed.strftime("%Y年%m月%d日の日記")
 
-        create_props = {}
-        if date_prop_name:
-            create_props[date_prop_name] = {"date": {"start": today_str}}
-        tname = title_prop_name or "Name"
-        create_props[tname] = {"title": [{"type": "text", "text": {"content": page_title}}]}
+    if parent_info:
+        ptype = parent_info.get("type")
+        print(f"[diary] parent type={ptype}, creating new page")
+
+        if ptype == "database_id":
+            # データベース配下：日付プロパティ付きで作成
+            create_props = {}
+            if date_prop_name:
+                create_props[date_prop_name] = {"date": {"start": today_str}}
+            tname = title_prop_name or "Name"
+            create_props[tname] = {"title": [{"type": "text", "text": {"content": page_title}}]}
+            parent_body = {"database_id": parent_info["database_id"]}
+        elif ptype == "page_id":
+            # 通常ページ配下：タイトルのみ
+            create_props = {
+                "title": [{"type": "text", "text": {"content": page_title}}]
+            }
+            parent_body = {"page_id": parent_info["page_id"]}
+        else:
+            print(f"[diary] unknown parent type={ptype}, fallback")
+            if latest_page_id:
+                return latest_page_id
+            return None
 
         r2 = req.post("https://api.notion.com/v1/pages",
             headers=headers,
-            json={"parent": {"database_id": db_id}, "properties": create_props}
+            json={"parent": parent_body, "properties": create_props}
         )
         print(f"[diary] create new page status={r2.status_code}")
         if r2.status_code == 200:
@@ -453,14 +469,9 @@ def find_or_create_diary_page(notion_token, today_str):
             return new_id
         else:
             print(f"[diary] create error: {r2.text[:300]}")
-            # 作成失敗時のみ最新ページにフォールバック
             if latest_page_id:
                 print(f"[diary] fallback to latest page id={latest_page_id}")
                 return latest_page_id
-    elif latest_page_id:
-        # 親がデータベースでない場合（通常ページ直下など）はフォールバック
-        print(f"[diary] parent is not database, fallback to latest page id={latest_page_id}")
-        return latest_page_id
 
     print("[diary] no diary page found at all")
     return None
@@ -618,7 +629,7 @@ def add_diary_memo(memo_text):
     if not page_id:
         print("[diary] page_id is None, cannot append")
         return False
-    content_text = f"{time_str} {memo_text}"
+    content_text = f"{today_str} {time_str} {memo_text}"
     r = req.patch(
         f"https://api.notion.com/v1/blocks/{page_id}/children",
         headers={
