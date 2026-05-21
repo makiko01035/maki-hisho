@@ -605,6 +605,9 @@ def dashboard():
             ('AI×note教材', 'https://utage-system.com/members/hkhySPyvCE3y/login', True),
             ('eBay教科書', 'https://brain-market.com/u/hyexport_ebay/a/bzATO2QjMgoTZsNWa0JXY?discount_code=48de', True),
         ]),
+        ('Finance', [
+            ('マネーフォワード', 'https://moneyforward.com/', True),
+        ]),
         ('まきの会社', [
             ('まるちゃんワールド', 'https://maki-hisho.onrender.com/game', True),
             ('会社組織図', 'https://maki-hisho.onrender.com/office', False),
