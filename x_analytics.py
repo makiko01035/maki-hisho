@@ -468,6 +468,29 @@ def find_or_create_diary_page(notion_token, today_str):
             new_id = r2.json()["id"]
             print(f"[diary] created today's page id={new_id}")
             return new_id
+        elif r2.status_code == 400:
+            # Linked Database（multiple_data_sources）の場合、ソースDBのIDでリトライ
+            err_data = r2.json()
+            source_ids = err_data.get("additional_data", {}).get("child_data_source_ids", [])
+            if source_ids:
+                source_db_id = source_ids[0]
+                print(f"[diary] linked db detected, retry with source db_id={source_db_id}")
+                r3 = req.post("https://api.notion.com/v1/pages",
+                    headers=headers,
+                    json={"parent": {"database_id": source_db_id}, "properties": create_props}
+                )
+                print(f"[diary] retry create status={r3.status_code}")
+                if r3.status_code == 200:
+                    new_id = r3.json()["id"]
+                    print(f"[diary] created today's page id={new_id}")
+                    return new_id
+                else:
+                    print(f"[diary] retry create error: {r3.text[:300]}")
+            else:
+                print(f"[diary] create error: {r2.text[:300]}")
+            if latest_page_id:
+                print(f"[diary] fallback to latest page id={latest_page_id}")
+                return latest_page_id
         else:
             print(f"[diary] create error: {r2.text[:300]}")
             if latest_page_id:
