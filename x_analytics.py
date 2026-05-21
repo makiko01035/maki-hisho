@@ -141,6 +141,7 @@ def send_note_reminder():
 def send_note_weekly_reminder():
     """毎週木曜9:05：noteネタ提案＋ラインナップ俯瞰リマインダー"""
     try:
+        from line_handler import NOTE_PUBLISHED_TITLES, NOTE_LINEUP
         user_id = os.environ['LINE_USER_ID']
         published_count = len(NOTE_PUBLISHED_TITLES)
         next_item = NOTE_LINEUP[published_count] if published_count < len(NOTE_LINEUP) else None
