@@ -162,6 +162,17 @@ def post_kvision_card_now():
         return f'❌ エラー: {e}', 500
 
 
+@debug_bp.route('/post-kvision-listcard-now')
+def post_kvision_listcard_now():
+    """今すぐリスト型カード画像投稿を送る（手動テスト用）"""
+    try:
+        from koharumama_card_post import post_kvision_card_image
+        post_kvision_card_image()
+        return '✅ @kvision_m カード画像投稿完了！Xアプリで確認してください。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @debug_bp.route('/test-line-send')
 def test_line_send():
     """LINEにテストメッセージを送信して動作確認"""

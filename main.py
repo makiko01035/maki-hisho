@@ -52,6 +52,7 @@ from sns_direct_poster import (
     post_mako_threads_morning, post_mako_threads_aff_auto,
     post_mako_x_morning_tweet,
 )
+from koharumama_card_post import post_kvision_card_image
 from routes_debug import debug_bp
 from routes_company import company_bp
 from routes_wp import wp_bp
@@ -153,6 +154,8 @@ scheduler.add_job(post_kvision_travel_aff_auto, 'cron', hour=20, minute=30)
 scheduler.add_job(post_kvision_card_tweet, 'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 # 木曜夜19時：楽天ROOM誘導投稿（前後30分ランダム）
 scheduler.add_job(post_kvision_room_intro, 'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
+# 日曜11時：リスト型カード画像投稿（商品写真4枚+タイトル）
+scheduler.add_job(post_kvision_card_image, 'cron', day_of_week='sun', hour=11, minute=0)
 # ========== こはるまま SNSエンジン 6ロール ==========
 # ① リサーチャー：月曜 05:00（今週のテーマ生成）
 scheduler.add_job(koharu_researcher, 'cron', day_of_week='mon', hour=5, minute=0)
