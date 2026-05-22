@@ -245,6 +245,10 @@ def post_kvision_room_intro():
         print("kvision room intro tweet successful")
     except Exception as e:
         print(f"post_kvision_room_intro error: {e}")
+        try:
+            line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(text=f"❌ @kvision_m ROOM誘導投稿エラー\n{str(e)[:200]}"))
+        except Exception:
+            pass
 
 
 def post_koharu_threads_room_intro():
@@ -345,6 +349,10 @@ def post_kvision_travel_aff(slot_index):
     try:
         body, url = _fetch_travel_suggestion(genre)
         if not body or not url:
+            try:
+                line_bot_api.push_message(os.environ.get('LINE_USER_ID', ''), TextSendMessage(text=f"⚠️ @kvision_m アフィスレッドスキップ（楽天API取得失敗）\nジャンル：{genre['name']}"))
+            except Exception:
+                pass
             return
         score = _check_kvision_post_quality(body)
         if score < 60:
