@@ -78,16 +78,27 @@ def _generate_theme():
 # ============================================================
 
 def _fetch_rakuten_item(keyword):
+    import time
     from blog_yakuzen import search_rakuten_items
-    try:
-        items = search_rakuten_items(keyword, hits=5)
-        if not items:
-            return None
-        with_image = [i for i in items if i.get('image')]
-        return random.choice(with_image) if with_image else random.choice(items)
-    except Exception as e:
-        print(f"[card_post] rakuten fetch error ({keyword}): {e}")
-        return None
+
+    # 指定キーワードで試行→失敗時は旅行グッズで再試行
+    fallback_keywords = [
+        '旅行 便利グッズ レディース',
+        '子連れ 旅行 おすすめ',
+        'アウトドア 旅行 グッズ',
+    ]
+    for kw in [keyword] + fallback_keywords:
+        try:
+            items = search_rakuten_items(kw, hits=5)
+            with_image = [i for i in items if i.get('image')]
+            if with_image:
+                return random.choice(with_image)
+            if items:
+                return random.choice(items)
+        except Exception as e:
+            print(f"[card_post] rakuten fetch error ({kw}): {e}")
+        time.sleep(0.5)
+    return None
 
 
 def _download_image(url, size):
@@ -238,9 +249,12 @@ def post_kvision_card_image():
         scenes     = theme['scenes']
         tweet_hook = theme.get('tweet_hook', card_title)
 
+        import time as _time
         scenes_data = []
         aff_urls    = []
-        for sc in scenes[:4]:
+        for i, sc in enumerate(scenes[:4]):
+            if i > 0:
+                _time.sleep(1.0)  # 楽天APIレート制限対策
             item = _fetch_rakuten_item(sc['keyword'])
             scenes_data.append({'label': sc['label'], 'item': item})
             if item and item.get('url'):
