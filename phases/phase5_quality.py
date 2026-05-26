@@ -203,7 +203,7 @@ def run(keyword, draft_md, output_dir="articles"):
             break
         else:
             print(f" — あと{95 - total}点")
-            if cycle < 3:
+            if cycle < 10:
                 print(f"  問題点を修正中...")
                 for issue in priority_issues[:5]:
                     print(f"    - {issue}")
