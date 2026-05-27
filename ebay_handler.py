@@ -9,6 +9,12 @@ from datetime import datetime, timedelta
 import random
 from linebot.models import TextSendMessage
 from clients import line_bot_api, anthropic_client
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request as GoogleRequest
+from googleapiclient.discovery import build as google_build
+
+EBAY_RESEARCH_SPREADSHEET_ID = "1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI"
+EBAY_RESEARCH_SHEET_NAME = "eBay仕入れ候補"
 
 EBAY_APP_ID = os.environ.get('EBAY_APP_ID', '')
 EBAY_CERT_ID = os.environ.get('EBAY_CERT_ID', '')
@@ -442,6 +448,67 @@ def check_seller_now(user_id: str, seller_username: str):
         line_bot_api.push_message(user_id, TextSendMessage(text=f"エラーが発生しました: {str(e)[:80]}"))
 
 
+def _get_sheets_service():
+    creds_info = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+    creds = Credentials(
+        token=None,
+        refresh_token=creds_info.get('refresh_token'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=creds_info.get('client_id'),
+        client_secret=creds_info.get('client_secret'),
+        scopes=['https://www.googleapis.com/auth/spreadsheets'],
+    )
+    creds.refresh(GoogleRequest())
+    return google_build('sheets', 'v4', credentials=creds)
+
+
+def _save_candidates_to_sheet(items: list):
+    """仕入れ候補をGoogleスプレッドシートに追記"""
+    try:
+        service = _get_sheets_service()
+        today = datetime.now().strftime("%Y/%m/%d")
+
+        # シートが存在しない場合は作成
+        spreadsheet = service.spreadsheets().get(spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID).execute()
+        existing = [s["properties"]["title"] for s in spreadsheet["sheets"]]
+        if EBAY_RESEARCH_SHEET_NAME not in existing:
+            service.spreadsheets().batchUpdate(
+                spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID,
+                body={"requests": [{"addSheet": {"properties": {"title": EBAY_RESEARCH_SHEET_NAME}}}]}
+            ).execute()
+            # ヘッダー行を追加
+            service.spreadsheets().values().update(
+                spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID,
+                range=f"{EBAY_RESEARCH_SHEET_NAME}!A1",
+                valueInputOption="USER_ENTERED",
+                body={"values": [["日付", "タイトル", "eBay価格(USD)", "仕入れ上限(円)", "売れた日", "メルカリ検索URL", "セラー", "ステータス"]]}
+            ).execute()
+
+        rows = []
+        for r in items:
+            rows.append([
+                today,
+                r["title"],
+                f"${r['price_usd']:.0f}",
+                r["purchase_limit"],
+                r.get("sold_date", ""),
+                r["mercari_url"],
+                r.get("seller", ""),
+                "未確認",
+            ])
+
+        service.spreadsheets().values().append(
+            spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID,
+            range=f"{EBAY_RESEARCH_SHEET_NAME}!A1",
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": rows},
+        ).execute()
+        print(f"スプレッドシートに{len(rows)}件追記完了")
+    except Exception as e:
+        print(f"_save_candidates_to_sheet error: {e}")
+
+
 def send_daily_purchase_candidates(user_id: str, debug: bool = False):
     """毎日の仕入れ候補リストをLINEに送信"""
     try:
@@ -538,6 +605,9 @@ def send_daily_purchase_candidates(user_id: str, debug: bool = False):
 
         line_bot_api.push_message(user_id, TextSendMessage(text=msg))
         print(f"send_daily_purchase_candidates: {len(top)}件送信完了")
+
+        # スプレッドシートに追記（LINE通知と独立して動く）
+        _save_candidates_to_sheet(top)
 
     except Exception as e:
         print(f"send_daily_purchase_candidates error: {e}")
