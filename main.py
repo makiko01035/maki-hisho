@@ -85,25 +85,37 @@ def run_blog_now():
 
 @app.route('/debug-blog', methods=['GET', 'POST'])
 def debug_blog():
-    """段階診断用エンドポイント（GETでも動く）"""
-    import traceback, sys
+    """環境変数確認のみ（診断用）"""
+    import sys
+    from pathlib import Path
+    kw_file = Path(__file__).parent / 'keywords_new.txt'
+    lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
+    return {
+        'keyword': lines[0] if lines else '(空)',
+        'ANTHROPIC_API_KEY': 'OK' if os.environ.get('ANTHROPIC_API_KEY') else 'NG',
+        'YAKUZEN_WP_APP_PASSWORD': 'OK' if os.environ.get('YAKUZEN_WP_APP_PASSWORD') else 'NG',
+        'LINE_CHANNEL_ACCESS_TOKEN': 'OK' if os.environ.get('LINE_CHANNEL_ACCESS_TOKEN') else 'NG',
+        'python': sys.version,
+    }
+
+
+@app.route('/debug-phase4', methods=['POST'])
+def debug_phase4():
+    """Phase4（執筆）のみ同期実行してエラーを返す"""
+    import traceback
+    data = request.get_json(silent=True) or {}
+    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
+        abort(403)
     try:
         from pathlib import Path
         kw_file = Path(__file__).parent / 'keywords_new.txt'
         lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
-        keyword = lines[0] if lines else '(空)'
-        anthropic_key = 'OK' if os.environ.get('ANTHROPIC_API_KEY') else 'NG'
-        wp_pass = 'OK' if os.environ.get('YAKUZEN_WP_APP_PASSWORD') else 'NG'
-        line_token = 'OK' if os.environ.get('LINE_CHANNEL_ACCESS_TOKEN') else 'NG'
-        return {
-            'keyword': keyword,
-            'ANTHROPIC_API_KEY': anthropic_key,
-            'YAKUZEN_WP_APP_PASSWORD': wp_pass,
-            'LINE_CHANNEL_ACCESS_TOKEN': line_token,
-            'python': sys.version,
-        }
+        keyword = lines[0] if lines else 'テスト'
+        from phases import phase4_write
+        draft, _ = phase4_write.run(keyword, f'# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。')
+        return {'status': 'ok', 'keyword': keyword, 'chars': len(draft), 'preview': draft[:300]}
     except Exception as e:
-        return {'error': str(e), 'traceback': traceback.format_exc()[-500:]}
+        return {'error': str(e), 'traceback': traceback.format_exc()[-800:]}
 
 
 
