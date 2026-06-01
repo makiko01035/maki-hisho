@@ -83,6 +83,27 @@ def run_blog_now():
         return {'status': 'started', 'mode': 'new'}
 
 
+@app.route('/debug-blog', methods=['POST'])
+def debug_blog():
+    """Phase4のみ実行してエラーを返す診断用エンドポイント"""
+    import traceback
+    data = request.get_json(silent=True) or {}
+    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
+        abort(403)
+    try:
+        from pathlib import Path
+        kw_file = Path(__file__).parent / 'keywords_new.txt'
+        lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
+        if not lines:
+            return {'error': 'keywords_new.txtが空です'}
+        keyword = lines[0]
+        from phases import phase4_write
+        draft, _ = phase4_write.run(keyword, f'# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。')
+        return {'status': 'ok', 'keyword': keyword, 'draft_len': len(draft), 'preview': draft[:200]}
+    except Exception as e:
+        return {'error': str(e), 'traceback': traceback.format_exc()[-1000:]}
+
+
 
 
 @app.route('/callback', methods=['POST'])
