@@ -91,8 +91,8 @@ scheduler = BackgroundScheduler(timezone='Asia/Tokyo')
 scheduler.add_job(send_morning_message, 'cron', hour=7, minute=0)
 scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_week='sun')
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
-# 毎月1日朝8時30分：HSBC換金リマインダー
-scheduler.add_job(send_hsbc_reminder, 'cron', day=1, hour=8, minute=30)
+# 3・6・9・12月の1日朝8時30分：HSBC換金リマインダー（3か月に1回）
+scheduler.add_job(send_hsbc_reminder, 'cron', month='3,6,9,12', day=1, hour=8, minute=30)
 # 毎月1日朝9時：Famm更新リマインダー
 scheduler.add_job(send_famm_reminder, 'cron', day=1, hour=9, minute=0)
 # 毎月6日朝9時：Famm期限3日前リマインダー
