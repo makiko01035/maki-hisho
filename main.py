@@ -34,8 +34,7 @@ from scheduler_reminders import (
     send_morning_message, send_preparation_reminder,
     send_hsbc_reminder, send_zaitage_reminder,
     send_x_engage_reminder, send_famm_reminder, send_famm_deadline_reminder,
-    send_sekisui_blog_reminder, send_ebay_check_reminder,
-    send_a8_check_reminder, send_monthly_review_reminder,
+    send_ebay_check_reminder, send_monthly_review_reminder,
 )
 from x_poster import post_to_x_daily, post_to_x_noon, post_to_x_evening
 from x_analytics import (
@@ -102,14 +101,10 @@ scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
 
 scheduler.add_job(auto_blog_new,     'cron', day_of_week='mon,thu', hour=8, minute=0)
 scheduler.add_job(auto_blog_rewrite, 'cron', day_of_week='wed,sat', hour=8, minute=0)
-# 毎週木曜朝9時：セキスイブログ更新リマインダー
-scheduler.add_job(send_sekisui_blog_reminder, 'cron', day_of_week='thu', hour=9, minute=0)
 # 毎週土曜朝9時：eBayチェックリマインダー
 scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
 # 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
-# 毎週月曜朝9時：A8審査確認リマインダー（全審査通過後に削除してOK）
-scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
 scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minute=10)
 # 毎日朝8:30・昼12:30（奇数日のみ）・夜19:30：X（Twitter）自動投稿（2〜3本/日）

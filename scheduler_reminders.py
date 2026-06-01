@@ -203,16 +203,6 @@ def send_famm_deadline_reminder():
         print(f"Famm deadline reminder error: {e}")
 
 
-def send_sekisui_blog_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="🏠 【セキスイブログ更新日・木曜日】\n今日はセキスイブログの投稿日です！\n\n① 音声入力でネタを話す\n② テキストをClaudeに貼って👇\n「セキスイの記事投稿して」"
-        ))
-    except Exception as e:
-        print(f"Sekisui blog reminder error: {e}")
-
-
 def send_ebay_check_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']
@@ -221,16 +211,6 @@ def send_ebay_check_reminder():
         ))
     except Exception as e:
         print(f"eBay check reminder error: {e}")
-
-
-def send_a8_check_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="📧 【A8審査確認】\nA8の審査結果メールが届いていませんか？\n\n審査が通っていたらClaudeに👇\n「○○のA8審査通った。リンク追加して」\n\n確認待ち：\n・ユーキャン\n・がくぶん\n・ヒューマンアカデミー"
-        ))
-    except Exception as e:
-        print(f"A8 check reminder error: {e}")
 
 
 def send_monthly_review_reminder():
