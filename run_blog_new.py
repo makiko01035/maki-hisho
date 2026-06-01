@@ -44,7 +44,7 @@ def main():
         draft, _ = phase4_write.run(keyword, design)
         final, score, passed, _ = phase5_quality.run(keyword, draft)
 
-        if passed or score >= 80:
+        if passed or score >= 75:
             phase6_publish.run(keyword, final)
         else:
             msg = f"❌ 自動投稿スキップ（品質{score}点）\nキーワード：「{keyword}」\n手動で確認が必要です"

@@ -51,7 +51,7 @@ def main():
         draft, _ = phase4_rewrite.run(keyword, "")
         final, score, passed, _ = phase5_quality.run(keyword, draft)
 
-        if passed or score >= 80:
+        if passed or score >= 75:
             phase6_publish.run_update(keyword, final, post_id)
         else:
             msg = f"❌ 自動リライトスキップ（品質{score}点）\n記事ID:{post_id}「{title}」\n手動で確認が必要です"
