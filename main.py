@@ -99,21 +99,23 @@ def debug_blog():
     }
 
 
-@app.route('/debug-phase4', methods=['GET', 'POST'])
+@app.route('/debug-phase4', methods=['POST'])
 def debug_phase4():
-    """Anthropic API実呼び出しテスト（短い返答）"""
+    """Phase4（記事執筆）を同期実行してエラーを返す"""
     import traceback, time
+    data = request.get_json(silent=True) or {}
+    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
+        abort(403)
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+        from pathlib import Path
+        kw_file = Path(__file__).parent / 'keywords_new.txt'
+        lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
+        keyword = lines[0] if lines else '更年期 眠れない ほてり 対策'
+        from phases import phase4_write
         t0 = time.time()
-        resp = client.messages.create(
-            model='claude-haiku-4-5-20251001',
-            max_tokens=50,
-            messages=[{'role': 'user', 'content': '「はい」とだけ答えてください。'}]
-        )
+        draft, _ = phase4_write.run(keyword, f'# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。')
         elapsed = round(time.time() - t0, 2)
-        return {'status': 'ok', 'reply': resp.content[0].text, 'elapsed_sec': elapsed}
+        return {'status': 'ok', 'keyword': keyword, 'chars': len(draft), 'elapsed_sec': elapsed, 'preview': draft[:200]}
     except Exception as e:
         return {'error': str(e), 'traceback': traceback.format_exc()[-800:]}
 
