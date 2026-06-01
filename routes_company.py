@@ -1076,22 +1076,36 @@ function updateAddBtn() {
 }
 
 function showConfirm(items) {
-  const label = selectedTarget === 'amazon' ? 'Amazon仕入れ管理' : 'メルカリ仕入れ管理';
   let html = `<div class="card">
-    <h3 style="color:#c9a84c;margin-bottom:12px">読み取り結果 → ${label}</h3>
+    <h3 style="color:#c9a84c;margin-bottom:12px">読み取り結果</h3>
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="btn-secondary" style="margin:0;padding:8px 12px;font-size:0.8rem" onclick="toggleAll(true)">全て選択</button>
       <button class="btn-secondary" style="margin:0;padding:8px 12px;font-size:0.8rem" onclick="toggleAll(false)">全て解除</button>
     </div>`;
   items.forEach((item, i) => {
+    const defTarget = selectedTarget;
     html += `<div class="result-card" style="display:flex;gap:12px;align-items:flex-start">
       <input type="checkbox" class="item-check" data-idx="${i}" checked onchange="updateAddBtn()"
-        style="margin-top:4px;width:18px;height:18px;accent-color:#c9a84c;flex-shrink:0">
+        style="margin-top:6px;width:18px;height:18px;accent-color:#c9a84c;flex-shrink:0">
       <div style="flex:1">
-        <div class="item-row"><span class="item-label">商品名</span><span>${item.name}</span></div>
+        <div class="item-row" style="align-items:center">
+          <span class="item-label">商品名</span>
+          <input class="name-input" data-idx="${i}" value="${item.name.replace(/"/g,'&quot;')}"
+            style="background:#1a1a1a;border:1px solid #444;border-radius:4px;color:#e0e0e0;padding:4px 8px;font-size:0.88rem;width:60%;text-align:right">
+        </div>
         <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
         <div class="item-row"><span class="item-label">価格</span><span>${priceStr(item)}</span></div>
         <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
+        <div class="item-row" style="margin-top:6px">
+          <span class="item-label">追加先</span>
+          <span>
+            <select class="dest-select" data-idx="${i}"
+              style="background:#222;border:1px solid #444;border-radius:4px;color:#e0e0e0;padding:4px 8px;font-size:0.85rem">
+              <option value="amazon" ${defTarget==='amazon'?'selected':''}>📦 Amazon</option>
+              <option value="mercari" ${defTarget==='mercari'?'selected':''}>🛍 メルカリ</option>
+            </select>
+          </span>
+        </div>
       </div>
     </div>`;
   });
@@ -1102,21 +1116,41 @@ function showConfirm(items) {
 }
 
 async function confirmAdd() {
-  const checked = [...document.querySelectorAll('.item-check')]
-    .filter(cb => cb.checked)
-    .map(cb => parsedItems[Number(cb.dataset.idx)]);
-  if (!checked.length) return;
+  const checks = [...document.querySelectorAll('.item-check')].filter(cb => cb.checked);
+  if (!checks.length) return;
+  // 商品名の編集と追加先を反映
+  const amazonItems = [], mercariItems = [];
+  checks.forEach(cb => {
+    const i = Number(cb.dataset.idx);
+    const item = Object.assign({}, parsedItems[i]);
+    const nameEl = document.querySelector(`.name-input[data-idx="${i}"]`);
+    if (nameEl) item.name = nameEl.value.trim() || item.name;
+    const destEl = document.querySelector(`.dest-select[data-idx="${i}"]`);
+    const dest = destEl ? destEl.value : selectedTarget;
+    if (dest === 'mercari') mercariItems.push(item);
+    else amazonItems.push(item);
+  });
   const area = document.getElementById('result-area');
   area.innerHTML = '<div class="loading"><div class="spinner"></div>追加中...</div>';
   try {
-    const res = await fetch('/api/purchase/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: checked, target: selectedTarget })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '追加エラー');
-    area.innerHTML = `<div class="card"><p class="success">✅ ${data.count}件を追加しました！</p>
+    let totalCount = 0;
+    if (amazonItems.length) {
+      const r = await fetch('/api/purchase/confirm', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ items: amazonItems, target: 'amazon' }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Amazonへの追加エラー');
+      totalCount += d.count;
+    }
+    if (mercariItems.length) {
+      const r = await fetch('/api/purchase/confirm', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ items: mercariItems, target: 'mercari' }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'メルカリへの追加エラー');
+      totalCount += d.count;
+    }
+    const breakdown = [amazonItems.length && `Amazon ${amazonItems.length}件`, mercariItems.length && `メルカリ ${mercariItems.length}件`].filter(Boolean).join(' / ');
+    area.innerHTML = `<div class="card"><p class="success">✅ ${totalCount}件を追加しました！</p>
+      <p style="text-align:center;color:#888;font-size:0.85rem;margin-top:4px">${breakdown}</p>
       <a href="https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit" target="_blank" style="display:block;text-align:center;color:#c9a84c;margin-top:12px">スプレッドシートを開く →</a>
       <button class="btn-secondary" style="margin-top:16px" onclick="resetForm()">続けて追加する</button>
     </div>`;
