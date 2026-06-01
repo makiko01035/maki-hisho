@@ -69,55 +69,6 @@ def ping():
     return 'OK'
 
 
-@app.route('/run-blog-now', methods=['POST'])
-def run_blog_now():
-    data = request.get_json(silent=True) or {}
-    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
-        abort(403)
-    mode = data.get('mode', 'new')
-    if mode == 'rewrite':
-        threading.Thread(target=auto_blog_rewrite, daemon=True).start()
-        return {'status': 'started', 'mode': 'rewrite'}
-    else:
-        threading.Thread(target=auto_blog_new, daemon=True).start()
-        return {'status': 'started', 'mode': 'new'}
-
-
-@app.route('/debug-blog', methods=['GET', 'POST'])
-def debug_blog():
-    """環境変数確認のみ（診断用）"""
-    import sys
-    from pathlib import Path
-    kw_file = Path(__file__).parent / 'keywords_new.txt'
-    lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
-    return {
-        'keyword': lines[0] if lines else '(空)',
-        'ANTHROPIC_API_KEY': 'OK' if os.environ.get('ANTHROPIC_API_KEY') else 'NG',
-        'YAKUZEN_WP_APP_PASSWORD': 'OK' if os.environ.get('YAKUZEN_WP_APP_PASSWORD') else 'NG',
-        'LINE_CHANNEL_ACCESS_TOKEN': 'OK' if os.environ.get('LINE_CHANNEL_ACCESS_TOKEN') else 'NG',
-        'python': sys.version,
-    }
-
-
-@app.route('/debug-phase4', methods=['POST'])
-def debug_phase4():
-    """Phase4（記事執筆）を同期実行してエラーを返す"""
-    import traceback, time
-    data = request.get_json(silent=True) or {}
-    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
-        abort(403)
-    try:
-        from pathlib import Path
-        kw_file = Path(__file__).parent / 'keywords_new.txt'
-        lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
-        keyword = lines[0] if lines else '更年期 眠れない ほてり 対策'
-        from phases import phase4_write
-        t0 = time.time()
-        draft, _ = phase4_write.run(keyword, f'# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。')
-        elapsed = round(time.time() - t0, 2)
-        return {'status': 'ok', 'keyword': keyword, 'chars': len(draft), 'elapsed_sec': elapsed, 'preview': draft[:200]}
-    except Exception as e:
-        return {'error': str(e), 'traceback': traceback.format_exc()[-800:]}
 
 
 
@@ -146,10 +97,8 @@ scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
 scheduler.add_job(send_hsbc_reminder, 'cron', month='3,6,9,12', day=1, hour=8, minute=30)
 # 毎月6日朝9時：Famm期限3日前リマインダー
 scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
-# 月・木 8:00：7stepパイプラインで新規記事を自動作成
-
-scheduler.add_job(auto_blog_new,     'cron', day_of_week='mon,thu', hour=8, minute=0)
-scheduler.add_job(auto_blog_rewrite, 'cron', day_of_week='wed,sat', hour=8, minute=0)
+# ブログ自動投稿はGitHub Actionsに移行済み（OOM対策）
+# 月・木 新規 / 水・土 リライト → .github/workflows/blog_auto.yml を参照
 # 毎週土曜朝9時：eBayチェックリマインダー
 scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
 # 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）

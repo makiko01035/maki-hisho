@@ -1,0 +1,77 @@
+name: ブログ自動投稿
+
+on:
+  schedule:
+    # 月・木 8:00 JST = 日・水 23:00 UTC
+    - cron: '0 23 * * 0'   # 月曜新規（日曜23時UTC）
+    - cron: '0 23 * * 3'   # 木曜新規（水曜23時UTC）
+    # 水・土 8:00 JST = 火・金 23:00 UTC
+    - cron: '0 23 * * 2'   # 水曜リライト（火曜23時UTC）
+    - cron: '0 23 * * 5'   # 土曜リライト（金曜23時UTC）
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '実行モード (new / rewrite)'
+        required: true
+        default: 'new'
+
+jobs:
+  blog-new:
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'new' ||
+      github.event.schedule == '0 23 * * 0' ||
+      github.event.schedule == '0 23 * * 3'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージインストール
+        run: pip install anthropic==0.40.0 requests markdown python-dotenv Pillow
+
+      - name: 新規記事を生成・投稿
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YAKUZEN_WP_APP_PASSWORD: ${{ secrets.YAKUZEN_WP_APP_PASSWORD }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          NOTIFY_SECRET: maki2025
+        run: python run_blog_new.py
+
+      - name: keywords_new.txtの更新をコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add keywords_new.txt
+          git diff --staged --quiet || git commit -m "chore: 使用済みキーワードを削除"
+          git push
+
+  blog-rewrite:
+    if: >
+      github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'rewrite' ||
+      github.event.schedule == '0 23 * * 2' ||
+      github.event.schedule == '0 23 * * 5'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 依存パッケージインストール
+        run: pip install anthropic==0.40.0 requests markdown python-dotenv Pillow
+
+      - name: リライト記事を生成・投稿
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          YAKUZEN_WP_APP_PASSWORD: ${{ secrets.YAKUZEN_WP_APP_PASSWORD }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          NOTIFY_SECRET: maki2025
+        run: python run_blog_rewrite.py
