@@ -64,6 +64,17 @@ def lookup_asin_by_jan(jan_code: str) -> str | None:
     return None
 
 
+def enrich_items_with_asin(items: list[dict]) -> list[dict]:
+    """JANコードがある商品にKeepaでASINを付与する。OCR直後に呼ぶ。"""
+    for item in items:
+        jan = (item.get('jan') or '').strip()
+        if not jan:
+            continue
+        asin = lookup_asin_by_jan(jan)
+        item['asin'] = asin if asin else f'JAN:{jan}'
+    return items
+
+
 def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: str) -> list[dict]:
     """Claude Visionでレシートから商品情報を抽出する。画像・PDF両対応。"""
     today = datetime.date.today().strftime('%Y/%m/%d')
@@ -133,12 +144,17 @@ def format_confirm_message(items: list[dict], target: str) -> str:
     label = 'Amazon仕入れ' if target == 'amazon' else 'メルカリ仕入れ'
     lines = [f'📦 読み取り結果（{label}リスト）\n{"━" * 20}']
     for i, item in enumerate(items, 1):
-        lines.append(
+        line = (
             f'【{i}】{item["name"]}\n'
             f'    店舗: {item["store"]}\n'
             f'    価格: {_item_price_str(item)}\n'
             f'    日付: {item["date"]}'
         )
+        if item.get('asin'):
+            line += f'\n    ASIN: {item["asin"]}'
+        elif item.get('jan'):
+            line += f'\n    JAN: {item["jan"]}'
+        lines.append(line)
     lines.append('━' * 20)
     lines.append('「OK」で追加 ／ 「キャンセル」でやり直し')
     return '\n'.join(lines)
@@ -168,15 +184,10 @@ def append_to_amazon_sheet(items: list[dict]) -> int:
         qty = int(item.get('quantity', 1) or 1)
         jan = (item.get('jan') or '').strip()
 
-        # JANコードがあればKeepaでASIN検索
-        asin = ''
-        if jan:
-            found = lookup_asin_by_jan(jan)
-            if found:
-                asin = found
-                print(f"[purchase] JAN:{jan} → ASIN:{asin}")
-            else:
-                asin = f'JAN:{jan}'  # 見つからない場合はJANコードをそのまま入れる
+        # ASINはenrich_items_with_asin()で付与済みのものを使う
+        asin = item.get('asin', '')
+        if not asin and jan:
+            asin = f'JAN:{jan}'
 
         memo_parts = []
         if qty > 1:
@@ -251,7 +262,13 @@ def append_to_mercari_sheet(items: list[dict]) -> int:
         no = next_no + i
         unit_price = item.get('unit_price', item.get('price', ''))
         qty = int(item.get('quantity', 1) or 1)
-        memo = f'{qty}個購入・単価{int(unit_price):,}円' if qty > 1 else ''
+        jan = (item.get('jan') or '').strip()
+        memo_parts = []
+        if qty > 1:
+            memo_parts.append(f'{qty}個購入・単価{int(unit_price):,}円')
+        if jan:
+            memo_parts.append(f'JAN:{jan}')
+        memo = '・'.join(memo_parts)
         row = [
             str(no),
             item.get('name', ''),

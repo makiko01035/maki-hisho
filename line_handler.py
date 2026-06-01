@@ -36,7 +36,8 @@ from ebay_handler import run_ebay_research, send_daily_purchase_candidates, chec
 from sns_engine_koharu import handle_approval as koharu_handle_approval
 from sns_engine_mako import handle_mako_approval
 from purchase_receipt import (
-    parse_receipt_with_vision, format_confirm_message,
+    parse_receipt_with_vision, enrich_items_with_asin,
+    format_confirm_message,
     append_to_amazon_sheet, append_to_mercari_sheet,
 )
 
@@ -278,6 +279,7 @@ JSON形式のみ返してください。"""
         def _process_receipt(uid, img_b64, mt, tgt):
             try:
                 items = parse_receipt_with_vision(anthropic_client, img_b64, mt)
+                items = enrich_items_with_asin(items)
                 if not items:
                     line_bot_api.push_message(uid, TextSendMessage(text="商品情報が読み取れませんでした😢\nもう一度鮮明な画像を送ってください"))
                     return

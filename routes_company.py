@@ -1096,7 +1096,7 @@ function showConfirm(items) {
         <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
         <div class="item-row"><span class="item-label">価格</span><span>${priceStr(item)}</span></div>
         <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
-        ${item.jan ? `<div class="item-row"><span class="item-label">JAN</span><span style="color:#888">${item.jan}</span></div>` : ''}
+        ${item.asin ? `<div class="item-row"><span class="item-label">ASIN</span><span style="color:#c9a84c;font-family:monospace">${item.asin}</span></div>` : (item.jan ? `<div class="item-row"><span class="item-label">JAN</span><span style="color:#888">${item.jan}</span></div>` : '')}
         <div class="item-row" style="margin-top:6px">
           <span class="item-label">追加先</span>
           <span>
@@ -1179,7 +1179,7 @@ def purchase_ocr():
     import traceback
     try:
         from clients import anthropic_client
-        from purchase_receipt import parse_receipt_with_vision
+        from purchase_receipt import parse_receipt_with_vision, enrich_items_with_asin
         body = request.get_json(force=True)
         image_base64 = body.get('image_base64', '')
         media_type = body.get('media_type', 'image/jpeg')
@@ -1188,6 +1188,7 @@ def purchase_ocr():
         items = parse_receipt_with_vision(anthropic_client, image_base64, media_type)
         if not items:
             return jsonify({'error': '商品情報が読み取れませんでした。鮮明な画像を使ってください'}), 400
+        items = enrich_items_with_asin(items)
         return jsonify({'items': items})
     except Exception as e:
         traceback.print_exc()
