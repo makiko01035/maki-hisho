@@ -32,9 +32,7 @@ from ebay_dashboard import ebay_bp
 from calendar_manager import check_deadline_reminders
 from scheduler_reminders import (
     send_morning_message, send_preparation_reminder,
-    send_ebay_reset_reminder, send_threads_api_reminder,
     send_hsbc_reminder, send_zaitage_reminder,
-    send_may28_finance_reminder, send_may25_reminder, send_may30_reminder,
     send_x_engage_reminder, send_famm_reminder, send_famm_deadline_reminder,
     send_sekisui_blog_reminder, send_ebay_check_reminder,
     send_a8_check_reminder, send_monthly_review_reminder,
@@ -114,12 +112,6 @@ scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30
 scheduler.add_job(send_a8_check_reminder, 'cron', day_of_week='mon', hour=9, minute=0)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
 scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minute=10)
-# 2026-05-28 朝9時：家計整理月末確認リマインド（一回限り）
-scheduler.add_job(send_may28_finance_reminder, 'date', run_date='2026-05-28 09:00:00')
-# 2026-05-25 朝9時：MAKOのX実装 + こはるままThreads連携リマインド（一回限り）
-scheduler.add_job(send_may25_reminder, 'date', run_date='2026-05-25 09:00:00')
-# 2026-05-30 朝9時：MAKOのThreads連携リマインド（一回限り）
-scheduler.add_job(send_may30_reminder, 'date', run_date='2026-05-30 09:00:00')
 # 毎日朝8:30・昼12:30（奇数日のみ）・夜19:30：X（Twitter）自動投稿（2〜3本/日）
 scheduler.add_job(post_to_x_daily, 'cron', hour=8, minute=30)
 scheduler.add_job(post_to_x_noon, 'cron', hour=12, minute=30)
@@ -142,8 +134,6 @@ scheduler.add_job(send_room_suggestion_slot, 'cron', hour=12, minute=30, args=[1
 scheduler.add_job(send_room_suggestion_slot, 'cron', hour=17, minute=30, args=[2])  # 父の日ギフト
 scheduler.add_job(send_room_suggestion_slot, 'cron', hour=20, minute=0, args=[4])   # 美容サプリ（ゴールデンタイム）
 scheduler.add_job(send_room_suggestion_slot, 'cron', hour=22, minute=0, args=[6])   # スキンケア
-# 5月1日朝9時45分：eBay月次リセット＆リミットアップ案内
-scheduler.add_job(send_ebay_reset_reminder, 'date', run_date='2026-05-01 09:45:00', timezone='Asia/Tokyo')
 # 7月7日朝9時：Threadsトークン更新リマインド（60日期限）
 scheduler.add_job(send_threads_token_reminder, 'date', run_date='2026-07-07 09:00:00', timezone='Asia/Tokyo')
 # @kvision_m（こはるまま）旅行×楽天アフィ X：1日2本 + 楽天カード週2

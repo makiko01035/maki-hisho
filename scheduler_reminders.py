@@ -119,32 +119,6 @@ def send_preparation_reminder():
         print(f"Preparation reminder error: {e}")
 
 
-def send_ebay_reset_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        message = (
-            "🎉 eBay月次リセットday！\n\n"
-            "今日から出品枠がリフレッシュされました！\n"
-            "✅ 無料出品250品 → リセット\n"
-            "✅ 出品総額$7,000 → リセット\n\n"
-            "たくさん出品するチャンスです！\n"
-            "Claude Codeに「出品サポートして」と声かけてね📦\n\n"
-            "また5月26日頃にはリミットアップ申請も可能になります！"
-        )
-        line_bot_api.push_message(user_id, TextSendMessage(text=message))
-    except Exception as e:
-        print(f"send_ebay_reset_reminder error: {e}")
-
-
-def send_threads_api_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="🧵 【Threadsリマインド】\nブログ→Threads自動投稿の実装をやる予定でした！\n\n準備できたらClaudeに「Threads API実装して」と声かけしてね✅"
-        ))
-    except Exception as e:
-        print(f"Threads API reminder error: {e}")
-
 
 def send_hsbc_reminder():
     try:
@@ -191,60 +165,6 @@ def send_zaitage_reminder():
     except Exception as e:
         print(f"Zaitage reminder error: {e}")
 
-
-def send_may28_finance_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        msg = (
-            "💰【家計整理 月末確認】\n\n"
-            "🔴 急ぎ：できてる？\n"
-            "① 常陽→りそな 自動振込設定（常陽銀行アプリ）\n"
-            "② Apple Music解約\n"
-            "③ Googleフォト→iCloud転送開始\n\n"
-            "🟡 今月中にやりたいこと\n"
-            "④ JAL View引き落とし→りそなに変更（viewcard.jp）\n"
-            "⑤ 習い事の引き落とし→りそなに変更（各窓口）\n"
-            "⑥ Payoneer→楽天銀行への出金設定\n\n"
-            "📦 6月からAmazon物販スタート！\n"
-            "→ Amazon売上の振込先を楽天銀行に設定した？\n"
-            "　（セラーセントラル→設定→口座情報）\n\n"
-            "📋 全体確認はこちら\n"
-            "https://notion.so/364f8d6d41de811bbac5e914538b85ec"
-        )
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
-    except Exception as e:
-        print(f"May28 finance reminder error: {e}")
-
-
-def send_may25_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        msg = (
-            "📱【5/25 実装リマインド】\n\n"
-            "以下の2つを進めましょう！\n\n"
-            "① MAKOのX自動投稿の実装\n"
-            "　→ クレカ届いてたら「MAKO X実装して」\n\n"
-            "② こはるままのThreads連携\n"
-            "　→ トークン取得してRenderに設定\n"
-            "　→ 「こはるままThreads連携して」"
-        )
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
-    except Exception as e:
-        print(f"May25 reminder error: {e}")
-
-
-def send_may30_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        msg = (
-            "📱【5/30 実装リマインド】\n\n"
-            "MAKOのThreads連携を進めましょう！\n\n"
-            "→ トークン取得してRenderに設定\n"
-            "→ 「MAKOのThreads連携して」"
-        )
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
-    except Exception as e:
-        print(f"May30 reminder error: {e}")
 
 
 def send_x_engage_reminder():
