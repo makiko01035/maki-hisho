@@ -99,21 +99,17 @@ def debug_blog():
     }
 
 
-@app.route('/debug-phase4', methods=['POST'])
+@app.route('/debug-phase4', methods=['GET', 'POST'])
 def debug_phase4():
-    """Phase4（執筆）のみ同期実行してエラーを返す"""
+    """Phase4インポートのみテスト（APIは呼ばない）"""
     import traceback
-    data = request.get_json(silent=True) or {}
-    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
-        abort(403)
     try:
-        from pathlib import Path
-        kw_file = Path(__file__).parent / 'keywords_new.txt'
-        lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
-        keyword = lines[0] if lines else 'テスト'
-        from phases import phase4_write
-        draft, _ = phase4_write.run(keyword, f'# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。')
-        return {'status': 'ok', 'keyword': keyword, 'chars': len(draft), 'preview': draft[:300]}
+        import anthropic
+        ver = anthropic.__version__
+        key_ok = bool(os.environ.get('ANTHROPIC_API_KEY'))
+        # client初期化だけ試す（API呼び出しなし）
+        client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+        return {'status': 'ok', 'anthropic_version': ver, 'key_ok': key_ok}
     except Exception as e:
         return {'error': str(e), 'traceback': traceback.format_exc()[-800:]}
 
