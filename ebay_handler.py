@@ -576,13 +576,7 @@ def send_daily_purchase_candidates(user_id: str, debug: bool = False):
                 time.sleep(0.5)
 
         if not all_items:
-            msg = f"仕入れ候補リサーチ：条件に合う商品なし\n"
-            msg += f"取得件数={raw_count}件 / APIエラー={api_errors}件\n"
-            if api_errors > 0:
-                msg += "→ Finding APIのレートリミットが継続中。明朝6:30に再試行します。"
-            else:
-                msg += f"→ {raw_count}件取得できたが価格条件($50〜$400)を外れました。"
-            line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+            print(f"仕入れ候補リサーチ：条件に合う商品なし / 取得={raw_count}件 / APIエラー={api_errors}件")
             return
 
         # 仕入れ上限が大きい順に並べて上位15件を候補にし、その中からランダムで5件選ぶ
@@ -590,24 +584,9 @@ def send_daily_purchase_candidates(user_id: str, debug: bool = False):
         pool = all_items[:15]
         top = random.sample(pool, min(5, len(pool)))
 
-        today = datetime.now().strftime("%-m/%-d")
-        fallback_note = "※売れ筋APIが一時停止中のため現在出品中の商品を表示\n\n" if using_fallback else "\n"
-        msg = f"【今日の仕入れ候補】{today}\n{fallback_note}"
-        for i, r in enumerate(top, 1):
-            seller_tag = f" [{r.get('seller', '')}]" if r.get("seller_watch") else ""
-            msg += f"{i}.{seller_tag} ${r['price_usd']:.0f} | {r['title'][:38]}\n"
-            msg += f"   仕入れ上限: ¥{r['purchase_limit']:,}以下\n"
-            msg += f"   {r['mercari_url']}\n\n"
-
-        watch_note = f"（ウォッチ: {', '.join(WATCHED_SELLERS)}）\n" if WATCHED_SELLERS else ""
-        msg += f"合計{len(all_items)}件から{len(top)}件を抽出 {watch_note}"
-        msg += "→ URLをタップしてメルカリで相場確認してね"
-
-        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
-        print(f"send_daily_purchase_candidates: {len(top)}件送信完了")
-
-        # スプレッドシートに追記（LINE通知と独立して動く）
+        # スプレッドシートに追記（LINE通知なし・スプシで確認する運用）
         _save_candidates_to_sheet(top)
+        print(f"send_daily_purchase_candidates: {len(top)}件をスプレッドシートに保存")
 
     except Exception as e:
         print(f"send_daily_purchase_candidates error: {e}")
