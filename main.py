@@ -83,25 +83,27 @@ def run_blog_now():
         return {'status': 'started', 'mode': 'new'}
 
 
-@app.route('/debug-blog', methods=['POST'])
+@app.route('/debug-blog', methods=['GET', 'POST'])
 def debug_blog():
-    """Phase4のみ実行してエラーを返す診断用エンドポイント"""
-    import traceback
-    data = request.get_json(silent=True) or {}
-    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
-        abort(403)
+    """段階診断用エンドポイント（GETでも動く）"""
+    import traceback, sys
     try:
         from pathlib import Path
         kw_file = Path(__file__).parent / 'keywords_new.txt'
         lines = [l.strip() for l in kw_file.read_text(encoding='utf-8').splitlines() if l.strip()]
-        if not lines:
-            return {'error': 'keywords_new.txtが空です'}
-        keyword = lines[0]
-        from phases import phase4_write
-        draft, _ = phase4_write.run(keyword, f'# テーマ: {keyword}\n\n共感→原因→改善→薬膳補助→まとめ の構成で執筆してください。')
-        return {'status': 'ok', 'keyword': keyword, 'draft_len': len(draft), 'preview': draft[:200]}
+        keyword = lines[0] if lines else '(空)'
+        anthropic_key = 'OK' if os.environ.get('ANTHROPIC_API_KEY') else 'NG'
+        wp_pass = 'OK' if os.environ.get('YAKUZEN_WP_APP_PASSWORD') else 'NG'
+        line_token = 'OK' if os.environ.get('LINE_CHANNEL_ACCESS_TOKEN') else 'NG'
+        return {
+            'keyword': keyword,
+            'ANTHROPIC_API_KEY': anthropic_key,
+            'YAKUZEN_WP_APP_PASSWORD': wp_pass,
+            'LINE_CHANNEL_ACCESS_TOKEN': line_token,
+            'python': sys.version,
+        }
     except Exception as e:
-        return {'error': str(e), 'traceback': traceback.format_exc()[-1000:]}
+        return {'error': str(e), 'traceback': traceback.format_exc()[-500:]}
 
 
 
