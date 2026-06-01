@@ -1075,7 +1075,14 @@ function updateAddBtn() {
   document.getElementById('add-btn').disabled = !any;
 }
 
+function idRow(item) {
+  if (item.asin) return `<div class="item-row"><span class="item-label">ASIN</span><span style="color:#c9a84c;font-family:monospace">${item.asin}</span></div>`;
+  if (item.jan)  return `<div class="item-row"><span class="item-label">JAN</span><span style="color:#888">${item.jan}</span></div>`;
+  return '';
+}
+
 function showConfirm(items) {
+  const defTarget = selectedTarget;
   let html = `<div class="card">
     <h3 style="color:#c9a84c;margin-bottom:12px">読み取り結果</h3>
     <div style="display:flex;gap:8px;margin-bottom:16px">
@@ -1083,7 +1090,6 @@ function showConfirm(items) {
       <button class="btn-secondary" style="margin:0;padding:8px 12px;font-size:0.8rem" onclick="toggleAll(false)">全て解除</button>
     </div>`;
   items.forEach((item, i) => {
-    const defTarget = selectedTarget;
     html += `<div class="result-card" style="display:flex;gap:12px;align-items:flex-start">
       <input type="checkbox" class="item-check" data-idx="${i}" checked onchange="updateAddBtn()"
         style="margin-top:6px;width:18px;height:18px;accent-color:#c9a84c;flex-shrink:0">
@@ -1096,7 +1102,7 @@ function showConfirm(items) {
         <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
         <div class="item-row"><span class="item-label">価格</span><span>${priceStr(item)}</span></div>
         <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
-        ${item.asin ? `<div class="item-row"><span class="item-label">ASIN</span><span style="color:#c9a84c;font-family:monospace">${item.asin}</span></div>` : (item.jan ? `<div class="item-row"><span class="item-label">JAN</span><span style="color:#888">${item.jan}</span></div>` : '')}
+        ${idRow(item)}
         <div class="item-row" style="margin-top:6px">
           <span class="item-label">追加先</span>
           <span>
