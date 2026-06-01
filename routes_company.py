@@ -1058,32 +1058,61 @@ async function runOcr() {
   }
 }
 
+function priceStr(item) {
+  const unit = Number(item.unit_price ?? item.price ?? 0);
+  const qty = Number(item.quantity ?? 1);
+  if (qty > 1) return `${unit.toLocaleString()}円 × ${qty}個 = <strong>${(unit * qty).toLocaleString()}円</strong>`;
+  return `${unit.toLocaleString()}円`;
+}
+
+function toggleAll(checked) {
+  document.querySelectorAll('.item-check').forEach(cb => cb.checked = checked);
+  updateAddBtn();
+}
+
+function updateAddBtn() {
+  const any = [...document.querySelectorAll('.item-check')].some(cb => cb.checked);
+  document.getElementById('add-btn').disabled = !any;
+}
+
 function showConfirm(items) {
   const label = selectedTarget === 'amazon' ? 'Amazon仕入れ管理' : 'メルカリ仕入れ管理';
-  let html = `<div class="card"><h3 style="color:#c9a84c;margin-bottom:16px">読み取り結果 → ${label}</h3>`;
+  let html = `<div class="card">
+    <h3 style="color:#c9a84c;margin-bottom:12px">読み取り結果 → ${label}</h3>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn-secondary" style="margin:0;padding:8px 12px;font-size:0.8rem" onclick="toggleAll(true)">全て選択</button>
+      <button class="btn-secondary" style="margin:0;padding:8px 12px;font-size:0.8rem" onclick="toggleAll(false)">全て解除</button>
+    </div>`;
   items.forEach((item, i) => {
-    html += `<div class="result-card">
-      <h3>商品 ${i + 1}</h3>
-      <div class="item-row"><span class="item-label">商品名</span><span>${item.name}</span></div>
-      <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
-      <div class="item-row"><span class="item-label">仕入れ価格</span><span>${Number(item.price).toLocaleString()}円</span></div>
-      <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
+    html += `<div class="result-card" style="display:flex;gap:12px;align-items:flex-start">
+      <input type="checkbox" class="item-check" data-idx="${i}" checked onchange="updateAddBtn()"
+        style="margin-top:4px;width:18px;height:18px;accent-color:#c9a84c;flex-shrink:0">
+      <div style="flex:1">
+        <div class="item-row"><span class="item-label">商品名</span><span>${item.name}</span></div>
+        <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
+        <div class="item-row"><span class="item-label">価格</span><span>${priceStr(item)}</span></div>
+        <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
+      </div>
     </div>`;
   });
-  html += `<button class="btn-primary" onclick="confirmAdd()">✅ スプレッドシートに追加</button>
+  html += `<button class="btn-primary" id="add-btn" onclick="confirmAdd()" style="margin-top:16px">✅ 選択した商品を追加</button>
     <button class="btn-secondary" onclick="resetForm()">やり直す</button>
   </div>`;
   document.getElementById('result-area').innerHTML = html;
 }
 
 async function confirmAdd() {
+  const checked = [...document.querySelectorAll('.item-check')]
+    .filter(cb => cb.checked)
+    .map(cb => parsedItems[Number(cb.dataset.idx)]);
+  if (!checked.length) return;
   const area = document.getElementById('result-area');
   area.innerHTML = '<div class="loading"><div class="spinner"></div>追加中...</div>';
   try {
     const res = await fetch('/api/purchase/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: parsedItems, target: selectedTarget })
+      body: JSON.stringify({ items: checked, target: selectedTarget })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '追加エラー');

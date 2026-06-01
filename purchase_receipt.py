@@ -72,13 +72,16 @@ def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: s
 [
   {{
     "name": "商品名（できるだけ正確に）",
-    "price": 金額（数字のみ・円記号なし）,
+    "unit_price": 単価（数字のみ・円記号なし）,
+    "quantity": 個数（数字のみ・1個なら1）,
     "store": "店舗名（レシートから読み取る）",
     "date": "YYYY/MM/DD形式の仕入れ日"
   }}
 ]
 ・複数商品があれば全て含める
-・金額は税込み価格（小計行や合計行は除外）
+・「2コ×単699」「×2 @500」などの表記は unit_price=699, quantity=2 のように分解する
+・単価が不明な場合は合計額を unit_price に入れ quantity=1 とする
+・小計・合計・消費税・レジ袋・ポイント等の明細行は除外する
 ・商品名が読み取れない場合は「商品名不明」とする"""
                 }
             ]
@@ -94,6 +97,15 @@ def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: s
     return json.loads(raw[start:end + 1])
 
 
+def _item_price_str(item: dict) -> str:
+    """単価×個数の表示文字列を生成する"""
+    unit = item.get('unit_price', item.get('price', 0))
+    qty = int(item.get('quantity', 1) or 1)
+    if qty > 1:
+        return f'{int(unit):,}円 × {qty}個 = {int(unit) * qty:,}円'
+    return f'{int(unit):,}円'
+
+
 def format_confirm_message(items: list[dict], target: str) -> str:
     label = 'Amazon仕入れ' if target == 'amazon' else 'メルカリ仕入れ'
     lines = [f'📦 読み取り結果（{label}リスト）\n{"━" * 20}']
@@ -101,7 +113,7 @@ def format_confirm_message(items: list[dict], target: str) -> str:
         lines.append(
             f'【{i}】{item["name"]}\n'
             f'    店舗: {item["store"]}\n'
-            f'    価格: {item["price"]:,}円\n'
+            f'    価格: {_item_price_str(item)}\n'
             f'    日付: {item["date"]}'
         )
     lines.append('━' * 20)
@@ -128,25 +140,28 @@ def append_to_amazon_sheet(items: list[dict]) -> int:
     rows = []
     for i, item in enumerate(items):
         no = next_no + i
-        row_num = no + 1  # スプレッドシートの行番号（1始まり）
+        row_num = no + 1
+        unit_price = item.get('unit_price', item.get('price', ''))
+        qty = int(item.get('quantity', 1) or 1)
+        memo = f'{qty}個購入・単価{int(unit_price):,}円' if qty > 1 else ''
         row = [
             str(no),                   # A: No.
             '',                        # B: メーカー（空欄）
             item.get('store', ''),     # C: 仕入れ先
             item.get('name', ''),      # D: 商品名
             '',                        # E: ASIN（空欄）
-            str(item.get('price', '')),# F: 仕入れ価格
+            str(unit_price),           # F: 仕入れ価格（単価）
             '',                        # G: Amazon売値（空欄）
             '8',                       # H: 紹介料率(%)
-            f'=IF(OR(G{row_num}="",H{row_num}=""),"",ROUND(G{row_num}*H{row_num}/100,0))',  # I: 紹介料
+            f'=IF(OR(G{row_num}="",H{row_num}=""),"",ROUND(G{row_num}*H{row_num}/100,0))',
             '',                        # J: FBA手数料（空欄）
-            f'=IF(OR(G{row_num}="",J{row_num}=""),"",G{row_num}-F{row_num}-I{row_num}-J{row_num})',  # K: 粗利
-            f'=IF(OR(K{row_num}="",G{row_num}="",G{row_num}=0),"",ROUND(K{row_num}/G{row_num}*100,1))',  # L: 利益率
+            f'=IF(OR(G{row_num}="",J{row_num}=""),"",G{row_num}-F{row_num}-I{row_num}-J{row_num})',
+            f'=IF(OR(K{row_num}="",G{row_num}="",G{row_num}=0),"",ROUND(K{row_num}/G{row_num}*100,1))',
             'スポット',                # M: ルーチン区分
             '1回限り',                 # N: 仕入れ頻度
             item.get('date', ''),      # O: 最終仕入れ日
             '書類待ち',                # P: ステータス
-            '',                        # Q: メモ
+            memo,                      # Q: メモ（複数個の場合のみ）
         ]
         rows.append(row)
 
@@ -193,16 +208,19 @@ def append_to_mercari_sheet(items: list[dict]) -> int:
     rows = []
     for i, item in enumerate(items):
         no = next_no + i
+        unit_price = item.get('unit_price', item.get('price', ''))
+        qty = int(item.get('quantity', 1) or 1)
+        memo = f'{qty}個購入・単価{int(unit_price):,}円' if qty > 1 else ''
         row = [
             str(no),
             item.get('name', ''),
             item.get('store', ''),
-            str(item.get('price', '')),
+            str(unit_price),
             '',   # メルカリ売値（後で手入力）
             '',   # 利益率（後で手入力）
             item.get('date', ''),
             '仕入れ済み',
-            '',
+            memo,
         ]
         rows.append(row)
 
