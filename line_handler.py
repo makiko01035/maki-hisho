@@ -4,6 +4,7 @@ import base64
 import re
 import datetime
 import threading
+import requests
 from linebot.models import (
     TextSendMessage, ImageMessage, AudioMessage, FileMessage,
     MessageEvent, TextMessage,
