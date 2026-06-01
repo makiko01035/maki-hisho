@@ -591,6 +591,7 @@ def dashboard():
             ('メルカリ', 'https://jp.mercari.com/', False),
             ('eBay出品中', 'https://www.ebay.com/mys/active', True),
             ('eBay売上管理', '/ebay-dashboard', True),
+            ('仕入れ記録', '/purchase', True),
             ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
             ('CPASS', 'https://cpass.ebay.com/order/paid', True),
         ]),
