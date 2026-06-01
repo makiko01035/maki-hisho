@@ -279,6 +279,12 @@ def _mercari_url(title: str) -> str:
     return f"https://jp.mercari.com/search?keyword={q}&status=on_sale"
 
 
+def _ebay_search_url(title: str) -> str:
+    """タイトルからeBay売れた実績検索URLを生成（API不要）"""
+    q = urllib.parse.quote(title[:50])
+    return f"https://www.ebay.com/sch/i.html?_nkw={q}&LH_Sold=1&LH_Complete=1"
+
+
 def _search_jp_sold_one(keyword: str, min_usd: float = 50.0, max_usd: float = 400.0):
     """日本人セラーが売れた商品を取得（Finding API）。失敗時はNoneを返す"""
     # 過去7日以内に売れた商品に絞る
@@ -355,7 +361,7 @@ def _browse_items_to_candidates(items: list) -> list:
             results.append({
                 "title": title,
                 "price_usd": price,
-                "sold_date": "出品中",
+                "sold_date": "—",
                 "purchase_limit": purchase_limit,
                 "mercari_url": _mercari_url(title),
             })
@@ -471,18 +477,19 @@ def _save_candidates_to_sheet(items: list):
         # シートが存在しない場合は作成
         spreadsheet = service.spreadsheets().get(spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID).execute()
         existing = [s["properties"]["title"] for s in spreadsheet["sheets"]]
+        new_headers = ["日付", "タイトル", "eBay価格(USD)", "仕入れ上限(円)", "売れた日", "eBay検索URL", "メルカリ検索URL", "セラー", "ステータス"]
         if EBAY_RESEARCH_SHEET_NAME not in existing:
             service.spreadsheets().batchUpdate(
                 spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID,
                 body={"requests": [{"addSheet": {"properties": {"title": EBAY_RESEARCH_SHEET_NAME}}}]}
             ).execute()
-            # ヘッダー行を追加
-            service.spreadsheets().values().update(
-                spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID,
-                range=f"{EBAY_RESEARCH_SHEET_NAME}!A1",
-                valueInputOption="USER_ENTERED",
-                body={"values": [["日付", "タイトル", "eBay価格(USD)", "仕入れ上限(円)", "売れた日", "メルカリ検索URL", "セラー", "ステータス"]]}
-            ).execute()
+        # ヘッダー行を常に最新に更新
+        service.spreadsheets().values().update(
+            spreadsheetId=EBAY_RESEARCH_SPREADSHEET_ID,
+            range=f"{EBAY_RESEARCH_SHEET_NAME}!A1",
+            valueInputOption="USER_ENTERED",
+            body={"values": [new_headers]}
+        ).execute()
 
         rows = []
         for r in items:
@@ -492,6 +499,7 @@ def _save_candidates_to_sheet(items: list):
                 f"${r['price_usd']:.0f}",
                 r["purchase_limit"],
                 r.get("sold_date", ""),
+                _ebay_search_url(r["title"]),
                 r["mercari_url"],
                 r.get("seller", ""),
                 "未確認",
