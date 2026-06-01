@@ -35,10 +35,15 @@ from x_analytics import (
 from ebay_handler import run_ebay_research, send_daily_purchase_candidates, check_seller_now
 from sns_engine_koharu import handle_approval as koharu_handle_approval
 from sns_engine_mako import handle_mako_approval
+from purchase_receipt import (
+    parse_receipt_with_vision, format_confirm_message,
+    append_to_amazon_sheet, append_to_mercari_sheet,
+)
 
 PENDING_FILE = '/tmp/pending_events.json'
 SEKISUI_SESSION_FILE = '/tmp/sekisui_sessions.json'
 YAKUZEN_SESSION_FILE = '/tmp/yakuzen_sessions.json'
+PURCHASE_SESSION_FILE = '/tmp/purchase_sessions.json'
 
 def load_pending_events():
     try:
@@ -86,6 +91,22 @@ def save_yakuzen_sessions(data):
             json.dump(data, f, ensure_ascii=False)
     except Exception as e:
         print(f"yakuzen_sessions save error: {e}")
+
+
+def load_purchase_sessions():
+    try:
+        with open(PURCHASE_SESSION_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_purchase_sessions(data):
+    try:
+        with open(PURCHASE_SESSION_FILE, 'w') as f:
+            json.dump(data, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"purchase_sessions save error: {e}")
 
 
 def _start_old_check(user_id, skip_ids):
@@ -249,6 +270,28 @@ JSON形式のみ返してください。"""
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"プリントの読み取りに失敗しました😢\nエラー: {str(e)[:100]}"))
         return
 
+    # 仕入れレシートセッションチェック
+    purchase_sessions = load_purchase_sessions()
+    if user_id in purchase_sessions and purchase_sessions[user_id].get('state') == 'waiting_for_receipt':
+        target = purchase_sessions[user_id].get('target', 'amazon')
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📷 レシートを読み取り中です...少々お待ちください"))
+        def _process_receipt(uid, img_b64, mt, tgt):
+            try:
+                items = parse_receipt_with_vision(anthropic_client, img_b64, mt)
+                if not items:
+                    line_bot_api.push_message(uid, TextSendMessage(text="商品情報が読み取れませんでした😢\nもう一度鮮明な画像を送ってください"))
+                    return
+                ps = load_purchase_sessions()
+                ps[uid] = {'state': 'waiting_for_confirm', 'target': tgt, 'items': items}
+                save_purchase_sessions(ps)
+                msg = format_confirm_message(items, tgt)
+                line_bot_api.push_message(uid, TextSendMessage(text=msg))
+            except Exception as e:
+                print(f"Receipt parse error: {e}")
+                import traceback; traceback.print_exc()
+                line_bot_api.push_message(uid, TextSendMessage(text=f"読み取りに失敗しました😢\nエラー: {str(e)[:100]}"))
+        threading.Thread(target=_process_receipt, args=(user_id, image_base64, media_type, target)).start()
+        return
 
     # Claudeで画像からイベント情報を抽出
     try:
@@ -756,6 +799,68 @@ def handle_message(event):
             text="📄 プリントの写真を送ってください！\n\n撮影のコツ：\n・平らに置いて撮る\n・文字がはっきり見えるように\n・プリント全体が入るように"
         ))
         return
+
+    # 仕入れ記録トリガー
+    purchase_trigger_keywords = ['仕入れ', '仕入れ記録', '仕入れ登録', '実店舗仕入れ', 'レシート入力']
+    if any(kw in user_message for kw in purchase_trigger_keywords):
+        purchase_sessions = load_purchase_sessions()
+        purchase_sessions[user_id] = {'state': 'waiting_for_target'}
+        save_purchase_sessions(purchase_sessions)
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(
+            text="🛒 仕入れ記録\nどちらのリストに追加しますか？\n\n1. Amazon仕入れ管理\n2. メルカリ仕入れ管理"
+        ))
+        return
+
+    # 仕入れ先選択（waiting_for_target状態のとき）
+    purchase_sessions = load_purchase_sessions()
+    if user_id in purchase_sessions and purchase_sessions[user_id].get('state') == 'waiting_for_target':
+        if user_message in ['1', 'Amazon', 'amazon', 'Amazon仕入れ', 'amazon仕入れ']:
+            purchase_sessions[user_id] = {'state': 'waiting_for_receipt', 'target': 'amazon'}
+            save_purchase_sessions(purchase_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="📦 Amazon仕入れリストに追加します。\nレシートの写真を送ってください📷"
+            ))
+            return
+        elif user_message in ['2', 'メルカリ', 'mercari', 'メルカリ仕入れ', 'mercari仕入れ']:
+            purchase_sessions[user_id] = {'state': 'waiting_for_receipt', 'target': 'mercari'}
+            save_purchase_sessions(purchase_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="📦 メルカリ仕入れリストに追加します。\nレシートの写真を送ってください📷"
+            ))
+            return
+
+    # 仕入れ確認（OK / キャンセル）
+    if user_id in purchase_sessions and purchase_sessions[user_id].get('state') == 'waiting_for_confirm':
+        if user_message.upper() in ['OK', 'ＯＫ', 'ok', 'オーケー', '追加して']:
+            target = purchase_sessions[user_id].get('target', 'amazon')
+            items = purchase_sessions[user_id].get('items', [])
+            del purchase_sessions[user_id]
+            save_purchase_sessions(purchase_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✅ スプレッドシートに追加中..."))
+            def _append_items(uid, tgt, its):
+                try:
+                    if tgt == 'amazon':
+                        count = append_to_amazon_sheet(its)
+                        sheet_name = 'Amazon仕入れ管理'
+                    else:
+                        count = append_to_mercari_sheet(its)
+                        sheet_name = 'メルカリ仕入れ管理'
+                    line_bot_api.push_message(uid, TextSendMessage(
+                        text=f"✅ {count}件を「{sheet_name}」に追加しました！\n\nhttps://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit"
+                    ))
+                except Exception as e:
+                    print(f"Append purchase error: {e}")
+                    import traceback; traceback.print_exc()
+                    line_bot_api.push_message(uid, TextSendMessage(text=f"追加に失敗しました😢\nエラー: {str(e)[:100]}"))
+            threading.Thread(target=_append_items, args=(user_id, target, items)).start()
+            return
+        elif user_message in ['キャンセル', 'cancel', 'Cancel', 'やめる', 'やり直し']:
+            del purchase_sessions[user_id]
+            save_purchase_sessions(purchase_sessions)
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(
+                text="キャンセルしました。\n「仕入れ」でもう一度始められます。"
+            ))
+            return
 
     # SEOレポート即時取得
     seo_keywords = ['SEOレポート', 'seoレポート', '流入確認', '流入みせて', 'ブログ流入', '検索流入']

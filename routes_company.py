@@ -911,3 +911,229 @@ def richmenu_preview():
         return send_file(io.BytesIO(data), mimetype='image/png')
     except Exception:
         return f'<pre>{traceback.format_exc()}</pre>', 500
+
+
+# ===== 仕入れ記録ページ（PC用） =====
+
+@company_bp.route('/purchase')
+def purchase_page():
+    return '''<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>仕入れ記録 | まきの会社</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f0f0f; color: #e0e0e0; font-family: 'Noto Sans JP', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+  h1 { font-size: 1.6rem; color: #c9a84c; margin-bottom: 8px; }
+  .subtitle { color: #888; font-size: 0.9rem; margin-bottom: 32px; }
+  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 28px; width: 100%; max-width: 560px; margin-bottom: 20px; }
+  label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 8px; }
+  .target-btns { display: flex; gap: 12px; margin-bottom: 24px; }
+  .target-btn { flex: 1; padding: 12px; border: 2px solid #333; border-radius: 8px; background: transparent; color: #e0e0e0; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
+  .target-btn.active { border-color: #c9a84c; color: #c9a84c; background: rgba(201,168,76,0.08); }
+  .drop-area { border: 2px dashed #333; border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: border-color 0.2s; margin-bottom: 20px; }
+  .drop-area:hover, .drop-area.dragover { border-color: #c9a84c; }
+  .drop-area p { color: #666; font-size: 0.9rem; margin-top: 8px; }
+  #preview { max-width: 100%; border-radius: 8px; margin-top: 12px; display: none; }
+  #file-input { display: none; }
+  .btn-primary { width: 100%; padding: 14px; background: #c9a84c; color: #000; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { width: 100%; padding: 12px; background: transparent; color: #c9a84c; border: 1px solid #c9a84c; border-radius: 8px; font-size: 0.95rem; cursor: pointer; margin-top: 10px; }
+  .result-card { background: #111; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  .result-card h3 { color: #c9a84c; font-size: 0.9rem; margin-bottom: 10px; }
+  .item-row { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid #1e1e1e; font-size: 0.9rem; }
+  .item-row:last-child { border-bottom: none; }
+  .item-label { color: #888; font-size: 0.8rem; }
+  .loading { text-align: center; color: #888; padding: 20px; }
+  .spinner { border: 3px solid #333; border-top: 3px solid #c9a84c; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; margin: 12px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .success { color: #4caf50; text-align: center; font-size: 1.1rem; padding: 20px; }
+  .error { color: #f44336; font-size: 0.85rem; margin-top: 8px; }
+  a.back { color: #888; font-size: 0.85rem; text-decoration: none; margin-bottom: 24px; }
+  a.back:hover { color: #c9a84c; }
+</style>
+</head>
+<body>
+<a href="/company" class="back">← ダッシュボードに戻る</a>
+<h1>仕入れ記録</h1>
+<p class="subtitle">レシートや領収書の画像をアップロードするとスプレッドシートに自動追加します</p>
+
+<div class="card">
+  <label>① 追加先リスト</label>
+  <div class="target-btns">
+    <button class="target-btn active" onclick="selectTarget('amazon', this)">📦 Amazon仕入れ</button>
+    <button class="target-btn" onclick="selectTarget('mercari', this)">🛍 メルカリ仕入れ</button>
+  </div>
+
+  <label>② レシート・領収書の画像</label>
+  <div class="drop-area" id="drop-area" onclick="document.getElementById('file-input').click()">
+    <span style="font-size:2rem">📷</span>
+    <p>クリックまたはドラッグ＆ドロップで画像を選択</p>
+    <p style="font-size:0.8rem;margin-top:4px">JPG / PNG / WEBP 対応</p>
+    <img id="preview" />
+  </div>
+  <input type="file" id="file-input" accept="image/*" onchange="onFileSelected(this)">
+
+  <button class="btn-primary" id="ocr-btn" onclick="runOcr()" disabled>読み取り開始</button>
+</div>
+
+<div id="result-area" style="display:none;width:100%;max-width:560px"></div>
+
+<script>
+let selectedTarget = 'amazon';
+let parsedItems = null;
+let fileBase64 = null;
+let fileMediaType = null;
+
+function selectTarget(t, el) {
+  selectedTarget = t;
+  document.querySelectorAll('.target-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  fileMediaType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    fileBase64 = e.target.result.split(',')[1];
+    const preview = document.getElementById('preview');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    document.getElementById('ocr-btn').disabled = false;
+  };
+  reader.readAsDataURL(file);
+}
+
+const drop = document.getElementById('drop-area');
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('file-input').files = dt.files;
+    onFileSelected(document.getElementById('file-input'));
+  }
+});
+
+async function runOcr() {
+  if (!fileBase64) return;
+  const area = document.getElementById('result-area');
+  area.style.display = 'block';
+  area.innerHTML = '<div class="loading"><div class="spinner"></div>読み取り中...</div>';
+  document.getElementById('ocr-btn').disabled = true;
+
+  try {
+    const res = await fetch('/api/purchase/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64: fileBase64, media_type: fileMediaType, target: selectedTarget })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'OCRエラー');
+    parsedItems = data.items;
+    showConfirm(data.items);
+  } catch (e) {
+    area.innerHTML = `<div class="card"><p class="error">❌ ${e.message}</p></div>`;
+    document.getElementById('ocr-btn').disabled = false;
+  }
+}
+
+function showConfirm(items) {
+  const label = selectedTarget === 'amazon' ? 'Amazon仕入れ管理' : 'メルカリ仕入れ管理';
+  let html = `<div class="card"><h3 style="color:#c9a84c;margin-bottom:16px">読み取り結果 → ${label}</h3>`;
+  items.forEach((item, i) => {
+    html += `<div class="result-card">
+      <h3>商品 ${i + 1}</h3>
+      <div class="item-row"><span class="item-label">商品名</span><span>${item.name}</span></div>
+      <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
+      <div class="item-row"><span class="item-label">仕入れ価格</span><span>${Number(item.price).toLocaleString()}円</span></div>
+      <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
+    </div>`;
+  });
+  html += `<button class="btn-primary" onclick="confirmAdd()">✅ スプレッドシートに追加</button>
+    <button class="btn-secondary" onclick="resetForm()">やり直す</button>
+  </div>`;
+  document.getElementById('result-area').innerHTML = html;
+}
+
+async function confirmAdd() {
+  const area = document.getElementById('result-area');
+  area.innerHTML = '<div class="loading"><div class="spinner"></div>追加中...</div>';
+  try {
+    const res = await fetch('/api/purchase/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: parsedItems, target: selectedTarget })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '追加エラー');
+    area.innerHTML = `<div class="card"><p class="success">✅ ${data.count}件を追加しました！</p>
+      <a href="https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit" target="_blank" style="display:block;text-align:center;color:#c9a84c;margin-top:12px">スプレッドシートを開く →</a>
+      <button class="btn-secondary" style="margin-top:16px" onclick="resetForm()">続けて追加する</button>
+    </div>`;
+  } catch (e) {
+    area.innerHTML = `<div class="card"><p class="error">❌ ${e.message}</p>
+      <button class="btn-secondary" onclick="showConfirm(parsedItems)">戻る</button>
+    </div>`;
+  }
+}
+
+function resetForm() {
+  parsedItems = null; fileBase64 = null; fileMediaType = null;
+  document.getElementById('preview').style.display = 'none';
+  document.getElementById('file-input').value = '';
+  document.getElementById('ocr-btn').disabled = true;
+  document.getElementById('result-area').style.display = 'none';
+}
+</script>
+</body>
+</html>'''
+
+
+@company_bp.route('/api/purchase/ocr', methods=['POST'])
+def purchase_ocr():
+    import traceback
+    try:
+        from clients import anthropic_client
+        from purchase_receipt import parse_receipt_with_vision
+        body = request.get_json(force=True)
+        image_base64 = body.get('image_base64', '')
+        media_type = body.get('media_type', 'image/jpeg')
+        if not image_base64:
+            return jsonify({'error': '画像データがありません'}), 400
+        items = parse_receipt_with_vision(anthropic_client, image_base64, media_type)
+        if not items:
+            return jsonify({'error': '商品情報が読み取れませんでした。鮮明な画像を使ってください'}), 400
+        return jsonify({'items': items})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)[:200]}), 500
+
+
+@company_bp.route('/api/purchase/confirm', methods=['POST'])
+def purchase_confirm():
+    import traceback
+    try:
+        from purchase_receipt import append_to_amazon_sheet, append_to_mercari_sheet
+        body = request.get_json(force=True)
+        items = body.get('items', [])
+        target = body.get('target', 'amazon')
+        if not items:
+            return jsonify({'error': '追加するデータがありません'}), 400
+        if target == 'amazon':
+            count = append_to_amazon_sheet(items)
+        else:
+            count = append_to_mercari_sheet(items)
+        return jsonify({'count': count})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)[:200]}), 500
