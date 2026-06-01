@@ -1096,6 +1096,7 @@ function showConfirm(items) {
         <div class="item-row"><span class="item-label">店舗</span><span>${item.store}</span></div>
         <div class="item-row"><span class="item-label">価格</span><span>${priceStr(item)}</span></div>
         <div class="item-row"><span class="item-label">仕入れ日</span><span>${item.date}</span></div>
+        ${item.jan ? `<div class="item-row"><span class="item-label">JAN</span><span style="color:#888">${item.jan}</span></div>` : ''}
         <div class="item-row" style="margin-top:6px">
           <span class="item-label">追加先</span>
           <span>

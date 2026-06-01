@@ -13,6 +13,7 @@ from google.oauth2.credentials import Credentials as GCreds
 
 SPREADSHEET_ID = "1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI"
 AMAZON_SHEET   = "Amazon仕入れ管理"
+KEEPA_API_KEY  = os.environ.get('KEEPA_API_KEY', 'qm7suqd5ehemt109m37s85sp0bbq3g2lc6c4d089dbvvnpbnm3qtn0kvf2mfsp8p')
 MERCARI_SHEET  = "メルカリ仕入れ管理"
 
 MERCARI_HEADER = [
@@ -41,6 +42,26 @@ def _get_sheets_creds():
     except Exception as e:
         print(f"[purchase_receipt] sheets creds error: {e}")
         return None
+
+
+def lookup_asin_by_jan(jan_code: str) -> str | None:
+    """KeepaAPIでJANコード→ASINを検索。見つからなければNoneを返す。"""
+    try:
+        resp = requests.get(
+            'https://api.keepa.com/product',
+            params={'key': KEEPA_API_KEY, 'domain': 5, 'code': jan_code, 'history': 0},
+            timeout=15,
+            verify=False,
+        )
+        if resp.status_code != 200:
+            print(f"[Keepa] JAN検索エラー: {resp.status_code}")
+            return None
+        products = resp.json().get('products', [])
+        if products:
+            return products[0].get('asin')
+    except Exception as e:
+        print(f"[Keepa] JAN検索例外: {e}")
+    return None
 
 
 def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: str) -> list[dict]:
@@ -75,13 +96,15 @@ def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: s
     "unit_price": 単価（数字のみ・円記号なし）,
     "quantity": 個数（数字のみ・1個なら1）,
     "store": "店舗名（レシートから読み取る）",
-    "date": "YYYY/MM/DD形式の仕入れ日"
+    "date": "YYYY/MM/DD形式の仕入れ日",
+    "jan": "JANコード（バーコード番号・13桁の数字・なければnull）"
   }}
 ]
 ・複数商品があれば全て含める
 ・「2コ×単699」「×2 @500」などの表記は unit_price=699, quantity=2 のように分解する
 ・単価が不明な場合は合計額を unit_price に入れ quantity=1 とする
 ・小計・合計・消費税・レジ袋・ポイント等の明細行は除外する
+・JANコードは商品コード・バーコード番号として印字されている13桁の数字
 ・商品名が読み取れない場合は「商品名不明」とする"""
                 }
             ]
@@ -143,13 +166,31 @@ def append_to_amazon_sheet(items: list[dict]) -> int:
         row_num = no + 1
         unit_price = item.get('unit_price', item.get('price', ''))
         qty = int(item.get('quantity', 1) or 1)
-        memo = f'{qty}個購入・単価{int(unit_price):,}円' if qty > 1 else ''
+        jan = (item.get('jan') or '').strip()
+
+        # JANコードがあればKeepaでASIN検索
+        asin = ''
+        if jan:
+            found = lookup_asin_by_jan(jan)
+            if found:
+                asin = found
+                print(f"[purchase] JAN:{jan} → ASIN:{asin}")
+            else:
+                asin = f'JAN:{jan}'  # 見つからない場合はJANコードをそのまま入れる
+
+        memo_parts = []
+        if qty > 1:
+            memo_parts.append(f'{qty}個購入・単価{int(unit_price):,}円')
+        if jan:
+            memo_parts.append(f'JAN:{jan}')
+        memo = '・'.join(memo_parts)
+
         row = [
             str(no),                   # A: No.
             '',                        # B: メーカー（空欄）
             item.get('store', ''),     # C: 仕入れ先
             item.get('name', ''),      # D: 商品名
-            '',                        # E: ASIN（空欄）
+            asin,                      # E: ASIN（またはJANコード）
             str(unit_price),           # F: 仕入れ価格（単価）
             '',                        # G: Amazon売値（空欄）
             '8',                       # H: 紹介料率(%)
@@ -161,7 +202,7 @@ def append_to_amazon_sheet(items: list[dict]) -> int:
             '1回限り',                 # N: 仕入れ頻度
             item.get('date', ''),      # O: 最終仕入れ日
             '書類待ち',                # P: ステータス
-            memo,                      # Q: メモ（複数個の場合のみ）
+            memo,                      # Q: メモ
         ]
         rows.append(row)
 
