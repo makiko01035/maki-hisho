@@ -69,6 +69,20 @@ def ping():
     return 'OK'
 
 
+@app.route('/run-blog-now', methods=['POST'])
+def run_blog_now():
+    data = request.get_json(silent=True) or {}
+    if data.get('secret') != os.environ.get('NOTIFY_SECRET', 'maki2025'):
+        abort(403)
+    mode = data.get('mode', 'new')
+    if mode == 'rewrite':
+        threading.Thread(target=auto_blog_rewrite, daemon=True).start()
+        return {'status': 'started', 'mode': 'rewrite'}
+    else:
+        threading.Thread(target=auto_blog_new, daemon=True).start()
+        return {'status': 'started', 'mode': 'new'}
+
+
 
 
 @app.route('/callback', methods=['POST'])
