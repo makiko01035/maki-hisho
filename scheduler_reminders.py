@@ -183,16 +183,6 @@ def send_x_engage_reminder():
         print(f"X engage reminder error: {e}")
 
 
-def send_famm_reminder():
-    try:
-        user_id = os.environ['LINE_USER_ID']
-        line_bot_api.push_message(user_id, TextSendMessage(
-            text="📸 【Famm更新】今月のFammの更新をお忘れなく！\n期限は今月9日です。"
-        ))
-    except Exception as e:
-        print(f"Famm reminder error: {e}")
-
-
 def send_famm_deadline_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']

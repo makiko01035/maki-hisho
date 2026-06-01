@@ -33,7 +33,7 @@ from calendar_manager import check_deadline_reminders
 from scheduler_reminders import (
     send_morning_message, send_preparation_reminder,
     send_hsbc_reminder, send_zaitage_reminder,
-    send_x_engage_reminder, send_famm_reminder, send_famm_deadline_reminder,
+    send_x_engage_reminder, send_famm_deadline_reminder,
     send_ebay_check_reminder, send_monthly_review_reminder,
 )
 from x_poster import post_to_x_daily, post_to_x_noon, post_to_x_evening
@@ -93,8 +93,6 @@ scheduler.add_job(send_preparation_reminder, 'cron', hour=20, minute=0, day_of_w
 scheduler.add_job(check_deadline_reminders, 'cron', hour=8, minute=0)
 # 3・6・9・12月の1日朝8時30分：HSBC換金リマインダー（3か月に1回）
 scheduler.add_job(send_hsbc_reminder, 'cron', month='3,6,9,12', day=1, hour=8, minute=30)
-# 毎月1日朝9時：Famm更新リマインダー
-scheduler.add_job(send_famm_reminder, 'cron', day=1, hour=9, minute=0)
 # 毎月6日朝9時：Famm期限3日前リマインダー
 scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
 # 月・木 8:00：7stepパイプラインで新規記事を自動作成
