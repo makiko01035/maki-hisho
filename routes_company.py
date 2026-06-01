@@ -937,6 +937,7 @@ def purchase_page():
   .drop-area:hover, .drop-area.dragover { border-color: #c9a84c; }
   .drop-area p { color: #666; font-size: 0.9rem; margin-top: 8px; }
   #preview { max-width: 100%; border-radius: 8px; margin-top: 12px; display: none; }
+  #pdf-name { color: #c9a84c; font-size: 0.9rem; margin-top: 12px; display: none; }
   #file-input { display: none; }
   .btn-primary { width: 100%; padding: 14px; background: #c9a84c; color: #000; border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
   .btn-primary:hover { opacity: 0.85; }
@@ -971,11 +972,12 @@ def purchase_page():
   <label>② レシート・領収書の画像</label>
   <div class="drop-area" id="drop-area" onclick="document.getElementById('file-input').click()">
     <span style="font-size:2rem">📷</span>
-    <p>クリックまたはドラッグ＆ドロップで画像を選択</p>
-    <p style="font-size:0.8rem;margin-top:4px">JPG / PNG / WEBP 対応</p>
+    <p>クリックまたはドラッグ＆ドロップで画像・PDFを選択</p>
+    <p style="font-size:0.8rem;margin-top:4px">JPG / PNG / WEBP / PDF 対応</p>
     <img id="preview" />
+    <p id="pdf-name"></p>
   </div>
-  <input type="file" id="file-input" accept="image/*" onchange="onFileSelected(this)">
+  <input type="file" id="file-input" accept="image/*,application/pdf" onchange="onFileSelected(this)">
 
   <button class="btn-primary" id="ocr-btn" onclick="runOcr()" disabled>読み取り開始</button>
 </div>
@@ -997,13 +999,21 @@ function selectTarget(t, el) {
 function onFileSelected(input) {
   const file = input.files[0];
   if (!file) return;
-  fileMediaType = file.type || 'image/jpeg';
+  fileMediaType = file.type === 'application/pdf' ? 'application/pdf' : (file.type || 'image/jpeg');
   const reader = new FileReader();
   reader.onload = e => {
     fileBase64 = e.target.result.split(',')[1];
     const preview = document.getElementById('preview');
-    preview.src = e.target.result;
-    preview.style.display = 'block';
+    const pdfName = document.getElementById('pdf-name');
+    if (fileMediaType === 'application/pdf') {
+      preview.style.display = 'none';
+      pdfName.textContent = '📄 ' + file.name;
+      pdfName.style.display = 'block';
+    } else {
+      preview.src = e.target.result;
+      preview.style.display = 'block';
+      pdfName.style.display = 'none';
+    }
     document.getElementById('ocr-btn').disabled = false;
   };
   reader.readAsDataURL(file);

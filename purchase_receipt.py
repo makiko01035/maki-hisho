@@ -44,22 +44,24 @@ def _get_sheets_creds():
 
 
 def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: str) -> list[dict]:
-    """Claude Visionでレシートから商品情報を抽出する。複数商品に対応。"""
+    """Claude Visionでレシートから商品情報を抽出する。画像・PDF両対応。"""
     today = datetime.date.today().strftime('%Y/%m/%d')
+    is_pdf = media_type == 'application/pdf'
+    file_block = {
+        'type': 'document' if is_pdf else 'image',
+        'source': {
+            'type': 'base64',
+            'media_type': media_type,
+            'data': image_base64
+        }
+    }
     response = anthropic_client.messages.create(
         model='claude-sonnet-4-6',
         max_tokens=1500,
         messages=[{
             'role': 'user',
             'content': [
-                {
-                    'type': 'image',
-                    'source': {
-                        'type': 'base64',
-                        'media_type': media_type,
-                        'data': image_base64
-                    }
-                },
+                file_block,
                 {
                     'type': 'text',
                     'text': f"""これは実店舗での仕入れレシートです。
