@@ -29,6 +29,8 @@ import random
 import re
 import time
 from datetime import datetime, timedelta
+import pytz
+_JST = pytz.timezone('Asia/Tokyo')
 
 import requests
 
@@ -942,9 +944,10 @@ def run_monitor():
         if not _get_mako_x_client():
             issues.append("⚠️ MAKO X APIキー未設定（MAKO_X_API_KEY等）")
 
-        if datetime.now().hour >= 22:
+        now_jst = datetime.now(_JST)
+        if now_jst.hour >= 22:
             log        = _load(POSTED_LOG_PATH, {'recent': []})
-            today      = datetime.now().strftime('%Y-%m-%d')
+            today      = now_jst.strftime('%Y-%m-%d')
             today_posts = [p for p in log['recent'] if (p.get('posted_at') or '').startswith(today)]
             if not today_posts:
                 issues.append("⚠️ MAKOの今日の投稿記録がありません")

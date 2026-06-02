@@ -21,6 +21,8 @@ import random
 import re
 import time
 from datetime import datetime, timedelta
+import pytz
+_JST = pytz.timezone('Asia/Tokyo')
 
 import requests
 
@@ -829,9 +831,10 @@ def run_monitor():
         # トークン未設定は想定内（未開始）のためアラートなし
 
         # 22時台のみ：当日投稿確認
-        if datetime.now().hour >= 22:
+        now_jst = datetime.now(_JST)
+        if now_jst.hour >= 22:
             log = _load(POSTED_LOG_PATH, {'recent': []})
-            today = datetime.now().strftime('%Y-%m-%d')
+            today = now_jst.strftime('%Y-%m-%d')
             today_posts = [p for p in log['recent'] if (p.get('posted_at') or '').startswith(today)]
             if not today_posts:
                 issues.append("⚠️ 今日の投稿記録がありません（スケジューラを確認してください）")
