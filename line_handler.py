@@ -291,7 +291,7 @@ JSON形式のみ返してください。"""
             except Exception as e:
                 print(f"Receipt parse error: {e}")
                 import traceback; traceback.print_exc()
-                line_bot_api.push_message(uid, TextSendMessage(text=f"読み取りに失敗しました😢\nエラー: {str(e)[:100]}"))
+                line_bot_api.push_message(uid, TextSendMessage(text=f"読み取りに失敗しました😢\nエラー: {str(e)[:300]}"))
         threading.Thread(target=_process_receipt, args=(user_id, image_base64, media_type, target)).start()
         return
 
