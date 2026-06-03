@@ -594,6 +594,7 @@ def dashboard():
             ('仕入れ記録', '/purchase', True),
             ('利益計算シート', 'https://docs.google.com/spreadsheets/d/1pPAVYxeETPq6VVtg7Jd7eapXZf8lgTttndRN6Cd4wqI/edit?gid=973340213#gid=973340213', True),
             ('CPASS', 'https://cpass.ebay.com/order/paid', True),
+            ('add×one', 'https://tools.aione.co.jp/buppan-tool/', True),
         ]),
         ('Amazon', [
             ('Amazon.co.jp', 'https://www.amazon.co.jp/', False),
