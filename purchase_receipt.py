@@ -9,6 +9,8 @@ import json
 import time
 import datetime
 import requests
+import httplib2
+import google_auth_httplib2
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials as GCreds
 
@@ -37,6 +39,7 @@ def _get_sheets_creds():
                 'grant_type':    'refresh_token',
             },
             timeout=10,
+            verify=False,
         )
         token = resp.json().get('access_token')
         return GCreds(token=token) if token else None
@@ -183,7 +186,10 @@ def append_to_amazon_sheet(items: list[dict]) -> int:
     if not creds:
         raise RuntimeError('Googleスプレッドシート認証に失敗しました')
 
-    service = build('sheets', 'v4', credentials=creds)
+    authorized_http = google_auth_httplib2.AuthorizedHttp(
+        creds, http=httplib2.Http(disable_ssl_certificate_validation=True)
+    )
+    service = build('sheets', 'v4', http=authorized_http)
     sheet = service.spreadsheets()
 
     existing = sheet.values().get(
