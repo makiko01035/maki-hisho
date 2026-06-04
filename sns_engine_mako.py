@@ -677,7 +677,10 @@ def run_poster_info():
 
         # フォールバック
         text = random.choice(_FALLBACK_MORNING)
-        _post_threads(text)
+        post_id = _post_threads(text)
+        if post_id:
+            _log_post({'type': 'info', 'body': text, 'theme': 'fallback',
+                       'posted_at': datetime.now(_JST).isoformat(), 'post_id': post_id})
         print(f"[mako] poster info (fallback): {text[:30]}")
         time.sleep(10)
         _post_x(text)

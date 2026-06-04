@@ -571,7 +571,10 @@ def run_poster_morning():
 
         # フォールバック
         text = random.choice(_FALLBACK_MORNING)
-        _post(text)
+        post_id = _post(text)
+        if post_id:
+            _log_post({'type': 'morning', 'body': text, 'theme': 'fallback',
+                       'posted_at': datetime.now(_JST).isoformat(), 'post_id': post_id})
         print(f"[koharu] poster morning (fallback): {text[:30]}")
 
     except Exception as e:
