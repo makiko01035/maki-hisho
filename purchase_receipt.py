@@ -26,23 +26,21 @@ MERCARI_HEADER = [
 
 
 def _get_sheets_creds():
+    from google.auth.transport.requests import Request
     raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
     try:
         clean = re.sub(r'[\x00-\x1f\x7f]', '', raw) if raw else ''
         data = json.loads(clean) if clean else json.load(open('token_sheets.json', encoding='utf-8'))
-        resp = requests.post(
-            'https://oauth2.googleapis.com/token',
-            data={
-                'client_id':     data['client_id'],
-                'client_secret': data['client_secret'],
-                'refresh_token': data['refresh_token'],
-                'grant_type':    'refresh_token',
-            },
-            timeout=10,
-            verify=False,
+        creds = GCreds(
+            token=None,
+            refresh_token=data['refresh_token'],
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=data['client_id'],
+            client_secret=data['client_secret'],
+            scopes=['https://www.googleapis.com/auth/spreadsheets'],
         )
-        token = resp.json().get('access_token')
-        return GCreds(token=token) if token else None
+        creds.refresh(Request())
+        return creds
     except Exception as e:
         print(f"[purchase_receipt] sheets creds error: {e}")
         return None
