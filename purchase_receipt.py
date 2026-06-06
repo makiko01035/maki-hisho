@@ -27,10 +27,11 @@ MERCARI_HEADER = [
 
 def _get_sheets_creds():
     from google.auth.transport.requests import Request
-    raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
+    # GOOGLE_CREDENTIALS（カレンダーと共通）を優先。なければ旧GOOGLE_SHEETS_TOKENを使う
+    raw = os.environ.get('GOOGLE_CREDENTIALS') or os.environ.get('GOOGLE_SHEETS_TOKEN', '')
     try:
         clean = re.sub(r'[\x00-\x1f\x7f]', '', raw) if raw else ''
-        data = json.loads(clean) if clean else json.load(open('token_sheets.json', encoding='utf-8'))
+        data = json.loads(clean) if clean else json.load(open('token_combined.json', encoding='utf-8'))
         creds = GCreds(
             token=None,
             refresh_token=data['refresh_token'],
