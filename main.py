@@ -69,6 +69,24 @@ def ping():
     return 'OK'
 
 
+@app.route('/check-google')
+def check_google():
+    import re, json, os
+    raw = os.environ.get('GOOGLE_CREDENTIALS', '')
+    if not raw:
+        return 'GOOGLE_CREDENTIALS: 未設定', 500
+    try:
+        clean = re.sub(r'[\x00-\x1f\x7f]', '', raw)
+        data = json.loads(clean)
+        keys = list(data.keys())
+        client_id_short = str(data.get('client_id', 'なし'))[:30]
+        has_refresh = 'あり' if data.get('refresh_token') else 'なし'
+        scopes = data.get('scopes', 'なし')
+        return f'OK\nkeys: {keys}\nclient_id: {client_id_short}...\nrefresh_token: {has_refresh}\nscopes: {scopes}'
+    except Exception as e:
+        return f'JSONパースエラー: {e}\n先頭50文字: {raw[:50]}', 500
+
+
 
 
 
