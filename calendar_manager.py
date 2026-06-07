@@ -9,8 +9,11 @@ from clients import line_bot_api, JST
 
 
 def get_calendar_service():
+    import re
     from google.auth.transport.requests import Request
-    creds_info = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+    raw = os.environ['GOOGLE_CREDENTIALS']
+    clean = re.sub(r'[\x00-\x1f\x7f]', '', raw)
+    creds_info = json.loads(clean)
     creds = Credentials(
         token=None,
         refresh_token=creds_info.get('refresh_token'),
