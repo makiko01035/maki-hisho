@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-WP_URL = os.getenv("WP_URL")
-WP_USER = os.getenv("WP_USER")
-WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD")
+WP_URL = os.getenv("WP_URL") or os.getenv("YAKUZEN_WP_URL", "https://foodmakehealth.com")
+WP_USER = os.getenv("WP_USER") or os.getenv("YAKUZEN_WP_USER", "makiko01035")
+WP_APP_PASSWORD = os.getenv("WP_APP_PASSWORD") or os.getenv("YAKUZEN_WP_APP_PASSWORD", "")
 
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 
