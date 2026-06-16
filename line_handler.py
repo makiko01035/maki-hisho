@@ -885,8 +885,8 @@ def handle_message(event):
         threading.Thread(target=send_daily_work_log).start()
         return
 
-    # 日記メモ（「メモ」改行形式 → Notionの今日の日記ページに追記）
-    if user_message.startswith('メモ\n'):
+    # 日記メモ（「メモ」または「日記」改行形式 → Notionの今日の日記ページに追記）
+    if user_message.startswith('メモ\n') or user_message.startswith('日記\n'):
         memo_text = user_message.split('\n', 1)[1].strip()
         if memo_text:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📓 日記に追記中..."))
@@ -901,7 +901,7 @@ def handle_message(event):
                     line_bot_api.push_message(uid, TextSendMessage(text=msg))
             threading.Thread(target=_add_diary).start()
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📝 2行目にメモ内容を書いてください\n例：\nメモ\n今日の外来、更年期が多かった"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📝 2行目に内容を書いてください\n例：\nメモ\n今日の外来、更年期が多かった\n\nまたは\n日記\n今日あったこと"))
         return
 
     # 勉強ノートへのメモ追加
