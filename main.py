@@ -35,11 +35,10 @@ from scheduler_reminders import (
     send_hsbc_reminder, send_zaitage_reminder,
     send_x_engage_reminder, send_famm_deadline_reminder,
     send_ebay_check_reminder, send_monthly_review_reminder,
-    send_google_token_reminder,
 )
 from x_poster import post_to_x_daily, post_to_x_noon, post_to_x_evening
 from x_analytics import (
-    send_weekly_seo_report, send_note_reminder, send_note_weekly_reminder,
+    send_note_reminder, send_note_weekly_reminder,
     send_x_weekly_report, send_daily_work_log,
 )
 from threads_room import send_room_suggestion_slot, send_threads_token_reminder
@@ -120,7 +119,6 @@ scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
 # 月・木 新規 / 水・土 リライト → .github/workflows/blog_auto.yml を参照
 # 毎週土曜朝9時：eBayチェックリマインダー
 scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
-scheduler.add_job(send_google_token_reminder, 'cron', day_of_week='fri', hour=9, minute=15)
 # 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
@@ -132,7 +130,6 @@ scheduler.add_job(post_to_x_evening, 'cron', hour=19, minute=30)
 # 毎週月・水・金 朝9時20分：X エンゲージメントリマインダー
 scheduler.add_job(send_x_engage_reminder, 'cron', day_of_week='mon', hour=9, minute=20)  # 月水金→月曜のみ（通数削減）
 # 毎週月曜朝9時30分：週次SEOレポート（薬膳・セキスイ・X）
-scheduler.add_job(send_weekly_seo_report, 'cron', day_of_week='mon', hour=9, minute=30)
 # 毎月末日朝9時：noteリマインド
 scheduler.add_job(send_note_reminder, 'cron', day='last', hour=9, minute=0)
 scheduler.add_job(send_note_weekly_reminder, 'cron', day_of_week='thu', hour=9, minute=5)
