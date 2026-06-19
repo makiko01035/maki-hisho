@@ -193,6 +193,24 @@ def send_famm_deadline_reminder():
         print(f"Famm deadline reminder error: {e}")
 
 
+def send_google_token_reminder():
+    try:
+        user_id = os.environ['LINE_USER_ID']
+        msg = (
+            "🔑【Googleトークン再認証・週次】\n\n"
+            "カレンダー・スプシ連携トークンが7日で切れる仕様のため、定期的な再認証が必要です。\n\n"
+            "① PowerShellで実行:\n"
+            "python refresh_sheets_token.py\n\n"
+            "② 表示されたURLをブラウザで開いてログイン\n\n"
+            "③ ターミナルの「=== Renderの GOOGLE_CREDENTIALS に貼り付ける値 ===」の下のJSONだけコピー\n\n"
+            "④ Render → GOOGLE_CREDENTIALS に貼り直して Save\n\n"
+            "終わったらClaudeに「再認証できた」と伝えてね"
+        )
+        line_bot_api.push_message(user_id, TextSendMessage(text=msg))
+    except Exception as e:
+        print(f"Google token reminder error: {e}")
+
+
 def send_ebay_check_reminder():
     try:
         user_id = os.environ['LINE_USER_ID']

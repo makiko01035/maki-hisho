@@ -35,6 +35,7 @@ from scheduler_reminders import (
     send_hsbc_reminder, send_zaitage_reminder,
     send_x_engage_reminder, send_famm_deadline_reminder,
     send_ebay_check_reminder, send_monthly_review_reminder,
+    send_google_token_reminder,
 )
 from x_poster import post_to_x_daily, post_to_x_noon, post_to_x_evening
 from x_analytics import (
@@ -119,6 +120,7 @@ scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
 # 月・木 新規 / 水・土 リライト → .github/workflows/blog_auto.yml を参照
 # 毎週土曜朝9時：eBayチェックリマインダー
 scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
+scheduler.add_job(send_google_token_reminder, 'cron', day_of_week='fri', hour=9, minute=15)
 # 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
