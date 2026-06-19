@@ -599,6 +599,7 @@ def dashboard():
         ('Amazon', [
             ('Amazon.co.jp', 'https://www.amazon.co.jp/', False),
             ('セラーセントラル', 'https://sellercentral.amazon.co.jp/home', True),
+            ('プライスター', 'https://jp2.pricetar.com/seller', True),
             ('ハピタス', 'https://hapitas.jp/', True),
         ]),
         ('教材', [
