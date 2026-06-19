@@ -36,7 +36,7 @@ def get_ebay_user_token():
 
 
 def get_sheets_creds():
-    raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
+    raw = os.environ.get('GOOGLE_CREDENTIALS') or os.environ.get('GOOGLE_SHEETS_TOKEN', '')
     try:
         clean = re.sub(r'[\x00-\x1f\x7f]', '', raw) if raw else ''
         data = json.loads(clean) if clean else json.load(open('token_sheets.json', encoding='utf-8'))
@@ -96,13 +96,14 @@ def ebay_dashboard_page():
 def ebay_debug():
     import traceback
     result = {
+        'GOOGLE_CREDENTIALS_set':  bool(os.environ.get('GOOGLE_CREDENTIALS', '')),
         'GOOGLE_SHEETS_TOKEN_set': bool(os.environ.get('GOOGLE_SHEETS_TOKEN', '')),
         'EBAY_REFRESH_TOKEN_set':  bool(os.environ.get('EBAY_REFRESH_TOKEN', '')),
         'EBAY_APP_ID_set':         bool(os.environ.get('EBAY_APP_ID', '')),
         'EBAY_CERT_ID_set':        bool(os.environ.get('EBAY_CERT_ID', '')),
     }
     try:
-        raw = os.environ.get('GOOGLE_SHEETS_TOKEN', '')
+        raw = os.environ.get('GOOGLE_CREDENTIALS') or os.environ.get('GOOGLE_SHEETS_TOKEN', '')
         clean = re.sub(r'[\x00-\x1f\x7f]', '', raw)
         data = json.loads(clean)
         result['token_keys'] = list(data.keys())
