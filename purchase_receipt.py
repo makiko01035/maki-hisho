@@ -131,7 +131,7 @@ def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: s
         try:
             response = anthropic_client.messages.create(
                 model='claude-sonnet-4-6',
-                max_tokens=1500,
+                max_tokens=4000,
                 messages=[{
                     'role': 'user',
                     'content': [
