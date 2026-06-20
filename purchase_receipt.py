@@ -147,6 +147,8 @@ def parse_receipt_with_vision(anthropic_client, image_base64: str, media_type: s
                     raw = m.group(1).strip()
             start = raw.find('[')
             end = raw.rfind(']')
+            if start == -1 or end == -1:
+                raise ValueError(f'レシートからJSON形式の商品情報を抽出できませんでした。Claude応答: {raw[:200]}')
             return json.loads(raw[start:end + 1])
         except Exception as e:
             last_err = e
