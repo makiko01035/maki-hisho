@@ -333,6 +333,33 @@ def ebay_sync_api():
         return jsonify({"error": str(e)}), 500
 
 
+@ebay_bp.route('/api/ebay/debug-sync')
+def ebay_debug_sync():
+    """同期時に何が起きているか確認用"""
+    try:
+        token = get_ebay_user_token()
+        if not token:
+            return jsonify({"error": "eBayトークン取得失敗"}), 500
+        resp = requests.get(
+            "https://api.ebay.com/sell/fulfillment/v1/order",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"limit": 50, "filter": "creationdate:[2026-01-01T00:00:00.000Z..]"},
+            timeout=20,
+        )
+        orders = resp.json().get("orders", [])
+        result = []
+        for o in orders:
+            result.append({
+                "order_id": o.get("orderId", ""),
+                "status":   o.get("orderFulfillmentStatus", ""),
+                "buyer":    o.get("buyer", {}).get("username", ""),
+                "item_id":  o.get("lineItems", [{}])[0].get("legacyItemId", "") if o.get("lineItems") else "",
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @ebay_bp.route('/api/ebay/send-message', methods=['POST'])
 def ebay_send_message_api():
     try:
