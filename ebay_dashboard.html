@@ -170,6 +170,18 @@
             cursor: pointer;
             margin-top: 4px;
         }
+        .btn-msg {
+            width: 100%;
+            padding: 13px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .btn-msg:disabled { background: #95a5a6; cursor: not-allowed; }
 
         .toast {
             position: fixed;
@@ -270,8 +282,13 @@
             <label class="form-label">備考（任意）</label>
             <input type="text" class="form-input" id="inNotes" placeholder="">
         </div>
+        <div class="form-row">
+            <label class="form-label">追跡番号（任意・感謝メッセージに含める）</label>
+            <input type="text" class="form-input" id="inTracking" placeholder="例: LX123456789JP">
+        </div>
 
         <button class="btn-save" id="saveBtn" onclick="saveOrder()">保存</button>
+        <button class="btn-msg" id="msgBtn" onclick="sendMessage()">✉️ 感謝メッセージを送る</button>
         <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
     </div>
 </div>
@@ -365,6 +382,7 @@ function openModal(o) {
     document.getElementById('inShipping').value         = o.shipping_cost_jpy || '';
     document.getElementById('inFxRate').value           = o.fx_rate || '155';
     document.getElementById('inNotes').value            = o.notes || '';
+    document.getElementById('inTracking').value         = '';
     calcProfit();
     document.getElementById('modalOverlay').classList.add('active');
 }
@@ -418,6 +436,31 @@ async function saveOrder() {
         showToast('エラー: ' + e.message);
     } finally {
         btn.disabled = false; btn.textContent = '保存';
+    }
+}
+
+async function sendMessage() {
+    if (!current) return;
+    const btn      = document.getElementById('msgBtn');
+    const tracking = document.getElementById('inTracking').value.trim();
+    btn.disabled = true; btn.textContent = '送信中...';
+    try {
+        const res = await fetch('/api/ebay/send-message', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                order_id:       current.order_id,
+                item_id:        current.item_id,
+                tracking_number: tracking,
+            })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        showToast('✉️ メッセージ送信完了！');
+    } catch(e) {
+        showToast('送信失敗: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '✉️ 感謝メッセージを送る';
     }
 }
 

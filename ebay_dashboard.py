@@ -35,6 +35,57 @@ def get_ebay_user_token():
     return resp.json().get("access_token")
 
 
+def send_buyer_message(order_id, item_id, tracking_number=""):
+    """発送後バイヤーへ感謝＋フィードバック依頼メッセージを送信"""
+    token = get_ebay_user_token()
+    if not token:
+        return False, "eBayトークン取得失敗"
+
+    # バイヤーのusername取得
+    r = requests.get(
+        f"https://api.ebay.com/sell/fulfillment/v1/order/{urllib.parse.quote(order_id, safe='')}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=10,
+    )
+    order_data = r.json()
+    buyer_username = order_data.get("buyer", {}).get("username", "")
+    if not buyer_username:
+        return False, f"バイヤー名取得失敗: {str(order_data)[:200]}"
+
+    tracking_line = f"\nTracking number: {tracking_number}" if tracking_number else ""
+    body = (
+        f"Hi {buyer_username},\n\n"
+        f"Thank you so much for your purchase!\n"
+        f"Your item has been shipped.{tracking_line}\n\n"
+        f"I hope you enjoy it! If you have any questions, please feel free to contact me anytime.\n\n"
+        f"It would mean a lot to me if you could leave feedback when you receive the item.\n\n"
+        f"Thank you again and have a wonderful day!\n"
+        f"Best regards,\nMaki"
+    )
+
+    resp = requests.post(
+        "https://api.ebay.com/post-order/v2/conversation",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+        },
+        json={
+            "recipientId": buyer_username,
+            "orderId": order_id,
+            "itemId": item_id,
+            "body": body,
+            "subject": "Thank you for your purchase! / Item shipped",
+        },
+        timeout=10,
+    )
+
+    if resp.status_code in (200, 201):
+        return True, "送信成功"
+    else:
+        return False, f"送信失敗 ({resp.status_code}): {resp.text[:300]}"
+
+
 def get_sheets_creds():
     raw = os.environ.get('GOOGLE_CREDENTIALS') or os.environ.get('GOOGLE_SHEETS_TOKEN', '')
     try:
@@ -241,6 +292,24 @@ def ebay_sync_api():
             ).execute()
 
         return jsonify({"added": len(new_rows), "fetched": len(ebay_orders)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@ebay_bp.route('/api/ebay/send-message', methods=['POST'])
+def ebay_send_message_api():
+    try:
+        data     = request.json
+        order_id = data.get("order_id", "")
+        item_id  = data.get("item_id", "")
+        tracking = data.get("tracking_number", "")
+        if not order_id:
+            return jsonify({"error": "order_idが必要です"}), 400
+        success, msg = send_buyer_message(order_id, item_id, tracking)
+        if success:
+            return jsonify({"success": True, "message": msg})
+        else:
+            return jsonify({"error": msg}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
