@@ -29,6 +29,7 @@ from sns_engine_mako import (
 )
 from blog_yakuzen import auto_blog_new, auto_blog_rewrite
 from ebay_dashboard import ebay_bp
+from monthly_pl import send_monthly_pl_prompt
 from calendar_manager import check_deadline_reminders
 from scheduler_reminders import (
     send_morning_message, send_preparation_reminder,
@@ -121,6 +122,8 @@ scheduler.add_job(send_famm_deadline_reminder, 'cron', day=6, hour=9, minute=0)
 scheduler.add_job(send_ebay_check_reminder, 'cron', day_of_week='sat', hour=9, minute=0)
 # 毎月1日朝9時30分：月初振り返りリマインダー（Fammリマインダーの30分後）
 scheduler.add_job(send_monthly_review_reminder, 'cron', day=1, hour=9, minute=30)
+# 毎月1日朝9時35分：前月の副業収支をeBay自動集計＋入力依頼でまとめる
+scheduler.add_job(send_monthly_pl_prompt, 'cron', day=1, hour=9, minute=35)
 # 毎週月曜朝9時10分：在宅専門医 取得プロジェクト週次リマインダー
 scheduler.add_job(send_zaitage_reminder, 'cron', day_of_week='mon', hour=9, minute=10)
 # 毎日朝8:30・昼12:30（奇数日のみ）・夜19:30：X（Twitter）自動投稿（2〜3本/日）

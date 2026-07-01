@@ -40,6 +40,7 @@ from purchase_receipt import (
     format_confirm_message,
     append_to_amazon_sheet, append_to_mercari_sheet,
 )
+from monthly_pl import handle_monthly_pl_input
 
 PENDING_FILE = '/tmp/pending_events.json'
 SEKISUI_SESSION_FILE = '/tmp/sekisui_sessions.json'
@@ -533,6 +534,17 @@ def handle_message(event):
                 saved.append(circle_chars[n - 1])
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f'{"・".join(saved)}をNotionの今週やることに保存しました✅'))
         return
+
+    # 月次副業収支の入力（「収支 amazon 4602 note 300 ...」）
+    if user_message.strip().startswith('収支'):
+        try:
+            reply = handle_monthly_pl_input(user_message)
+            if reply:
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+                return
+        except Exception as e:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f'収支計算でエラー: {e}'))
+            return
 
     # ユーザーIDを確認するコマンド
     if user_message == 'myid':
