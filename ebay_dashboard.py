@@ -333,6 +333,40 @@ def ebay_sync_api():
         return jsonify({"error": str(e)}), 500
 
 
+@ebay_bp.route('/api/ebay/test-message')
+def ebay_test_message():
+    """メッセージ送信テスト（1件だけ試す）"""
+    order_id      = "21-14803-88338"
+    item_id       = "336643762779"
+    buyer_username = "roro10101"
+    token = get_ebay_user_token()
+    if not token:
+        return jsonify({"error": "トークン取得失敗"})
+    safe_body = "Hi roro10101, this is a test message. Please ignore.".replace('&','&amp;')
+    xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<AddMemberMessageAAQtoPartnerRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>{item_id}</ItemID>
+  <MemberMessage>
+    <Body>{safe_body}</Body>
+    <RecipientID>{buyer_username}</RecipientID>
+    <Subject>Test</Subject>
+  </MemberMessage>
+</AddMemberMessageAAQtoPartnerRequest>"""
+    resp = requests.post(
+        "https://api.ebay.com/ws/api.dll",
+        headers={
+            "X-EBAY-API-CALL-NAME": "AddMemberMessageAAQtoPartner",
+            "X-EBAY-API-SITEID": "0",
+            "X-EBAY-API-COMPATIBILITY-LEVEL": "967",
+            "X-EBAY-API-IAF-TOKEN": token,
+            "Content-Type": "text/xml",
+        },
+        data=xml_body.encode("utf-8"),
+        timeout=10,
+    )
+    return jsonify({"status": resp.status_code, "response": resp.text[:1000]})
+
+
 @ebay_bp.route('/api/ebay/debug-sync')
 def ebay_debug_sync():
     """同期時に何が起きているか確認用"""
