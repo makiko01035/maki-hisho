@@ -471,7 +471,8 @@ async function syncOrders() {
         const res  = await fetch('/api/ebay/sync');
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        showToast(`同期完了！ 新規 ${data.added} 件追加`);
+        const msgInfo = data.auto_sent > 0 ? ` / ✉️ ${data.auto_sent}件に自動送信` : '';
+        showToast(`同期完了！ 新規 ${data.added} 件追加${msgInfo}`);
         await loadData();
     } catch(e) {
         showToast('同期失敗: ' + e.message);

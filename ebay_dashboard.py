@@ -16,6 +16,7 @@ EBAY_MGMT_HEADERS    = [
     "item_id", "order_id", "title", "sale_price_usd", "sale_date",
     "purchase_price_jpy", "shipping_method", "shipping_cost_jpy",
     "fx_rate", "ebay_fee_jpy", "profit_jpy", "completed", "notes",
+    "buyer_username", "msg_sent",
 ]
 
 
@@ -35,22 +36,21 @@ def get_ebay_user_token():
     return resp.json().get("access_token")
 
 
-def send_buyer_message(order_id, item_id, tracking_number=""):
-    """発送後バイヤーへ感謝＋フィードバック依頼メッセージを送信"""
+def send_buyer_message(order_id, item_id, tracking_number="", buyer_username=""):
+    """発送後バイヤーへ感謝＋フィードバック依頼メッセージを送信（Trading API使用）"""
     token = get_ebay_user_token()
     if not token:
         return False, "eBayトークン取得失敗"
 
-    # バイヤーのusername取得
-    r = requests.get(
-        f"https://api.ebay.com/sell/fulfillment/v1/order/{urllib.parse.quote(order_id, safe='')}",
-        headers={"Authorization": f"Bearer {token}"},
-        timeout=10,
-    )
-    order_data = r.json()
-    buyer_username = order_data.get("buyer", {}).get("username", "")
     if not buyer_username:
-        return False, f"バイヤー名取得失敗: {str(order_data)[:200]}"
+        r = requests.get(
+            f"https://api.ebay.com/sell/fulfillment/v1/order/{urllib.parse.quote(order_id, safe='')}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        buyer_username = r.json().get("buyer", {}).get("username", "")
+    if not buyer_username:
+        return False, "バイヤー名取得失敗"
 
     tracking_line = f"\nTracking number: {tracking_number}" if tracking_number else ""
     body = (
@@ -62,28 +62,35 @@ def send_buyer_message(order_id, item_id, tracking_number=""):
         f"Thank you again and have a wonderful day!\n"
         f"Best regards,\nMaki"
     )
+    safe_body = body.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<AddMemberMessageAAQtoPartnerRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>{item_id}</ItemID>
+  <MemberMessage>
+    <Body>{safe_body}</Body>
+    <RecipientID>{buyer_username}</RecipientID>
+    <Subject>Thank you for your purchase! / Item shipped</Subject>
+  </MemberMessage>
+</AddMemberMessageAAQtoPartnerRequest>"""
 
     resp = requests.post(
-        "https://api.ebay.com/post-order/v2/conversation",
+        "https://api.ebay.com/ws/api.dll",
         headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "X-EBAY-C-MARKETPLACE-ID": "EBAY_US",
+            "X-EBAY-API-CALL-NAME": "AddMemberMessageAAQtoPartner",
+            "X-EBAY-API-SITEID": "0",
+            "X-EBAY-API-COMPATIBILITY-LEVEL": "967",
+            "X-EBAY-API-IAF-TOKEN": token,
+            "Content-Type": "text/xml",
         },
-        json={
-            "recipientId": buyer_username,
-            "orderId": order_id,
-            "itemId": item_id,
-            "body": body,
-            "subject": "Thank you for your purchase! / Item shipped",
-        },
+        data=xml_body.encode("utf-8"),
         timeout=10,
     )
 
-    if resp.status_code in (200, 201):
+    if "Ack>Success" in resp.text or "Ack>Warning" in resp.text:
         return True, "送信成功"
     else:
-        return False, f"送信失敗 ({resp.status_code}): {resp.text[:300]}"
+        return False, f"送信失敗: {resp.text[:300]}"
 
 
 def get_sheets_creds():
@@ -259,28 +266,58 @@ def ebay_sync_api():
         service = build("sheets", "v4", credentials=creds)
         ensure_ebay_mgmt_sheet(service)
 
-        existing = service.spreadsheets().values().get(
+        # 既存行を全列読み込み（msg_sent判定のため）
+        existing_result = service.spreadsheets().values().get(
             spreadsheetId=EBAY_MGMT_SHEET_ID,
-            range=f"{EBAY_MGMT_SHEET_NAME}!B2:B1000",
+            range=f"{EBAY_MGMT_SHEET_NAME}!A2:O1000",
+            valueRenderOption="UNFORMATTED_VALUE",
         ).execute()
-        existing_ids = {row[0] for row in existing.get("values", []) if row}
+        existing_rows = existing_result.get("values", [])
+        existing_map = {}
+        for i, row in enumerate(existing_rows):
+            if len(row) > 1:
+                existing_map[row[1]] = {
+                    "row_num":       i + 2,
+                    "item_id":       row[0] if row else "",
+                    "buyer_username": row[13] if len(row) > 13 else "",
+                    "msg_sent":      row[14] if len(row) > 14 else "",
+                }
 
         new_rows = []
+        auto_sent = []
+        sent_this_sync = set()
+
         for order in ebay_orders:
-            order_id = order.get("orderId", "")
-            if order_id in existing_ids:
-                continue
-            sale_date   = (order.get("creationDate") or "")[:10]
-            total_price = (order.get("pricingSummary") or {}).get("total", {}).get("value", "0")
+            order_id           = order.get("orderId", "")
+            fulfillment_status = order.get("orderFulfillmentStatus", "")
+            buyer_username     = order.get("buyer", {}).get("username", "")
+            sale_date          = (order.get("creationDate") or "")[:10]
+            total_price        = (order.get("pricingSummary") or {}).get("total", {}).get("value", "0")
+
             for item in order.get("lineItems", []):
-                new_rows.append([
-                    item.get("legacyItemId", ""),
-                    order_id,
-                    item.get("title", ""),
-                    total_price,
-                    sale_date,
-                    "", "", "", "155", "", "", "FALSE", "",
-                ])
+                item_id = item.get("legacyItemId", "")
+                if order_id not in existing_map:
+                    new_rows.append([
+                        item_id, order_id, item.get("title", ""),
+                        total_price, sale_date,
+                        "", "", "", "155", "", "", "FALSE", "",
+                        buyer_username, "FALSE",
+                    ])
+                elif (fulfillment_status == "FULFILLED"
+                      and existing_map[order_id]["msg_sent"] != "TRUE"
+                      and order_id not in sent_this_sync):
+                    info   = existing_map[order_id]
+                    uname  = info["buyer_username"] or buyer_username
+                    ok, _  = send_buyer_message(order_id, info["item_id"] or item_id, buyer_username=uname)
+                    if ok:
+                        sent_this_sync.add(order_id)
+                        auto_sent.append(order_id)
+                        service.spreadsheets().values().update(
+                            spreadsheetId=EBAY_MGMT_SHEET_ID,
+                            range=f"{EBAY_MGMT_SHEET_NAME}!N{info['row_num']}:O{info['row_num']}",
+                            valueInputOption="RAW",
+                            body={"values": [[uname, "TRUE"]]},
+                        ).execute()
 
         if new_rows:
             service.spreadsheets().values().append(
@@ -291,7 +328,7 @@ def ebay_sync_api():
                 body={"values": new_rows},
             ).execute()
 
-        return jsonify({"added": len(new_rows), "fetched": len(ebay_orders)})
+        return jsonify({"added": len(new_rows), "fetched": len(ebay_orders), "auto_sent": len(auto_sent)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
