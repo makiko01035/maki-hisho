@@ -60,6 +60,44 @@ _FALLBACK_HOOKS = [
     "旅行の準備で「これ買ってよかった」ってなったのが",
 ]
 
+# threads_guide.html の冒頭フック集（カテゴリ別）。使い回し感を減らすため全カテゴリからランダム選択
+_HOOK_CATEGORIES = {
+    '驚き・発見系': [
+        "正直ノーマークだった。", "完全ノーマークだった、", "事件です。", "天才やん...",
+        "信じられないんですが、", "大変なことが起こりました", "センスいい人しかきづいてないけど、",
+    ],
+    '共感・呼びかけ系': _FALLBACK_HOOKS + [
+        "出産前に知りたかった...", "3年悩んだアレ、1日で解決した。", "今すぐやめて！！",
+        "勘違いしている人が多いですが、", "100回以上言ってるけど、",
+    ],
+    '愛用・推し系': [
+        "私が愛してやまない、", "私の推しの、", "これ内緒にして欲しいのですが、",
+        "ずっと我慢してたけど買った。",
+    ],
+    '価格・お得系': [
+        "値段バグなんよ...", "これで1,000円台？", "価格見て二度見した", "マラソンで価格おかしいことになってる",
+    ],
+    '口コミ・実績系': [
+        "楽天1位、納得🙂‍↕️", "SNSでバズってた理由が分かる...", "口コミ見たら泣いた",
+        "★4.8の理由、見ればわかる", "口コミに『もっと早く買えば』多すぎ", "低評価レビューが参考になる...",
+    ],
+    '緊急性系': [
+        "前回は3日で売り切れてた😭", "再販待ってた人、今出てる", "在庫残りわずかって出てる", "クーポン今日まで！！",
+    ],
+}
+_ALL_HOOKS = [h for hooks in _HOOK_CATEGORIES.values() for h in hooks]
+
+# コメント欄の誘導フレーズ（「こちら」系はリーチが弱いのでNG＝threads_guide.html）
+_LINK_PHRASES = [
+    "楽天1位、納得🙂‍↕️", "SNSでバズってた理由が分かる...", "口コミ見たら泣いた", "★4.8の理由、見ればわかる",
+    "値段バグなんよ...", "価格見て二度見した", "マラソンで価格おかしいことになってる",
+    "前回は3日で売り切れてた😭", "再販待ってた人、今出てる", "在庫残りわずかって出てる",
+]
+
+
+def _link_reply_text(url):
+    return f"{random.choice(_LINK_PHRASES)}\n{url}\n[楽天PR]"
+
 _FALLBACK_AFF_GENRES = [
     {'name': 'シアーパーカー・UVカット', 'keyword': 'シアーパーカー UVカット 羽織り レディース'},
     {'name': '折りたたみ日傘',           'keyword': '日傘 折りたたみ 完全遮光 軽量 UVカット'},
@@ -244,14 +282,14 @@ def run_writer():
         good_hooks     = feedback.get('good_hooks', [])
         is_marathon    = research.get('marathon_boost', False)
 
-        # 強化期（楽天マラソン）は生成数を2倍
-        morning_count = 14 if is_marathon else 7
-        aff_count     = 14 if is_marathon else 7
+        # 1日5投稿（朝1・アフィ4）＋休日朝1本分。強化期（楽天マラソン）は生成数を2倍
+        morning_count = 18 if is_marathon else 9
+        aff_count     = 56 if is_marathon else 28
 
         ai = _client()
         posts = []
 
-        # ---- 朝つぶやき（通常7本・強化期14本）----
+        # ---- 朝つぶやき（通常9本・強化期18本）----
         m_prompt = (
             f"今週テーマ：{weekly_theme}　フックヒント：{hook_hint}\n"
             f"参考テーマ：{', '.join(morning_themes)}\n"
@@ -264,21 +302,25 @@ def run_writer():
             'JSON形式のみで出力：[{"type":"morning","body":"投稿文","theme":"テーマ"}, ...]'
         )
         r = ai.messages.create(
-            model='claude-haiku-4-5-20251001', max_tokens=3000 if is_marathon else 1500,
+            model='claude-haiku-4-5-20251001', max_tokens=4000 if is_marathon else 2000,
             messages=[{'role': 'user', 'content': m_prompt}]
         )
         mt = re.search(r'\[.*\]', r.content[0].text, re.DOTALL)
         if mt:
             posts.extend(json.loads(mt.group()))
 
-        # ---- アフィ投稿（通常7本・強化期14本）楽天API → Claude生成 ----
-        # 強化期はキーワードをループして2周する
+        # ---- アフィ投稿（通常28本・強化期56本）楽天API → Claude生成 ----
+        # ジャンル数より必要数が多い場合はキーワードを周回して埋める
         try:
             from blog_yakuzen import search_rakuten_items
         except ImportError:
             search_rakuten_items = None
 
-        aff_kw_list = (aff_keywords * 2)[:aff_count] if is_marathon else aff_keywords[:aff_count]
+        if aff_keywords:
+            repeat = (aff_count // len(aff_keywords)) + 1
+            aff_kw_list = (aff_keywords * repeat)[:aff_count]
+        else:
+            aff_kw_list = []
         for i, kw in enumerate(aff_kw_list):
             try:
                 item = None
@@ -287,7 +329,7 @@ def run_writer():
                     if items:
                         item = random.choice(items)
 
-                hook = _FALLBACK_HOOKS[i % len(_FALLBACK_HOOKS)]
+                hook = random.choice(_ALL_HOOKS)
 
                 if item:
                     a_prompt = (
@@ -630,7 +672,7 @@ def run_poster_aff():
             if post_id:
                 time.sleep(5)
                 if post.get('url'):
-                    _post(f"↓ 商品はこちら\n{post['url']}\n[楽天PR]", reply_to_id=post_id)
+                    _post(_link_reply_text(post['url']), reply_to_id=post_id)
                 post.update({'posted': True, 'posted_at': datetime.now().isoformat(), 'post_id': post_id})
                 _save(STOCK_APPROVED_PATH, approved)
                 _log_post(post)
@@ -645,6 +687,19 @@ def run_poster_aff():
         _fallback_aff()
 
 
+def run_poster_aff_boost():
+    """5と0のつく日・楽天マラソン期のブースト投稿。対象日以外は何もしない"""
+    now = datetime.now(_JST)
+    is_marathon = 15 <= now.day <= 25
+    boost_days = (5, 10, 15, 20, 25, 30)
+    tomorrow_day = (now + timedelta(days=1)).day
+    is_5_0_boost = now.day in boost_days or tomorrow_day in boost_days
+    if not (is_marathon or is_5_0_boost):
+        return
+    print(f"[koharu] boost day (marathon={is_marathon}, 5_0={is_5_0_boost}): posting extra")
+    run_poster_aff()
+
+
 def _fallback_aff():
     """ストック切れ時：楽天APIでその場生成して投稿"""
     try:
@@ -654,7 +709,7 @@ def _fallback_aff():
         if not items:
             return
         item = random.choice(items)
-        hook = random.choice(_FALLBACK_HOOKS)
+        hook = random.choice(_ALL_HOOKS)
         prompt = (
             f"商品名：{item['name'][:40]}\n価格：{item['price']}円\n\n"
             f"こはるままのThreads投稿文。冒頭は「{hook}」で始める。\n"
@@ -668,7 +723,7 @@ def _fallback_aff():
         post_id = _post(body)
         if post_id and item.get('url'):
             time.sleep(5)
-            _post(f"↓ 商品はこちら\n{item['url']}\n[楽天PR]", reply_to_id=post_id)
+            _post(_link_reply_text(item['url']), reply_to_id=post_id)
         print(f"[koharu] fallback aff done: {body[:30]}")
     except Exception as e:
         print(f"[koharu] _fallback_aff error: {e}")

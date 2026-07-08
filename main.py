@@ -12,6 +12,7 @@ from sns_engine_koharu import (
     run_writer     as koharu_writer,
     run_poster_morning as koharu_poster_morning,
     run_poster_aff     as koharu_poster_aff,
+    run_poster_aff_boost as koharu_poster_aff_boost,
     run_collector  as koharu_collector,
     run_analyst    as koharu_analyst,
     run_monitor    as koharu_monitor,
@@ -164,9 +165,15 @@ scheduler.add_job(post_kvision_card_image, 'cron', day_of_week='sun', hour=11, m
 scheduler.add_job(koharu_researcher, 'cron', day_of_week='mon', hour=5, minute=0)
 # ② ライター：月曜 06:00（投稿案生成→AI採点→LINEで確認依頼）
 scheduler.add_job(koharu_writer, 'cron', day_of_week='mon', hour=6, minute=0)
-# ③ ポスター：承認済みストックから投稿（ストック切れ時はフォールバック自動生成）
-scheduler.add_job(koharu_poster_morning, 'cron', hour=6, minute=30, jitter=7200)   # 6:30〜8:30のランダム
-scheduler.add_job(koharu_poster_aff,     'cron', hour=19, minute=0,  jitter=7200)   # 19:00〜21:00のランダム
+# ③ ポスター：1日5投稿（threads_guide.htmlの推奨時間帯）。jitterで日によって時刻をずらしBAN対策
+scheduler.add_job(koharu_poster_morning, 'cron', hour=7,  minute=30, jitter=1200)  # 7:30±20分
+scheduler.add_job(koharu_poster_aff,     'cron', hour=12, minute=30, jitter=1200)  # 12:30±20分
+scheduler.add_job(koharu_poster_aff,     'cron', hour=17, minute=30, jitter=1200)  # 17:30±20分
+scheduler.add_job(koharu_poster_aff,     'cron', hour=20, minute=0,  jitter=900)   # 20:00±15分（ゴールデンタイム）
+scheduler.add_job(koharu_poster_aff,     'cron', hour=22, minute=0,  jitter=1200)  # 22:00±20分
+scheduler.add_job(koharu_poster_morning, 'cron', day_of_week='sat,sun', hour=9, minute=0, jitter=1200)  # 休日9:00追加
+# 5と0のつく日・楽天マラソン期はブースト投稿（対象日以外は内部でスキップ）
+scheduler.add_job(koharu_poster_aff_boost, 'cron', hour=15, minute=0, jitter=1200)
 # カード・ROOM誘導は既存関数を継続
 scheduler.add_job(post_koharu_threads_card,      'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 scheduler.add_job(post_koharu_threads_room_intro,'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
