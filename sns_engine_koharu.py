@@ -3,7 +3,7 @@ sns_engine_koharu.py
 こはるまま SNS自動化エンジン（6ロール）
 
 ① リサーチャー   月曜 05:00  今週のテーマ・ジャンル候補を生成
-② ライター      月曜 06:00  投稿案生成 → AI採点（70点以上のみ）→ LINEで確認依頼
+② ライター      月曜 06:00  投稿案生成 → AI採点 → 80点以上は自動承認・70〜79点はLINEで確認依頼
 ③ ポスター      スケジューラ  承認済みストックから連投防止で投稿
 ④ コレクター    毎日 23:00  Threads APIでパフォーマンスデータ取得
 ⑤ アナリスト    日曜 20:00  週次分析 → LINEレポート → ライターへフィードバック
@@ -320,24 +320,36 @@ def run_writer():
                 print(f"[koharu] aff gen error ({kw.get('name')}): {e}")
 
         # ---- 採点フィルタ ----
+        # 80点以上は自動承認（確認不要）、70〜79点はLINE確認待ち、70点未満は再生成
+        auto_approved = []
         approved = []
         rejected = 0
         for post in posts:
             score, fb = _score_post(post['body'], post['type'], ai)
             post['score'] = score
-            if score >= 70:
+            if score >= 80:
+                auto_approved.append(post)
+            elif score >= 70:
                 approved.append(post)
             else:
                 regen = _regenerate(post, fb, ai)
                 if regen:
                     new_score, _ = _score_post(regen['body'], regen['type'], ai)
                     regen['score'] = new_score
-                    if new_score >= 70:
+                    if new_score >= 80:
+                        auto_approved.append(regen)
+                    elif new_score >= 70:
                         approved.append(regen)
                     else:
                         rejected += 1
                 else:
                     rejected += 1
+
+        # 80点以上は即・承認済みストックへ
+        if auto_approved:
+            approved_stock = _load(STOCK_APPROVED_PATH, {'posts': []})
+            approved_stock.setdefault('posts', []).extend(auto_approved)
+            _save(STOCK_APPROVED_PATH, approved_stock)
 
         _save(STOCK_PENDING_PATH, {
             'created_at': datetime.now().isoformat(),
@@ -346,33 +358,48 @@ def run_writer():
             'rejected_count': rejected,
         })
 
-        # LINE確認依頼
+        # LINE確認依頼（70〜79点の分だけ）
+        auto_morning = [p for p in auto_approved if p['type'] == 'morning']
+        auto_aff     = [p for p in auto_approved if p['type'] == 'aff']
         morning_posts = [p for p in approved if p['type'] == 'morning']
         aff_posts     = [p for p in approved if p['type'] == 'aff']
 
-        morning_prev = '\n'.join([
-            f"  {i+1}. {p['body'][:30]}… ({p['score']}点)"
-            for i, p in enumerate(morning_posts[:3])
-        ])
-        aff_prev = '\n'.join([
-            f"  {len(morning_posts)+i+1}. {p['body'][:30]}… ({p['score']}点)"
-            for i, p in enumerate(aff_posts[:3])
-        ])
-
         marathon_label = "🔥 楽天マラソン強化期" if is_marathon else "通常期"
-        msg = (
-            f"📱 今週のこはるまま投稿案 完成！【{marathon_label}】\n\n"
-            f"テーマ：{weekly_theme}\n"
-            f"生成：{len(approved)}本（採点落ち：{rejected}本）\n"
-            f"  └ 朝つぶやき{len(morning_posts)}本 ＋ アフィ{len(aff_posts)}本\n\n"
-            f"【朝つぶやき（先頭3件）】\n{morning_prev}\n\n"
-            f"【アフィ投稿（先頭3件）】\n{aff_prev}\n\n"
-            f"✅ 全部OKなら「こはるままOK」\n"
-            f"番号指定で除外する場合「こはるまま2,4はNG」\n"
-            f"件数確認は「こはるまま確認」"
-        )
+
+        if not approved:
+            # 確認待ちがゼロ＝全部自動承認 or 落選のみ。確認依頼は送らない
+            msg = (
+                f"📱 今週のこはるまま投稿 自動承認完了！【{marathon_label}】\n\n"
+                f"テーマ：{weekly_theme}\n"
+                f"自動承認（80点以上）：{len(auto_approved)}本"
+                f"（朝{len(auto_morning)}・アフィ{len(auto_aff)}）\n"
+                f"採点落ち：{rejected}本\n\n"
+                "操作不要でそのまま投稿されます。"
+            )
+        else:
+            morning_prev = '\n'.join([
+                f"  {i+1}. {p['body'][:30]}… ({p['score']}点)"
+                for i, p in enumerate(morning_posts[:3])
+            ])
+            aff_prev = '\n'.join([
+                f"  {len(morning_posts)+i+1}. {p['body'][:30]}… ({p['score']}点)"
+                for i, p in enumerate(aff_posts[:3])
+            ])
+            msg = (
+                f"📱 今週のこはるまま投稿案【{marathon_label}】\n\n"
+                f"テーマ：{weekly_theme}\n"
+                f"自動承認（80点以上・確認不要）：{len(auto_approved)}本\n"
+                f"確認待ち（70〜79点）：{len(approved)}本"
+                f"（朝{len(morning_posts)}・アフィ{len(aff_posts)}）\n"
+                f"採点落ち：{rejected}本\n\n"
+                f"【朝つぶやき（先頭3件）】\n{morning_prev}\n\n"
+                f"【アフィ投稿（先頭3件）】\n{aff_prev}\n\n"
+                f"✅ 全部OKなら「こはるままOK」\n"
+                f"番号指定で除外する場合「こはるまま2,4はNG」\n"
+                f"件数確認は「こはるまま確認」"
+            )
         _send_line(msg)
-        print(f"[koharu] writer done: {len(approved)} posts, {rejected} rejected")
+        print(f"[koharu] writer done: auto={len(auto_approved)} pending={len(approved)} rejected={rejected}")
 
     except Exception as e:
         import traceback
