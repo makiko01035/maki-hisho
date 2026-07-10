@@ -710,6 +710,7 @@ def _fallback_aff():
         genre = random.choice(_FALLBACK_AFF_GENRES)
         items = search_rakuten_items(genre['keyword'], hits=5)
         if not items:
+            _send_line(f"⚠️ こはるまま(Threads) アフィ投稿スキップ（楽天API取得失敗）\nジャンル：{genre['name']}")
             return
         item = random.choice(items)
         hook = random.choice(_ALL_HOOKS)
