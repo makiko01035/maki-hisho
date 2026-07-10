@@ -14,6 +14,8 @@ from sns_engine_koharu import (
     run_researcher as koharu_researcher,
     run_writer as koharu_writer,
     run_analyst as koharu_analyst,
+    run_poster_morning as koharu_engine_poster_morning_fn,
+    run_poster_aff as koharu_engine_poster_aff_fn,
 )
 from sns_engine_mako import (
     run_researcher as mako_researcher,
@@ -245,6 +247,42 @@ def koharu_engine_writer_now():
         return '✅ こはるままライター起動！数分後にLINEに投稿案が届きます。'
     except Exception as e:
         return f'❌ {e}', 500
+
+
+@debug_bp.route('/koharu-engine-poster-morning-now')
+def koharu_engine_poster_morning_now():
+    """こはるままエンジン：本番スケジューラと同じ朝投稿関数を今すぐ実行（手動テスト・実際にThreadsに投稿されます）"""
+    import traceback, io, sys
+    buf = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = buf
+    try:
+        koharu_engine_poster_morning_fn()
+        output = buf.getvalue()
+        sys.stdout = old_stdout
+        return f'<pre>✅ 完了\n\n{output}</pre>'
+    except Exception as e:
+        output = buf.getvalue()
+        sys.stdout = old_stdout
+        return f'<pre>❌ エラー: {e}\n\n{traceback.format_exc()}\n\nログ:\n{output}</pre>', 500
+
+
+@debug_bp.route('/koharu-engine-poster-aff-now')
+def koharu_engine_poster_aff_now():
+    """こはるままエンジン：本番スケジューラと同じアフィ投稿関数を今すぐ実行（手動テスト・実際にThreadsに投稿されます）"""
+    import traceback, io, sys
+    buf = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = buf
+    try:
+        koharu_engine_poster_aff_fn()
+        output = buf.getvalue()
+        sys.stdout = old_stdout
+        return f'<pre>✅ 完了\n\n{output}</pre>'
+    except Exception as e:
+        output = buf.getvalue()
+        sys.stdout = old_stdout
+        return f'<pre>❌ エラー: {e}\n\n{traceback.format_exc()}\n\nログ:\n{output}</pre>', 500
 
 
 @debug_bp.route('/koharu-engine-researcher-now')
