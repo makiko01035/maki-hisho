@@ -114,7 +114,8 @@ _FALLBACK_AFF_GENRES = [
 
 def _client():
     import anthropic
-    return anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY', ''))
+    # timeout未設定だと通信が詰まった際に無限に待ち続けるため明示的に設定
+    return anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY', ''), timeout=30.0)
 
 
 def _send_line(message):
