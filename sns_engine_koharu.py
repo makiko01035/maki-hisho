@@ -283,8 +283,10 @@ def run_writer():
         is_marathon    = research.get('marathon_boost', False)
 
         # 1日5投稿（朝1・アフィ4）＋休日朝1本分。強化期（楽天マラソン）は生成数を2倍
+        # アフィ生成はAI+楽天APIを1件ずつ直列で叩くため重い。28本だと同期実行でタイムアウトしたため18本に抑える
+        # （4枠×7日=28理論値より少ないが、足りない分は_fallback_affが即席生成で埋める）
         morning_count = 18 if is_marathon else 9
-        aff_count     = 56 if is_marathon else 28
+        aff_count     = 36 if is_marathon else 18
 
         ai = _client()
         posts = []
