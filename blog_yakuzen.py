@@ -611,7 +611,7 @@ def search_rakuten_items(keyword, hits=3):
             'accessKey': RAKUTEN_ACCESS_KEY,
         }
         res = requests.get(
-            'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401',
+            'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701',
             params=params,
             headers={'Referer': 'http://foodmakehealth.com', 'Origin': 'https://maki-hisho.onrender.com'},
             timeout=10

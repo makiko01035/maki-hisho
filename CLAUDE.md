@@ -52,6 +52,7 @@
 | Notion | 連携済み（2026-04-15） | `C:/Users/nyank/.claude/.mcp.json` に設定済み |
 | Playwright | 連携済み（2026-05-05） | `C:/Users/nyank/.claude/.mcp.json` に設定済み |
 | Higgsfield | 連携済み（2026-05-07） | `C:/Users/nyank/.claude.json` に設定済み・画像生成用 |
+| Keepa | 連携済み（2026-06-09） | `C:/Users/nyank/.claude/.mcp.json` に設定済み・Amazon価格推移・仕入れ判断用 |
 
 ### Playwright MCPの使い方
 - **サイトの表示確認・レイアウト確認は必ずPlaywright MCPを使う**
@@ -220,7 +221,7 @@ python post_sekisui_direct.py "C:\path\to\記事.md"
 
 ### 楽天アフィリエイトAPI（睡眠ブログ自動挿入）
 - 実装場所：`blog_yakuzen.py`の`search_rakuten_items()`
-- エンドポイント：`https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401`（新仕様）
+- エンドポイント：`https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260701`（2026-07-11に旧バージョン20260401が失敗するようになり判明・更新。楽天は日付でAPIバージョン管理しており定期的に見直しが必要）
 - 必須ヘッダー：`Referer: http://foodmakehealth.com` と `Origin: https://maki-hisho.onrender.com`（両方ないと403エラー）
 - 動作：記事リライト・新規作成後にAIがキーワードを抽出→楽天APIで商品3件取得→記事末尾にカード形式で自動挿入
 
