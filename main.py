@@ -167,13 +167,14 @@ scheduler.add_job(koharu_researcher, 'cron', day_of_week='mon', hour=5, minute=0
 scheduler.add_job(koharu_writer, 'cron', day_of_week='mon', hour=6, minute=0)
 # ③ ポスター：1日5投稿（threads_guide.htmlの推奨時間帯）。jitterで日によって時刻をずらしBAN対策
 scheduler.add_job(koharu_poster_morning, 'cron', hour=7,  minute=30, jitter=1200)  # 7:30±20分
-scheduler.add_job(koharu_poster_aff,     'cron', hour=12, minute=30, jitter=1200)  # 12:30±20分
-scheduler.add_job(koharu_poster_aff,     'cron', hour=17, minute=30, jitter=1200)  # 17:30±20分
-scheduler.add_job(koharu_poster_aff,     'cron', hour=20, minute=0,  jitter=900)   # 20:00±15分（ゴールデンタイム）
-scheduler.add_job(koharu_poster_aff,     'cron', hour=22, minute=0,  jitter=1200)  # 22:00±20分
 scheduler.add_job(koharu_poster_morning, 'cron', day_of_week='sat,sun', hour=9, minute=0, jitter=1200)  # 休日9:00追加
-# 5と0のつく日・楽天マラソン期はブースト投稿（対象日以外は内部でスキップ）
-scheduler.add_job(koharu_poster_aff_boost, 'cron', hour=15, minute=0, jitter=1200)
+# 2026-07-11: 楽天商品検索APIがRenderサーバーからのアクセスをブロック/ハングしており
+# アフィ投稿4枠が全滅＋失敗通知が連発するため一時停止中。楽天API復旧確認後に再開する
+# scheduler.add_job(koharu_poster_aff,     'cron', hour=12, minute=30, jitter=1200)  # 12:30±20分
+# scheduler.add_job(koharu_poster_aff,     'cron', hour=17, minute=30, jitter=1200)  # 17:30±20分
+# scheduler.add_job(koharu_poster_aff,     'cron', hour=20, minute=0,  jitter=900)   # 20:00±15分（ゴールデンタイム）
+# scheduler.add_job(koharu_poster_aff,     'cron', hour=22, minute=0,  jitter=1200)  # 22:00±20分
+# scheduler.add_job(koharu_poster_aff_boost, 'cron', hour=15, minute=0, jitter=1200)  # 5と0のつく日・楽天マラソン期ブースト
 # カード・ROOM誘導は既存関数を継続
 scheduler.add_job(post_koharu_threads_card,      'cron', day_of_week='wed,sat', hour=12, minute=0, jitter=3600)
 scheduler.add_job(post_koharu_threads_room_intro,'cron', day_of_week='thu', hour=19, minute=0, jitter=1800)
