@@ -635,7 +635,10 @@ def debug_rakuten_ip():
     try:
         r = requests.get(url, headers=headers, timeout=15)
         elapsed = round(_time.time() - t0, 2)
-        return {'status_code': r.status_code, 'elapsed_sec': elapsed, 'bytes': len(r.content)}
+        return {
+            'status_code': r.status_code, 'elapsed_sec': elapsed, 'bytes': len(r.content),
+            'headers': dict(r.headers), 'body_preview': r.content[:500].decode('utf-8', errors='replace'),
+        }
     except Exception as e:
         elapsed = round(_time.time() - t0, 2)
         return {'error': str(e), 'elapsed_sec': elapsed}, 500
