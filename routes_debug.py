@@ -622,6 +622,25 @@ def debug_rakuten_fetch():
         return {'error': str(e), 'traceback': traceback.format_exc()}, 500
 
 
+@debug_bp.route('/debug-rakuten-ip')
+def debug_rakuten_ip():
+    """RenderのクラウドIPから楽天市場に単発リクエストが速く通るか確認する軽量デバッグ用
+    （/debug-rakuten-fetchが120秒タイムアウトで落ちた原因切り分け・2026-07-12）"""
+    import time as _time
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    }
+    url = request.args.get('url', 'https://www.rakuten.co.jp/pochibell/')
+    t0 = _time.time()
+    try:
+        r = requests.get(url, headers=headers, timeout=15)
+        elapsed = round(_time.time() - t0, 2)
+        return {'status_code': r.status_code, 'elapsed_sec': elapsed, 'bytes': len(r.content)}
+    except Exception as e:
+        elapsed = round(_time.time() - t0, 2)
+        return {'error': str(e), 'elapsed_sec': elapsed}, 500
+
+
 @debug_bp.route('/debug-amazon-ip')
 def debug_amazon_ip():
     """RenderのクラウドIPからAmazon.co.jpスクレイピングが通るか確認するデバッグ用エンドポイント
