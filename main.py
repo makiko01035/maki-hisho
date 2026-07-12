@@ -7,6 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 from clients import line_bot_api, handler
 from ebay_handler import send_daily_purchase_candidates
+from sourcing_calendar import run_sourcing_scan
 from sns_engine_koharu import (
     run_researcher as koharu_researcher,
     run_writer     as koharu_writer,
@@ -217,6 +218,9 @@ scheduler.add_job(
     lambda: send_daily_purchase_candidates(os.environ.get('LINE_USER_ID', '')),
     'cron', hour=5, minute=30,
 )
+# 5・10のつく日 朝4:30：電脳仕入れカレンダー（楽天/Yahoo!店舗をローテーションでAmazon転売候補スキャン、LINE通知なし・スプシ確認のみ）
+scheduler.add_job(run_sourcing_scan, 'cron', day='5,10,15,20,25,30', hour=4, minute=30)
+
 def _delayed_scheduler_start():
     time.sleep(120)
     scheduler.start()

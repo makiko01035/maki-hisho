@@ -64,8 +64,9 @@ UA_HEADERS = {
     'Accept-Language': 'ja-JP,ja;q=0.9',
 }
 
-SCREEN_PROFIT_THRESHOLD = 500   # 簡易計算でこれ未満は候補から外す（簡易⇔精密のズレを見込んで最終ラインより低めに設定）
-FINAL_PROFIT_THRESHOLD = 1000   # Keepa精密計算後の最終採用ライン（ポイント抜きベース。ポイント込みで積極的検討する基準として2026-07-12にまきさんと合意）
+SCREEN_PROFIT_THRESHOLD = 150    # 簡易計算でこれ未満は候補から外す（精密計算とのズレを見込んで最終ラインより低めに設定）
+FINAL_PROFIT_THRESHOLD = 300     # Keepa精密計算後の最終採用ライン（利益額）
+FINAL_PROFIT_RATE_THRESHOLD = 0.10  # 最終採用ライン（利益率＝利益/Amazon売価）。電脳仕入れカレンダーと共通の閾値（2026-07-12合意）
 
 FEE_RATE_BY_CATEGORY_KEYWORD = {
     "おもちゃ": 0.08, "ホビー": 0.08, "ゲーム": 0.08,
@@ -364,6 +365,7 @@ def _profit_from_keepa_product(product, source_price):
     fba_fee = _fba_fee_for_weight(weight_g)
     referral_fee = round(amazon_price * fee_rate)
     profit = amazon_price - referral_fee - fba_fee - source_price
+    profit_rate = (profit / amazon_price) if amazon_price else 0
 
     return {
         "asin": product.get("asin"),
@@ -373,6 +375,7 @@ def _profit_from_keepa_product(product, source_price):
         "referral_fee": referral_fee,
         "fba_fee": fba_fee,
         "profit": profit,
+        "profit_rate": profit_rate,
     }
 
 
@@ -517,9 +520,9 @@ def run_url_mode(shop_url):
         if not precise:
             print(f"  Keepa取得失敗: {item['name'][:25]}")
             continue
-        print(f"  {item['name'][:25]} -> 精密利益{precise['profit']:+.0f}円 "
+        print(f"  {item['name'][:25]} -> 精密利益{precise['profit']:+.0f}円 (利益率{precise['profit_rate']*100:.1f}%) "
               f"(Amazon{precise['amazon_price']}円 - 紹介料{precise['referral_fee']}円 - FBA{precise['fba_fee']}円 - 仕入{item['price']}円)")
-        if precise["profit"] >= FINAL_PROFIT_THRESHOLD:
+        if precise["profit"] >= FINAL_PROFIT_THRESHOLD and precise["profit_rate"] >= FINAL_PROFIT_RATE_THRESHOLD:
             final_candidates.append({
                 "source_name": item["name"], "source_price": item["price"], "source_url": item["url"],
                 "jan": item["jan"], "asin": precise["asin"], "amazon_title": precise["title"],

@@ -619,6 +619,22 @@ def debug_amazon_ip():
         return {'error': str(e)}, 500
 
 
+@debug_bp.route('/sourcing-scan-now')
+def sourcing_scan_now():
+    """電脳仕入れカレンダーを今すぐバックグラウンド実行（手動テスト用）。
+    ?day=5/10/15/20/25/30 で対象グループを指定可能（省略時は本日日付から判定）。
+    ?store=<店舗名> で1店舗だけに絞ってテスト可能（高速確認用）。"""
+    import threading
+    from sourcing_calendar import run_sourcing_scan
+    day = request.args.get('day', type=int)
+    store = request.args.get('store')
+    try:
+        threading.Thread(target=run_sourcing_scan, args=(day, store), daemon=True).start()
+        return f'✅ 電脳仕入れスキャン起動！（day={day or "本日"}, store={store or "グループ全店舗"}）数分〜数十分後にスプレッドシートを確認してください。Renderログでも進捗を確認できます。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @debug_bp.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
