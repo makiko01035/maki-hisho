@@ -327,6 +327,31 @@ def mako_engine_researcher_now():
         return f'❌ {e}', 500
 
 
+@debug_bp.route('/mako-posted-log')
+def mako_posted_log():
+    """MAKOの投稿済みログ（直近50件）を表示。/tmpが再起動でリセットされていないか確認用"""
+    import json as _json
+    try:
+        with open('/tmp/mako_posted_log.json', 'r', encoding='utf-8') as f:
+            data = _json.load(f)
+        return _json.dumps(data, ensure_ascii=False, indent=2)
+    except FileNotFoundError:
+        return '📭 投稿ログが存在しません（Render再起動でリセットされたか、まだ1件も投稿されていません）', 404
+    except Exception as e:
+        return f'❌ ログ読み取りエラー: {e}', 500
+
+
+@debug_bp.route('/mako-threads-token-check')
+def mako_threads_token_check():
+    """MAKOのThreadsトークン・ユーザーIDが設定されているか確認"""
+    token   = os.environ.get('MAKO_THREADS_ACCESS_TOKEN', '').strip()
+    user_id = os.environ.get('MAKO_THREADS_USER_ID', '').strip()
+    return {
+        'MAKO_THREADS_ACCESS_TOKEN_設定済み': bool(token),
+        'MAKO_THREADS_USER_ID_設定済み':      bool(user_id),
+    }
+
+
 @debug_bp.route('/mako-stock-status')
 def mako_stock_status():
     """MAKO承認待ち・承認済みストックの状態確認"""
