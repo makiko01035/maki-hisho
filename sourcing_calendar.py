@@ -93,9 +93,9 @@ def run_sourcing_scan(day_override=None, only_store=None):
         all_candidates = []
         for name, site, url in group:
             try:
-                found = _scan_store(name, site, url)
-                print(f"  [{name}] 最終候補 {len(found)}件")
-                status["per_store"][name] = {"candidates": len(found)}
+                found, counts = _scan_store(name, site, url)
+                print(f"  [{name}] 最終候補 {len(found)}件 (取得{counts['fetched']}/スクリーニング通過{counts['screened']})")
+                status["per_store"][name] = {"candidates": len(found), **counts}
                 all_candidates.extend(found)
             except Exception as e:
                 # 1店舗の失敗（サイト構造変更・ブロック等）で全体を止めない
@@ -150,7 +150,8 @@ def _scan_store(name, site, url):
                 "amazon_price": precise["amazon_price"], "referral_fee": precise["referral_fee"],
                 "fba_fee": precise["fba_fee"], "profit": precise["profit"], "profit_rate": precise["profit_rate"],
             })
-    return final
+    counts = {"fetched": len(items), "screened": len(screened)}
+    return final, counts
 
 
 def _get_sheets_service():
