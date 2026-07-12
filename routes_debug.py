@@ -598,27 +598,28 @@ def diary_debug():
 def debug_rakuten_fetch():
     """Render環境でfetch_rakuten_items/カテゴリ自動発見が実際どう動くか直接確認するデバッグ用
     （電脳仕入れカレンダーがRenderで0件しか取れない問題の切り分け・2026-07-12）"""
+    import traceback
     from ec_profit_scan import _discover_rakuten_categories, fetch_rakuten_items, UA_HEADERS
     shop_url = request.args.get('url', 'https://www.rakuten.co.jp/pochibell/')
     try:
         r = requests.get(shop_url, headers=UA_HEADERS, timeout=20)
         raw_len = len(r.content)
         html_text = r.content.decode('euc-jp', errors='ignore')
+
+        categories = _discover_rakuten_categories(shop_url)
+        items = fetch_rakuten_items(shop_url, max_pages=2)
+
+        return {
+            'top_page_status': r.status_code,
+            'top_page_raw_bytes': raw_len,
+            'top_page_decoded_len': len(html_text),
+            'category_itemnamelink_count_on_top_page': html_text.count('category_itemnamelink'),
+            'discovered_categories': categories,
+            'fetch_rakuten_items_result_count': len(items),
+            'sample_items': items[:3],
+        }
     except Exception as e:
-        return {'error': f'top page fetch failed: {e}'}, 500
-
-    categories = _discover_rakuten_categories(shop_url)
-    items = fetch_rakuten_items(shop_url, max_pages=2)
-
-    return {
-        'top_page_status': r.status_code,
-        'top_page_raw_bytes': raw_len,
-        'top_page_decoded_len': len(html_text),
-        'category_itemnamelink_count_on_top_page': html_text.count('category_itemnamelink'),
-        'discovered_categories': categories,
-        'fetch_rakuten_items_result_count': len(items),
-        'sample_items': items[:3],
-    }
+        return {'error': str(e), 'traceback': traceback.format_exc()}, 500
 
 
 @debug_bp.route('/debug-amazon-ip')
