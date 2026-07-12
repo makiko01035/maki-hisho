@@ -594,6 +594,31 @@ def diary_debug():
     return "\n".join(lines), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
 
+@debug_bp.route('/debug-amazon-ip')
+def debug_amazon_ip():
+    """RenderのクラウドIPからAmazon.co.jpスクレイピングが通るか確認するデバッグ用エンドポイント
+    （電脳仕入れカレンダーをRenderに乗せられるか判断するための一時テスト・2026-07-12）"""
+    import re as _re
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept-Language': 'ja-JP,ja;q=0.9',
+    }
+    try:
+        r = requests.get('https://www.amazon.co.jp/s?k=4902370536485', headers=headers, timeout=20)
+        has_asin = bool(_re.search(r'data-asin="[A-Z0-9]{10}"', r.text))
+        is_captcha = 'captcha' in r.text.lower() or 'automated access' in r.text.lower() or 'ロボットではありません' in r.text
+        return {
+            'status_code': r.status_code,
+            'body_length': len(r.text),
+            'found_product_asin': has_asin,
+            'looks_like_captcha_block': is_captcha,
+            'verdict': 'OK: Amazon検索が通っています' if (r.status_code == 200 and has_asin and not is_captcha)
+                       else 'NG: ブロックまたは想定外の応答です',
+        }
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @debug_bp.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
