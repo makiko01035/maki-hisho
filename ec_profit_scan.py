@@ -64,8 +64,8 @@ UA_HEADERS = {
     'Accept-Language': 'ja-JP,ja;q=0.9',
 }
 
-SCREEN_PROFIT_THRESHOLD = 150  # 簡易計算でこれ未満は候補から外す
-FINAL_PROFIT_THRESHOLD = 150   # Keepa精密計算後の最終採用ライン
+SCREEN_PROFIT_THRESHOLD = 500   # 簡易計算でこれ未満は候補から外す（簡易⇔精密のズレを見込んで最終ラインより低めに設定）
+FINAL_PROFIT_THRESHOLD = 1000   # Keepa精密計算後の最終採用ライン（ポイント抜きベース。ポイント込みで積極的検討する基準として2026-07-12にまきさんと合意）
 
 FEE_RATE_BY_CATEGORY_KEYWORD = {
     "おもちゃ": 0.08, "ホビー": 0.08, "ゲーム": 0.08,
