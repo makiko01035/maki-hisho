@@ -98,7 +98,33 @@ def detect_site(url):
 # 楽天: 商品リスト取得（JAN付き）
 # ========================
 
-def fetch_rakuten_items(shop_url, max_pages=20):
+def _discover_rakuten_categories(shop_url, limit=6):
+    """ショップTOPページ(www.rakuten.co.jp/<shop>/)には商品一覧が無く、
+    カテゴリページ(item.rakuten.co.jp/<shop>/c/<catid>/)に遷移しないと商品が取れない。
+    TOPページのHTMLからカテゴリURLを自動発見する（2026-07-12発覚・対応）。"""
+    shop_match = re.search(r'rakuten\.co\.jp/([a-zA-Z0-9_-]+)/?', shop_url)
+    shop_id = shop_match.group(1) if shop_match else None
+    if not shop_id:
+        return []
+    try:
+        r = requests.get(shop_url, headers=UA_HEADERS, timeout=20, verify=False)
+    except Exception as e:
+        print(f"  [楽天] カテゴリ発見用の接続エラー: {e}")
+        return []
+    if r.status_code != 200:
+        return []
+    html_text = r.content.decode('euc-jp', errors='ignore')
+    cat_ids = []
+    seen = set()
+    for m in re.finditer(rf'item\.rakuten\.co\.jp/{re.escape(shop_id)}/c/(\d+)', html_text):
+        cid = m.group(1)
+        if cid not in seen:
+            seen.add(cid)
+            cat_ids.append(cid)
+    return [f'https://item.rakuten.co.jp/{shop_id}/c/{cid}/' for cid in cat_ids[:limit]]
+
+
+def _fetch_rakuten_category(shop_url, max_pages=20):
     items = []
     for page in range(1, max_pages + 1):
         if page == 1:
@@ -132,11 +158,33 @@ def fetch_rakuten_items(shop_url, max_pages=20):
     return items
 
 
+def fetch_rakuten_items(shop_url, max_pages=20):
+    # ショップTOPページ（カテゴリページでない）ならカテゴリURLを自動発見して横断スキャンする
+    if not re.search(r'item\.rakuten\.co\.jp/[^/]+/c/\d+', shop_url):
+        category_urls = _discover_rakuten_categories(shop_url)
+        if category_urls:
+            print(f"  [楽天] TOPページのためカテゴリ{len(category_urls)}件を自動発見: {category_urls}")
+            pages_each = max(1, max_pages // len(category_urls))
+            items = []
+            for cat_url in category_urls:
+                items.extend(_fetch_rakuten_category(cat_url, max_pages=pages_each))
+            return items
+        print("  [楽天] カテゴリを発見できず、TOPページを直接スキャンします（通常0件になります）")
+    return _fetch_rakuten_category(shop_url, max_pages=max_pages)
+
+
 # ========================
 # Yahoo!ショッピング: 商品リスト取得（JAN付き）
 # ========================
 
 def fetch_yahoo_items(shop_url, max_pages=20):
+    # ショップTOPページには商品一覧が無いため、search.html（全商品一覧ページ）に切り替える
+    # （2026-07-12発覚・対応。すでに具体的なカテゴリ/検索ページが渡された場合はそのまま使う）
+    m = re.match(r'(https://store\.shopping\.yahoo\.co\.jp/[a-zA-Z0-9_-]+)/?(?:[?#].*)?$', shop_url)
+    if m:
+        shop_url = m.group(1) + '/search.html'
+        print(f"  [Yahoo] TOPページのためsearch.htmlに切り替え: {shop_url}")
+
     items = []
     seen_jan = set()
     for page in range(1, max_pages + 1):
