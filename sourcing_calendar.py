@@ -63,8 +63,22 @@ STORE_GROUPS = {
 }
 
 
+STATUS_LOG_FILE = "/tmp/sourcing_scan_status.json"
+
+
+def _write_status_log(status):
+    """Renderのログ画面が見えない環境からでも実行結果を確認できるよう/tmpに残す（/sourcing-scan-statusで読める）"""
+    try:
+        status["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        with open(STATUS_LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(status, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
 def run_sourcing_scan(day_override=None, only_store=None):
     """cron本体。day_override/only_storeはデバッグルートからの手動テスト用。"""
+    status = {"type": "sourcing_scan", "started_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
     try:
         target_day = day_override if day_override in STORE_GROUPS else datetime.now().day
         group = STORE_GROUPS.get(target_day, STORE_GROUPS[5])
@@ -72,25 +86,38 @@ def run_sourcing_scan(day_override=None, only_store=None):
             group = [g for g in group if g[0] == only_store] or group
 
         print(f"[電脳仕入れ] {datetime.now():%Y-%m-%d %H:%M} day={target_day} 対象店舗: {[g[0] for g in group]}")
+        status["day"] = target_day
+        status["stores"] = [g[0] for g in group]
+        status["per_store"] = {}
 
         all_candidates = []
         for name, site, url in group:
             try:
                 found = _scan_store(name, site, url)
                 print(f"  [{name}] 最終候補 {len(found)}件")
+                status["per_store"][name] = {"candidates": len(found)}
                 all_candidates.extend(found)
             except Exception as e:
                 # 1店舗の失敗（サイト構造変更・ブロック等）で全体を止めない
                 print(f"[電脳仕入れ] {name} でエラー: {e}\n{traceback.format_exc()}")
+                status["per_store"][name] = {"error": str(e)}
                 continue
 
         print(f"[電脳仕入れ] 合計最終候補 {len(all_candidates)}件")
+        status["total_candidates"] = len(all_candidates)
         if all_candidates:
             _save_to_sheet(all_candidates)
+            status["saved"] = True
         else:
             print("[電脳仕入れ] 候補なし。スプレッドシート保存はスキップ。")
+            status["saved"] = False
+        status["result"] = "completed"
     except Exception as e:
         print(f"[電脳仕入れ] run_sourcing_scan 致命的エラー: {e}\n{traceback.format_exc()}")
+        status["result"] = "fatal_error"
+        status["error"] = str(e)
+    finally:
+        _write_status_log(status)
 
 
 def _scan_store(name, site, url):
@@ -148,13 +175,15 @@ def _get_sheets_service():
     return build('sheets', 'v4', credentials=creds)  # Render(Linux)なのでSSL回避不要
 
 
-def _save_to_sheet(candidates):
-    service = _get_sheets_service()
-    today = datetime.now().strftime("%Y/%m/%d")
-    header = ["確認日", "仕入れ元店舗", "ASIN", "JAN", "Amazon商品名", "仕入れ元商品名",
-              "仕入れ元価格", "Amazon価格", "紹介料", "FBA手数料", "推定利益", "利益率(%)",
-              "仕入れ元URL", "Amazonリンク"]
+# ヘッダー列（0-indexed）。ウォッチ機能はこの並びに依存するので変更時は両方直す
+HEADER = ["確認日", "仕入れ元店舗", "ASIN", "JAN", "Amazon商品名", "仕入れ元商品名",
+          "仕入れ元価格", "Amazon価格", "紹介料", "FBA手数料", "推定利益", "利益率(%)",
+          "仕入れ元URL", "Amazonリンク", "ウォッチ", "最終確認日(ウォッチ)", "現在の利益(ウォッチ)", "現在の利益率%(ウォッチ)"]
+COL_JAN, COL_SOURCE_PRICE, COL_WATCH, COL_LAST_CHECK, COL_CUR_PROFIT, COL_CUR_RATE = 3, 6, 14, 15, 16, 17
 
+
+def _ensure_sheet(service):
+    """タブが無ければ作成し、ヘッダーが無ければ書き込む＋ウォッチ列にチェックボックスを設定する"""
     meta = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
     existing_sheets = [s["properties"]["title"] for s in meta["sheets"]]
     if SHEET_NAME not in existing_sheets:
@@ -169,19 +198,88 @@ def _save_to_sheet(candidates):
     if not result.get("values"):
         service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID, range=f"{SHEET_NAME}!A1",
-            valueInputOption="USER_ENTERED", body={"values": [header]}
+            valueInputOption="USER_ENTERED", body={"values": [HEADER]}
         ).execute()
+        meta = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
+        sheet_id = next(s["properties"]["sheetId"] for s in meta["sheets"] if s["properties"]["title"] == SHEET_NAME)
+        service.spreadsheets().batchUpdate(
+            spreadsheetId=SPREADSHEET_ID,
+            body={"requests": [{"setDataValidation": {
+                "range": {"sheetId": sheet_id, "startRowIndex": 1, "endRowIndex": 2000,
+                          "startColumnIndex": COL_WATCH, "endColumnIndex": COL_WATCH + 1},
+                "rule": {"condition": {"type": "BOOLEAN"}, "strict": True, "showCustomUi": True},
+            }}]}
+        ).execute()
+
+
+def _save_to_sheet(candidates):
+    service = _get_sheets_service()
+    today = datetime.now().strftime("%Y/%m/%d")
+    _ensure_sheet(service)
 
     rows = [[
         today, c["store_name"], c["asin"], c["jan"], c["amazon_title"][:60], c["source_name"][:60],
         c["source_price"], c["amazon_price"], c["referral_fee"], c["fba_fee"],
         c["profit"], round(c["profit_rate"] * 100, 1),
         c["source_url"], f"https://www.amazon.co.jp/dp/{c['asin']}",
+        False, "", "", "",
     ] for c in candidates]
 
     service.spreadsheets().values().append(
         spreadsheetId=SPREADSHEET_ID, range=f"{SHEET_NAME}!A1",
         valueInputOption="USER_ENTERED", insertDataOption="INSERT_ROWS",
-        body={"values": [[str(v) for v in row] for row in rows]}
+        body={"values": [[v if isinstance(v, bool) else str(v) for v in row] for row in rows]}
     ).execute()
     print(f"[電脳仕入れ] {len(rows)}件をスプレッドシート「{SHEET_NAME}」に保存")
+
+
+def run_watchlist_check():
+    """「電脳仕入れ候補」タブでウォッチ列がチェック済みの行だけ、Amazon価格を再チェックして更新する。
+    店舗巡回より軽い処理なので、店舗スキャンと同じ5・10のつく日に一緒に実行できる。"""
+    try:
+        service = _get_sheets_service()
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID, range=f"{SHEET_NAME}!A2:R2000"
+        ).execute()
+        rows = result.get("values", [])
+        if not rows:
+            print("[定番ウォッチ] 対象なし（シート未作成 or データなし）")
+            return
+
+        today = datetime.now().strftime("%Y/%m/%d")
+        updates = []
+        checked = 0
+        for i, row in enumerate(rows):
+            row_num = i + 2  # ヘッダーが1行目なのでデータは2行目から
+            is_watched = len(row) > COL_WATCH and str(row[COL_WATCH]).upper() == "TRUE"
+            if not is_watched:
+                continue
+            jan = row[COL_JAN] if len(row) > COL_JAN else None
+            source_price_raw = row[COL_SOURCE_PRICE] if len(row) > COL_SOURCE_PRICE else None
+            if not jan or not source_price_raw:
+                continue
+            try:
+                source_price = int(float(source_price_raw))
+            except (ValueError, TypeError):
+                continue
+
+            checked += 1
+            precise = keepa_precise_profit(jan, source_price)
+            time.sleep(2)
+            if not precise:
+                updates.append({"range": f"{SHEET_NAME}!P{row_num}", "values": [[today]]})
+                continue
+            updates.append({
+                "range": f"{SHEET_NAME}!P{row_num}:R{row_num}",
+                "values": [[today, precise["profit"], round(precise["profit_rate"] * 100, 1)]],
+            })
+            print(f"  [定番ウォッチ] JAN={jan} 現在利益{precise['profit']:+.0f}円 (利益率{precise['profit_rate']*100:.1f}%)")
+
+        if updates:
+            service.spreadsheets().values().batchUpdate(
+                spreadsheetId=SPREADSHEET_ID,
+                body={"valueInputOption": "USER_ENTERED", "data": updates}
+            ).execute()
+        print(f"[定番ウォッチ] {checked}件チェック・{len(updates)}件更新")
+    except Exception as e:
+        print(f"[定番ウォッチ] run_watchlist_check エラー: {e}\n{traceback.format_exc()}")

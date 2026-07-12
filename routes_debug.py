@@ -635,6 +635,31 @@ def sourcing_scan_now():
         return f'❌ エラー: {e}', 500
 
 
+@debug_bp.route('/sourcing-scan-status')
+def sourcing_scan_status():
+    """電脳仕入れカレンダーの直近の実行結果を確認する（Renderログが見えない環境用）"""
+    try:
+        with open('/tmp/sourcing_scan_status.json', 'r', encoding='utf-8') as f:
+            data = f.read()
+        return Response(data, mimetype='application/json; charset=utf-8')
+    except FileNotFoundError:
+        return '📭 まだ実行記録がありません（/sourcing-scan-now で起動するか、次の5・10のつく日を待ってください）', 404
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
+@debug_bp.route('/watchlist-check-now')
+def watchlist_check_now():
+    """定番商品ウォッチを今すぐバックグラウンド実行（手動テスト用）"""
+    import threading
+    from sourcing_calendar import run_watchlist_check
+    try:
+        threading.Thread(target=run_watchlist_check, daemon=True).start()
+        return '✅ 定番商品ウォッチ起動！数分後にスプレッドシートの該当行が更新されます。'
+    except Exception as e:
+        return f'❌ エラー: {e}', 500
+
+
 @debug_bp.route('/check-creds')
 def check_creds():
     """GOOGLE_CREDENTIALS の形式を確認するデバッグ用エンドポイント"""
