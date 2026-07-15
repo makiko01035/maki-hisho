@@ -13,7 +13,7 @@ import traceback
 from datetime import datetime
 
 from ec_profit_scan import (
-    fetch_rakuten_items, fetch_yahoo_items, search_amazon_by_jan,
+    fetch_rakuten_items, fetch_yahoo_items, fetch_shopify_items, search_amazon_by_jan,
     simple_profit, keepa_precise_profit,
     SCREEN_PROFIT_THRESHOLD, FINAL_PROFIT_THRESHOLD, FINAL_PROFIT_RATE_THRESHOLD,
 )
@@ -24,43 +24,49 @@ SHEET_NAME = "電脳仕入れ候補"
 MAX_PAGES_PER_STORE = 8     # ec_profit_scan.pyのfetch_*既定20より短く抑える（無人実行のため暴走防止）
 MAX_ITEMS_PER_STORE = 120   # 大型店舗（ハピネット/ケーズデンキ/LOHACOなど）の実行時間を上限で頭打ちにする
 
-# 23店舗を6グループ(4,4,4,3,4,4)に分割。各グループに Yahoo1店 + 楽天2〜3店 を配置し、
-# 5・10のつく日6回で全23店舗をちょうど1巡する。(name, site, url)
+# 29店舗を6グループ(5,5,5,4,5,5)に分割。各グループに Yahoo1店 + 楽天2〜3店 + Shopify製メーカー直販1店 を配置し、
+# 5・10のつく日6回で全29店舗をちょうど1巡する。(name, site, url)
 STORE_GROUPS = {
     5: [
         ("ぽちべる", "rakuten", "https://www.rakuten.co.jp/pochibell/"),
         ("JBL・AKG公式ストア", "rakuten", "https://www.rakuten.co.jp/jblstore/"),
         ("公式サンリオオンラインショップ", "rakuten", "https://www.rakuten.co.jp/sanrio/"),
         ("コジマYahoo!店", "yahoo", "https://store.shopping.yahoo.co.jp/y-kojima/"),
+        ("山新アウトレット", "shopify", "https://outlet.yamashin-grp.co.jp/"),
     ],
     10: [
         ("sokuhai-ソクハイ-", "rakuten", "https://www.rakuten.co.jp/soku-hai/"),
         ("プラスマート", "rakuten", "https://www.rakuten.co.jp/plusmart/"),
         ("アイリスオーヤマ公式 楽天市場店", "rakuten", "https://www.rakuten.co.jp/irisplaza-r/"),
         ("らいぶshop", "yahoo", "https://store.shopping.yahoo.co.jp/light-hikari/"),
+        ("トクポチ", "shopify", "https://tokupochi.com/"),
     ],
     15: [
         ("THINK RICH STORE", "rakuten", "https://www.rakuten.co.jp/thinkrich/"),
         ("ニッチ・リッチ・キャッチ", "rakuten", "https://www.rakuten.co.jp/mitsuyoshi/"),
         ("SuperSportsXEBIO楽天市場支店", "rakuten", "https://www.rakuten.co.jp/supersportsxebio/"),
         ("ブラウニーストア", "yahoo", "https://store.shopping.yahoo.co.jp/brownie-store/"),
+        ("日清食品グループオンラインストア", "shopify", "https://store.nissin.com/"),
     ],
     20: [
         ("ハピネットオンライン", "rakuten", "https://www.rakuten.co.jp/es-toys/"),
         ("MARUSOU", "rakuten", "https://www.rakuten.co.jp/marusou/"),
         ("エレコムダイレクトショップ", "yahoo", "https://store.shopping.yahoo.co.jp/elecom/"),
+        ("成城石井.com", "shopify", "https://seijoishii.com/"),
     ],
     25: [
         ("ケーズデンキ楽天市場店", "rakuten", "https://www.rakuten.co.jp/ksdenki/"),
         ("松風オンライン楽天市場店", "rakuten", "https://www.rakuten.co.jp/matukaze/"),
         ("Vドラッグ楽天市場店", "rakuten", "https://www.rakuten.co.jp/v-drug/"),
         ("LOHACO", "yahoo", "https://store.shopping.yahoo.co.jp/y-lohaco/"),
+        ("kuradashi", "shopify", "https://kuradashi.jp/"),
     ],
     30: [
         ("ベースストア", "rakuten", "https://www.rakuten.co.jp/bexcs/"),
         ("LULUSTOCK", "rakuten", "https://www.rakuten.co.jp/lulustock/"),
         ("ミスターマックス楽天市場店", "rakuten", "https://www.rakuten.co.jp/mrmax-r/"),
         ("一休さん2号館", "yahoo", "https://store.shopping.yahoo.co.jp/1932/"),
+        ("おざとや アウトレット", "shopify", "https://ozatoya.co.jp/"),
     ],
 }
 
@@ -123,7 +129,7 @@ def run_sourcing_scan(day_override=None, only_store=None):
 
 
 def _scan_store(name, site, url):
-    fetch_fn = fetch_rakuten_items if site == "rakuten" else fetch_yahoo_items
+    fetch_fn = {"rakuten": fetch_rakuten_items, "yahoo": fetch_yahoo_items, "shopify": fetch_shopify_items}[site]
     items = fetch_fn(url, max_pages=MAX_PAGES_PER_STORE)[:MAX_ITEMS_PER_STORE]
     print(f"  [{name}] 取得 {len(items)}件（上限{MAX_ITEMS_PER_STORE}件でカット）")
 

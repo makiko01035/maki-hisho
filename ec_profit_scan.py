@@ -95,6 +95,76 @@ def detect_site(url):
 
 
 # ========================
+# Shopify製メーカー直販サイト: 商品リスト取得（JAN付き）
+# ========================
+# 2026-07-15の「ショップサイトリサーチ」で、山新アウトレット・トクポチ・日清食品・
+# 成城石井.com・kuradashi・おざとやがいずれもShopify製と判明。Shopifyは公開JSON
+# エンドポイント(/products.json)を持つ共通仕様のため、店舗ごとに個別スクレイパーを
+# 書かず1つの関数で使い回せる（Nike方式のような専用実装は不要）。
+# JAN/EANはvariants[].barcodeに入っている店舗もあれば、skuフィールドに入れている
+# 店舗もある（2026-07-15判明。山新・トクポチ・成城石井・おざとやはsku、日清食品・
+# kuradashiはどちらにも入っておらずJAN取得不可）。未入力/JAN形式でない商品は
+# 誤マッチを避けるため対象外にする（あいまいなキーワード一致はしない設計方針）。
+_JAN_RE = re.compile(r'^\d{8}$|^\d{12,14}$')
+
+
+def _extract_jan(variant):
+    barcode = re.sub(r'\D', '', variant.get("barcode") or "")
+    if _JAN_RE.match(barcode):
+        return barcode
+    sku = re.sub(r'\D', '', variant.get("sku") or "") if _JAN_RE.match((variant.get("sku") or "").strip()) else ""
+    if sku:
+        return sku
+    return None
+
+
+def fetch_shopify_items(shop_url, max_pages=20):
+    parsed = urllib.parse.urlparse(shop_url)
+    root = f"{parsed.scheme}://{parsed.netloc}"
+    items = []
+    for page in range(1, max_pages + 1):
+        url = f"{root}/products.json?limit=250&page={page}"
+        try:
+            r = requests.get(url, headers=UA_HEADERS, timeout=20, verify=False)
+        except Exception as e:
+            print(f"  [Shopify] 接続エラー: {e}")
+            break
+        if r.status_code != 200:
+            break
+        try:
+            products = r.json().get("products", [])
+        except Exception:
+            break
+        if not products:
+            break
+        page_count = 0
+        for p in products:
+            jan = None
+            variant = None
+            for v in (p.get("variants") or []):
+                jan = _extract_jan(v)
+                if jan:
+                    variant = v
+                    break
+            if not jan:
+                continue
+            try:
+                price = int(float(variant["price"]))
+            except (TypeError, ValueError):
+                continue
+            items.append({
+                "name": p.get("title", ""),
+                "price": price,
+                "jan": jan,
+                "url": f"{root}/products/{p.get('handle', '')}",
+            })
+            page_count += 1
+        print(f"  [Shopify] page {page}: {len(products)}件中JAN取得{page_count}件")
+        time.sleep(1)
+    return items
+
+
+# ========================
 # 楽天: 商品リスト取得（JAN付き）
 # ========================
 
@@ -526,6 +596,8 @@ def run_url_mode(shop_url):
         items = fetch_rakuten_items(shop_url)
     elif site == "yahoo":
         items = fetch_yahoo_items(shop_url)
+    elif site == "shopify":
+        items = fetch_shopify_items(shop_url)
     else:
         items = fetch_nike_items(shop_url)
     # 注: Nikeは1ページ目（トップ表示分）のみが対象。それ以外のサイトはmax_pages既定20ページまで巡回する。
