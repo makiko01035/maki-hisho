@@ -24,8 +24,8 @@ SHEET_NAME = "電脳仕入れ候補"
 MAX_PAGES_PER_STORE = 8     # ec_profit_scan.pyのfetch_*既定20より短く抑える（無人実行のため暴走防止）
 MAX_ITEMS_PER_STORE = 120   # 大型店舗（ハピネット/ケーズデンキ/LOHACOなど）の実行時間を上限で頭打ちにする
 
-# 31店舗を6グループ(5,5,5,5,6,5)に分割。各グループに Yahoo1店 + 楽天2〜4店 + Shopify製メーカー直販1店 を配置し、
-# 5・10のつく日6回で全31店舗をちょうど1巡する。(name, site, url)
+# 32店舗を6グループ(5,5,5,5,6,6)に分割。各グループに Yahoo1店 + 楽天2〜4店 + Shopify製メーカー直販1店 を配置し、
+# 5・10のつく日6回で全32店舗をちょうど1巡する。(name, site, url)
 STORE_GROUPS = {
     5: [
         ("ぽちべる", "rakuten", "https://www.rakuten.co.jp/pochibell/"),
@@ -67,6 +67,7 @@ STORE_GROUPS = {
         ("ベースストア", "rakuten", "https://www.rakuten.co.jp/bexcs/"),
         ("LULUSTOCK", "rakuten", "https://www.rakuten.co.jp/lulustock/"),
         ("ミスターマックス楽天市場店", "rakuten", "https://www.rakuten.co.jp/mrmax-r/"),
+        ("ヴィーナスラボ アウトレット楽天市場店", "rakuten", "https://www.rakuten.co.jp/venuslab-outlet/"),
         ("一休さん2号館", "yahoo", "https://store.shopping.yahoo.co.jp/1932/"),
         ("おざとや アウトレット", "shopify", "https://ozatoya.co.jp/"),
     ],
